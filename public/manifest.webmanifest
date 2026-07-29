@@ -1,0 +1,15 @@
+{
+  "name": "Blue Wave B2B Store — HPMP Manufacturers",
+  "short_name": "Blue Wave",
+  "description": "Order AC brackets & appliance trolleys at dealer prices from HPMP Manufacturers Pvt Ltd.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f7fb",
+  "theme_color": "#0b2a4a",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Blue Wave B2B Store — HPMP Manufacturers Pvt Ltd</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1ba6e0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Blue Wave">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="icon" href="/icons/icon-192.png">
+<script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
+<style>
+:root{
+  --navy:#1786c4; --navy2:#2d9fd9; --blue:#1ba6e0; --blue-lt:#eaf7fd;
+  --accent:#ffab3d; --green:#22a866; --red:#e05a5a;
+  --ink:#2a3a46; --mut:#7a8b99; --line:#e2edf5; --bg:#f7fbfe; --card:#fff;
+  --rad:14px; --shadow:0 4px 18px rgba(27,166,224,.10);
+  --brand-dark:#155f8f;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Britannic Bold','Britannic','Arial Narrow','Segoe UI Semibold',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color:var(--ink);font-size:15px;padding-bottom:78px;min-height:100vh;position:relative;
+  background:#ffffff}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;width:100%;background:#fff}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);border-color:var(--blue)}
+label{font-size:12.5px;font-weight:600;color:var(--navy);display:block;margin:10px 0 4px}
+label .req{color:var(--red)}
+.hint{font-size:12px;color:var(--mut);margin-top:3px}
+a{color:var(--blue)}
+
+header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);box-shadow:var(--shadow);border-bottom:1px solid var(--line)}
+.hwrap{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:8px 16px}
+.logo{display:flex;align-items:center;gap:10px;cursor:pointer}
+.logo img.mark{width:44px;height:44px;object-fit:contain}
+.logo b{font-size:15px;display:block;line-height:1.1;color:#3a2f8f}
+.logo span{font-size:10.5px;color:var(--mut)}
+.hspace{flex:1}
+.hbtn{background:#fff;border:1px solid var(--line);color:var(--brand-dark);padding:7px 13px;border-radius:9px;font-size:13px;font-weight:600}
+.hbtn.solid{background:var(--accent);border-color:var(--accent);color:#fff}
+.hero .hbtn{background:transparent;border:1px solid rgba(255,255,255,.45);color:#fff}
+.hero .hbtn.solid{background:var(--accent);border-color:var(--accent)}
+.backbtn{background:var(--blue-lt);border:1px solid var(--line);color:var(--navy);font-size:19px;font-weight:800;line-height:1;width:38px;height:38px;border-radius:50%;cursor:pointer}
+.backbtn:active{background:#d9edf9}
+/* show/hide password eye — added automatically to every password box */
+.pwwrap{position:relative}
+.pwwrap input{padding-right:46px}
+.pweye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;padding:6px 8px;font-size:17px;line-height:1;color:var(--mut);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pweye:active{opacity:.6}
+.hdrback{background:none;border:none;font-size:25px;line-height:1;padding:2px 10px 2px 0;color:var(--brand-dark);font-weight:700;cursor:pointer;-webkit-tap-highlight-color:rgba(23,134,196,.15)}
+.hdrback:active{opacity:.55}
+.bellbtn{position:relative;background:none;border:none;font-size:21px;line-height:1;padding:4px 2px;color:var(--brand-dark)}
+.belldot{position:absolute;top:2px;right:0;width:9px;height:9px;border-radius:50%;background:var(--accent);border:1.5px solid #fff}
+.userchip{display:flex;align-items:center;gap:7px;background:var(--blue-lt);padding:6px 11px;border-radius:9px;font-size:12.5px;cursor:pointer;color:var(--brand-dark)}
+.userchip .dot{width:8px;height:8px;border-radius:50%}
+
+main{max-width:1100px;margin:0 auto;padding:16px 14px 40px}
+.view{display:none}
+.view.on{display:block}
+
+/* bottom nav (app style) */
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:120;background:#fff;border-top:1px solid var(--line);display:flex;box-shadow:0 -4px 16px rgba(11,42,74,.06);padding-bottom:env(safe-area-inset-bottom,0)}
+.bnav button{flex:1;border:none;background:none;padding:9px 0 10px;font-size:10.5px;font-weight:600;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;-webkit-tap-highlight-color:rgba(23,134,196,.15);touch-action:manipulation;min-height:52px}
+.bnav button:active{background:var(--blue-lt)}
+.bnav button .ic{font-size:19px;line-height:1;pointer-events:none;display:flex;align-items:center;justify-content:center}
+.bnav button .ic svg{width:22px;height:22px;display:block}
+.bnav button{color:#1c2733}
+.bnav button.on{color:var(--blue)}
+.bnav button.on .ic svg{stroke-width:2}
+.bnav button span{pointer-events:none}
+.bnav button.on{color:var(--blue)}
+.bnav .bcart{position:relative}
+.bnav .bcnt{position:absolute;top:2px;right:calc(50% - 20px);background:var(--accent);color:#fff;font-size:9.5px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+
+/* home */
+.hero{background:linear-gradient(135deg,var(--navy),var(--blue));box-shadow:var(--shadow);color:#fff;border-radius:18px;padding:28px 24px;margin-bottom:18px}
+.rating{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);border-radius:16px;padding:5px 12px;font-size:12px;margin-bottom:12px}
+.hero h1{font-size:23px;line-height:1.25;margin-bottom:8px}
+.hero p{color:#c3d8ec;font-size:13.5px;max-width:560px}
+.hero .cta{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
+.sect{margin:26px 0 12px}
+.sect .kick{font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase}
+.sect h2{font-size:19px;color:var(--navy);margin-top:3px}
+.catgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.catcard{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px;text-align:center;cursor:pointer;transition:transform .15s}
+.catcard:hover{transform:translateY(-3px)}
+.catcard .big{font-size:38px}
+/* category tile slideshow */
+.catshow{position:relative;height:110px;border-radius:12px;overflow:hidden;background:#fff;border:1px solid var(--line)}
+.catshow img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:6px;opacity:0;transition:opacity .6s ease}
+.catshow img.on{opacity:1}
+.catshow .dots{position:absolute;bottom:6px;left:0;right:0;display:flex;gap:4px;justify-content:center}
+.catshow .dots i{width:5px;height:5px;border-radius:50%;background:var(--line)}
+.catshow .dots i.on{background:var(--blue)}
+
+.catcard b{display:block;color:var(--navy);font-size:13.5px;margin:8px 0 2px}
+.catcard span{font-size:11.5px;color:var(--mut)}
+.catcard .shopnow{display:inline-block;margin-top:9px;font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--blue);text-transform:uppercase}
+.statband{background:var(--navy);border-radius:16px;color:#fff;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;padding:18px 14px;text-align:center;margin:20px 0}
+.statband b{font-size:20px;display:block}
+.statband span{font-size:11px;color:#a9c6e2}
+.whyrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.whycard{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:15px 16px;font-size:13px;display:flex;gap:12px;align-items:flex-start}
+.whycard .ic{font-size:24px}
+.whycard b{color:var(--navy);display:block;margin-bottom:2px}
+.appband{background:linear-gradient(120deg,#17548d,var(--blue));border-radius:16px;color:#fff;padding:22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:20px 0}
+.appband .t{flex:1;min-width:200px}
+.appband b{font-size:16px}
+.appband p{font-size:12.5px;color:#d4e7f7;margin-top:4px}
+
+/* shop */
+.search{display:flex;gap:8px;margin-bottom:12px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 14px;overflow-x:auto}
+.chip{border:1px solid var(--line);background:var(--card);padding:7px 15px;border-radius:20px;font-size:12.5px;font-weight:600;color:var(--mut);white-space:nowrap}
+.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.pimg{height:170px;display:flex;align-items:center;justify-content:center;font-size:52px;background:#fff;border-bottom:1px solid var(--line);padding:8px}
+.pimg img{width:100%;height:100%;object-fit:contain}
+/* home category rails — products scroll sideways under each heading */
+.rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;scrollbar-width:thin}
+.rail::-webkit-scrollbar{height:5px}
+.rail::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.rail .pcard{flex:0 0 165px;scroll-snap-align:start}
+.rail .pimg{height:150px}
+.railhead{display:flex;align-items:baseline;justify-content:space-between;margin:22px 0 8px}
+.railhead h3{font-size:16px;color:var(--navy)}
+.railhead a{font-size:12px;font-weight:700}
+.pbody{padding:11px 13px 13px;display:flex;flex-direction:column;flex:1}
+.pcat{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--blue)}
+.pname{font-size:13.5px;font-weight:700;color:var(--navy);margin:2px 0 6px}
+.mrp-only{font-size:17px;font-weight:800;color:var(--ink)}
+.mrp-strike{font-size:12px;color:var(--mut);text-decoration:line-through;margin-right:6px}
+.dealerprice{font-size:18px;font-weight:800;color:var(--green)}
+.save{display:inline-block;background:#e3f6ec;color:#0f6b3d;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:5px}
+.plabel{font-size:10.5px;color:var(--mut)}
+.moq{font-size:10.5px;color:var(--mut);margin:5px 0 8px}
+.addrow{display:flex;gap:6px;margin-top:auto}
+.qty{width:58px;text-align:center;padding:8px 4px}
+.addbtn{flex:1;background:var(--blue);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12.5px;padding:9px 4px}
+.addbtn:hover{background:#0e63ab}
+
+/* cart drawer */
+.overlay{position:fixed;inset:0;background:rgba(10,25,45,.45);z-index:135;display:none}
+.overlay.on{display:block}
+.drawer{position:fixed;top:0;right:-420px;width:min(400px,95vw);height:100%;background:#fff;z-index:140;transition:right .25s;display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(0,0,0,.2)}
+.drawer.on{right:0}
+.dhead{padding:15px 18px;background:var(--navy);color:#fff;display:flex;justify-content:space-between;align-items:center}
+.dbody{flex:1;overflow-y:auto;padding:12px 18px}
+.citem{display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:10px 0}
+.citem .nm{font-size:13px;font-weight:600}
+.citem .pr{font-size:12.5px;color:var(--mut)}
+.qbtn{width:26px;height:26px;border:1px solid var(--line);background:#fff;border-radius:6px;font-weight:700}
+.rm{background:none;border:none;color:var(--red);font-size:16px}
+.dfoot{padding:14px 18px;border-top:1px solid var(--line)}
+.trow{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:5px}
+.trow.big{font-size:16px;font-weight:800;color:var(--navy)}
+.trow .gsttag{color:var(--mut);font-size:12px}
+.wide{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14.5px;font-weight:700;margin-top:8px}
+.wide.blue{background:var(--blue)}
+.wide.ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line)}
+
+/* modals */
+.modal{position:fixed;inset:0;z-index:130;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;background:rgba(10,25,45,.5);padding:26px 12px}
+.modal.on{display:flex}
+.mbox{background:#fff;border-radius:18px;width:100%;max-width:500px;padding:24px 24px;position:relative;margin:auto}
+.mbox.lg{max-width:640px}
+.mx{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;color:var(--mut)}
+.mtitle{font-size:19px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.msub{font-size:13px;color:var(--mut);margin-bottom:12px}
+.tabs{display:flex;gap:6px;background:var(--bg);padding:5px;border-radius:10px;margin-bottom:14px}
+.tab{flex:1;border:none;background:transparent;padding:9px;border-radius:8px;font-weight:700;font-size:13px;color:var(--mut)}
+.tab.on{background:#fff;color:var(--navy);box-shadow:var(--shadow)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+@media(max-width:520px){.frow{grid-template-columns:1fr}}
+.err{color:var(--red);font-size:12.5px;margin-top:6px;display:none}
+.ordiv{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:12px;margin:14px 0}
+.ordiv::before,.ordiv::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* badges + tables */
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px}
+.b-pending{background:#fdf3dd;color:#7a5a10}
+.b-approved{background:#e3f6ec;color:#0f6b3d}
+.b-rejected{background:#fbe4e4;color:#a92c2c}
+.b-awaiting_payment{background:#fdf3dd;color:#7a5a10}
+.b-payment_submitted{background:#e3ecfd;color:#1d4fa9}
+.b-paid{background:#dff7e8;color:#0b7a3e}
+.b-confirmed{background:#e3f6ec;color:#0f6b3d}
+.b-shipped{background:#e8e3fd;color:#5b3fb0}
+.b-delivered{background:#dcefe5;color:#0b4d2c}
+.b-cancelled{background:#eee;color:#666}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);padding:8px 10px;border-bottom:2px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tblwrap{background:#fff;border-radius:var(--rad);box-shadow:var(--shadow);padding:6px 12px 12px;overflow-x:auto}
+.smallbtn{border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;margin:2px}
+.ok-btn{background:var(--green);color:#fff}
+.no-btn{background:var(--red);color:#fff}
+.gr-btn{background:var(--blue-lt);color:var(--navy)}
+.notice{border-radius:12px;padding:11px 15px;font-size:13px;margin-bottom:14px}
+.notice.info{background:var(--blue-lt);color:var(--navy);border:1px solid #bcd9f2}
+.notice.warn{background:#fdf3dd;color:#7a5a10;border:1px solid #f0dca8}
+.notice.ok{background:#e3f6ec;color:#0f6b3d;border:1px solid #bfe7d2}
+
+/* admin */
+.atabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.atab{border:1px solid var(--line);background:#fff;padding:9px 16px;border-radius:10px;font-weight:700;font-size:13px;color:var(--mut)}
+.atab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.atab .n{background:var(--accent);color:#fff;font-size:10px;border-radius:9px;padding:1px 6px;margin-left:6px}
+.cardbox{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
+.cardbox h3{color:var(--navy);font-size:15.5px;margin-bottom:10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--card);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow)}
+.stat b{font-size:20px;color:var(--navy);display:block}
+.stat span{font-size:11.5px;color:var(--mut)}
+.pin{width:86px}
+.regdetail{font-size:13px;line-height:1.7;background:var(--bg);border-radius:10px;padding:10px 14px;margin:8px 0}
+.gstin-code{font-family:Consolas,monospace;background:var(--blue-lt);padding:2px 8px;border-radius:6px;font-weight:700;color:var(--navy)}
+.paybox{background:var(--blue-lt);border:1px dashed var(--blue);border-radius:12px;padding:15px;margin:12px 0;font-size:13.5px}
+.paybox .upi{font-size:19px;font-weight:800;color:var(--navy);font-family:Consolas,monospace;background:#fff;padding:7px 13px;border-radius:8px;display:inline-block;margin:6px 0}
+.paybox .row{margin:3px 0}
+.copybtn{border:1px solid var(--blue);background:#fff;color:var(--blue);border-radius:7px;padding:4px 10px;font-size:11.5px;font-weight:700;margin-left:8px}
+.acc-grid{display:grid;grid-template-columns:300px 1fr;gap:16px}
+@media(max-width:800px){.acc-grid{grid-template-columns:1fr}}
+.oitems{font-size:12px;color:var(--mut)}
+#toast{pointer-events:none;position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--navy);color:#fff;padding:12px 22px;border-radius:12px;font-size:13.5px;font-weight:600;z-index:200;opacity:0;transition:all .3s;box-shadow:0 8px 30px rgba(0,0,0,.3);max-width:90vw;text-align:center}
+#toast.on{transform:translateX(-50%) translateY(0);opacity:1}
+#toast.err{background:var(--red)}
+footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
+.fwrap{max-width:1100px;margin:0 auto;padding:24px 16px;display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between}
+.empty{text-align:center;color:var(--mut);padding:40px 10px;font-size:14px}
+.empty .big{font-size:40px;display:block;margin-bottom:8px}
+/* ---- admin order cards (clear, phone-friendly) ---- */
+.ocard{border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden;background:var(--card);box-shadow:var(--shadow)}
+.ohead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;background:var(--blue-lt);padding:10px 14px;font-size:13.5px}
+.osec{padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;line-height:1.65}
+.olabel{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--mut);margin-bottom:4px}
+.otable{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+.otable th{font-size:10.5px;padding:6px 6px;border-bottom:1px solid var(--line);color:var(--mut)}
+.otable td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.otable .r,.otable th.r{text-align:right}
+.ototals{margin-top:8px;font-size:13px}
+.ototals div{display:flex;justify-content:space-between;padding:2px 0;color:var(--mut)}
+.ototals .big{font-size:15px;font-weight:800;color:var(--navy);border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
+.orow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.orow input,.orow select{width:auto}
+
+
+/* ---- opening logo animation (ring draws, logo focuses in, light sweep) ---- */
+#splash{position:fixed;inset:0;z-index:300;overflow:hidden;
+  background:radial-gradient(circle at 50% 44%,#ffffff 0%,#f4f6f8 46%,#e6eaee 100%);
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .6s ease, visibility .6s ease}
+#splash.gone{opacity:0;visibility:hidden;pointer-events:none}
+
+.sp-stage{position:relative;width:220px;max-width:62vw;aspect-ratio:1/1;
+  animation:sp-settle 4.6s cubic-bezier(.25,.8,.3,1) both}
+.sp-stage>img{position:absolute;inset:6%;width:88%;height:88%;object-fit:contain}
+.sp-ring{position:absolute;inset:0;width:100%;height:100%;overflow:visible;
+  filter:drop-shadow(0 3px 6px rgba(20,60,120,.18))}
+.sp-ring circle{stroke-dasharray:578;stroke-dashoffset:578;transform:rotate(-95deg);transform-origin:50% 50%;
+  animation:sp-draw 1.5s cubic-bezier(.4,.1,.2,1) .15s forwards}
+.sp-wave{opacity:0;animation:sp-focus 1.3s cubic-bezier(.2,.8,.3,1) .75s both}
+.sp-word{opacity:0;animation:sp-focus 1.1s cubic-bezier(.2,.8,.3,1) 1.75s both}
+.sp-sweep{position:absolute;top:-12%;left:-70%;width:46%;height:124%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.92),transparent);
+  filter:blur(7px);transform:skewX(-14deg);opacity:0;
+  animation:sp-sweep 1.5s ease-in-out 2.5s both}
+.sp-star{position:absolute;width:16px;height:16px;opacity:0;
+  background:radial-gradient(circle,#fff 0 12%,transparent 60%);}
+.sp-star::before,.sp-star::after{content:'';position:absolute;inset:0;background:#fff;
+  clip-path:polygon(50% 0,58% 42%,100% 50%,58% 58%,50% 100%,42% 58%,0 50%,42% 42%)}
+.sp-star.s1{left:24%;top:38%;animation:sp-twinkle 1.8s ease-in-out 1.9s 2}
+.sp-star.s2{right:22%;top:56%;width:12px;height:12px;animation:sp-twinkle 1.8s ease-in-out 2.5s 2}
+.sp-star.s3{right:32%;top:30%;width:10px;height:10px;animation:sp-twinkle 1.8s ease-in-out 3.1s 1}
+
+@keyframes sp-draw{to{stroke-dashoffset:0}}
+@keyframes sp-focus{0%{opacity:0;filter:blur(9px);transform:scale(.93)}
+  60%{opacity:1;filter:blur(1px)}100%{opacity:1;filter:blur(0);transform:scale(1)}}
+@keyframes sp-sweep{0%{opacity:0;left:-70%}12%{opacity:.95}100%{opacity:0;left:120%}}
+@keyframes sp-twinkle{0%,100%{opacity:0;transform:scale(.4) rotate(0deg)}50%{opacity:.95;transform:scale(1) rotate(35deg)}}
+@keyframes sp-settle{0%{transform:scale(.94)}70%{transform:scale(1)}100%{transform:scale(1.06)}}
+@media (prefers-reduced-motion:reduce){
+  .sp-stage,.sp-ring circle,.sp-wave,.sp-word,.sp-sweep,.sp-star{animation:none!important;opacity:1;filter:none;stroke-dashoffset:0}
+  .sp-sweep,.sp-star{display:none}
+}
+/* ---- printable order slip ---- */
+#printArea{display:none}
+@media print{
+  body::before,body::after{display:none!important}
+  body>*{display:none!important}
+  body.printing #printArea{display:block!important}
+  body{background:#fff;padding:0;margin:0}
+  #printArea{font-family:'Britannic Bold','Britannic','Arial Narrow','Segoe UI Semibold',system-ui,-apple-system,'Segoe UI',sans-serif;color:#000;font-size:12px;padding:6mm}
+  .pr-head{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}
+  .pr-brand{font-size:16px;font-weight:bold}
+  .pr-title{font-size:15px;font-weight:bold;text-align:right}
+  .pr-right{text-align:right}
+  .pr-sub{font-size:10px;color:#444}
+  .pr-two{width:100%;border-collapse:collapse;margin-bottom:10px}
+  .pr-two td{width:50%;vertical-align:top;border:1px solid #000;padding:6px;font-size:11px}
+  .pr-items{width:100%;border-collapse:collapse}
+  .pr-items th,.pr-items td{border:1px solid #000;padding:5px 6px;font-size:11px}
+  .pr-items th{background:#eee}
+  .pr-items .r{text-align:right}
+  .pr-total td{font-weight:bold;font-size:12.5px}
+  .pr-sign{display:flex;justify-content:space-between;margin-top:26px;font-size:11px}
+}
+
+
+/* profile page */
+.pf-head{display:flex;align-items:center;justify-content:center;position:relative;padding:8px 0 16px}
+.pf-head h2{color:var(--blue);font-size:22px;font-weight:800}
+.pf-bell{position:absolute;right:4px;top:6px;font-size:20px;background:none;border:none}
+.pf-user{display:flex;align-items:center;gap:14px;padding:6px 4px 16px}
+.pf-av{width:82px;height:82px;border-radius:50%;background:#fff;overflow:hidden;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:var(--brand-dark);flex-shrink:0}
+.pf-name{font-size:20px;font-weight:800;color:var(--ink)}
+.pf-edit{background:none;border:none;font-size:18px;color:var(--blue)}
+.plist{display:flex;flex-direction:column;gap:10px}
+.prow{display:flex;align-items:center;gap:14px;padding:15px 14px;width:100%;font-size:15.5px;color:var(--ink);font-weight:600;
+  background:
+    repeating-linear-gradient(135deg,rgba(23,134,196,.05) 0 6px,transparent 6px 14px) right center/78px 100% no-repeat,
+    #fff;
+  border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:12px;
+  box-shadow:var(--shadow);transition:transform .12s ease, box-shadow .12s ease}
+.prow:active{transform:translateY(1px);box-shadow:0 2px 8px rgba(27,166,224,.14)}
+.prow:nth-child(2n){border-left-color:var(--navy)}
+.prow:nth-child(3n){border-left-color:var(--accent)}
+.prow .pi{width:28px;display:flex;align-items:center;justify-content:center}
+.prow .pl{flex:1;text-align:left}
+.prow .chev{color:var(--ink);font-weight:800;font-size:17px}
+
+.prow .pi svg,.pf-av svg,.pf-edit svg,.bellbtn svg,.btn-ic svg{width:21px;height:21px;stroke:#1c2733;display:block}
+.pf-av svg{width:56px;height:56px;stroke:var(--brand-dark)}
+.pf-edit svg{stroke:var(--blue)}
+.bellbtn svg{width:22px;height:22px}
+.btn-ic{display:inline-flex;vertical-align:-4px;margin-right:6px}
+.btn-ic svg{stroke:currentColor}
+.pimg{position:relative}
+.wishbtn{position:absolute;top:6px;right:8px;background:none;border:none;font-size:17px;line-height:1}
+
+/* ===== phone-app display: on big screens the app renders as a centered mobile column ===== */
+@media(min-width:521px){
+  body{background:linear-gradient(180deg,#eaf5fc 0%,#dcecf7 100%)}
+  header{max-width:430px;margin:0 auto}
+  main{max-width:430px;padding-left:12px;padding-right:12px;background:transparent;min-height:calc(100vh - 130px);box-shadow:0 0 40px rgba(0,0,0,.35)}
+  .bnav{max-width:430px;left:50%;right:auto;width:100%;transform:translateX(-50%);border-left:1px solid var(--line);border-right:1px solid var(--line)}
+  .hero h1{font-size:19px}
+  .hero{padding:22px 18px}
+  .grid{grid-template-columns:1fr 1fr}
+  .catgrid{grid-template-columns:1fr 1fr}
+  .acc-grid{grid-template-columns:1fr}
+  .frow{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+  .mbox,.mbox.lg{max-width:410px}
+  .drawer{width:400px}
+}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="sp-stage">
+    <svg class="sp-ring" viewBox="0 0 200 200" aria-hidden="true">
+      <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#31c3f3"/><stop offset="55%" stop-color="#1b7fd0"/><stop offset="100%" stop-color="#123a8f"/>
+      </linearGradient></defs>
+      <circle cx="100" cy="100" r="92" fill="none" stroke="url(#ringGrad)" stroke-width="3.4" stroke-linecap="round"/>
+    </svg>
+    <img class="sp-wave" src="/icons/anim-wave.png" alt="Blue Wave">
+    <img class="sp-word" src="/icons/anim-word.png" alt="">
+    <span class="sp-sweep"></span>
+  </div>
+  <b class="sp-star s1"></b><b class="sp-star s2"></b><b class="sp-star s3"></b>
+</div>
+
+<header>
+  <div class="hwrap">
+    <button id="hdrBack" class="hdrback" style="display:none" onclick="closeProduct()" title="Go back" aria-label="Go back">←</button>
+    <div class="logo" onclick="showView('home')">
+      <img class="mark" src="/icons/logo.png" alt="Blue Wave logo">
+      <div><b>Blue Wave</b><span>HPMP Manufacturers Pvt Ltd</span></div>
+    </div>
+    <div class="hspace"></div>
+    <span id="hdrAuth"></span>
+  </div>
+</header>
+
+<main>
+  <section id="view-home" class="view on"></section>
+  <section id="view-shop" class="view"></section>
+  <section id="view-category" class="view"></section>
+  <section id="view-orders" class="view"></section>
+  <section id="view-profile" class="view"></section>
+  <section id="view-product" class="view"></section>
+  <section id="view-auth" class="view"></section>
+  <section id="view-checkout" class="view"></section>
+  <section id="view-admin" class="view"></section>
+</main>
+
+<nav class="bnav" id="bnav"></nav>
+
+<div class="overlay" id="overlay" onclick="toggleCart(false)"></div>
+<aside class="drawer" id="drawer">
+  <div class="dhead"><b id="cartTitle">🛒 Your cart</b><button class="mx" style="position:static;color:#fff" onclick="toggleCart(false)">✕</button></div>
+  <div class="dbody" id="cartBody"></div>
+  <div class="dfoot" id="cartFoot"></div>
+</aside>
+
+<div id="authPage" style="display:none">
+  <div class="tabs">
+    <button class="tab on" id="tab-login" onclick="authTab('login')">Sign in</button>
+    <button class="tab" id="tab-register" onclick="authTab('register')">Create account</button>
+  </div>
+  <div id="pane-login">
+    <div class="mtitle">Sign in to your account</div>
+    <div class="msub">Enter your email and password to get started.</div>
+    <label>Email <span class="req">*</span></label><input id="li-email" type="email" placeholder="you@business.com">
+    <label>Password <span class="req">*</span></label><input id="li-pass" type="password" placeholder="••••••••">
+    <div class="err" id="li-err"></div>
+    <button class="wide blue" onclick="doLogin()">Continue</button>
+    <div class="ordiv">OR</div>
+    <div style="text-align:center;font-size:13px;color:var(--mut)">New to Blue Wave?<br>
+      <a href="javascript:authTab('register')" style="font-weight:700">Create an account</a></div>
+  </div>
+  <div id="pane-register" style="display:none">
+    <div class="mtitle">Create your account</div>
+    <div class="msub">Just a few details to get started. Your GSTIN is verified by our team before dealer pricing is unlocked (usually within 24 hours).</div>
+    <div class="frow">
+      <div><label>Your full name <span class="req">*</span></label><input id="rg-name" placeholder="Full name"></div>
+      <div><label>Mobile number <span class="req">*</span></label><input id="rg-phone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>
+    </div>
+    <div class="frow">
+      <div><label>Email <span class="req">*</span></label><input id="rg-email" type="email" placeholder="you@business.com"></div>
+      <div><label>Password <span class="req">*</span></label><input id="rg-pass" type="password" placeholder="Min 6 characters"></div>
+    </div>
+    <label>WhatsApp number</label><input id="rg-whatsapp" inputmode="numeric" maxlength="10" placeholder="Leave blank if same as mobile">
+    <label>Company name <span class="req">*</span></label><input id="rg-company" placeholder="e.g., Sharma Electricals & Traders">
+    <label>GSTIN <span class="req">*</span></label><input id="rg-gstin" placeholder="e.g., 36ABCDE1234F1Z5" maxlength="15" style="text-transform:uppercase;font-family:Consolas,monospace" oninput="checkGstin()">
+    <div id="gstin-info"></div>
+    <label>Business type <span class="req">*</span></label>
+    <select id="rg-type"><option>Dealer</option><option>Distributor</option><option>Retailer</option><option>Contractor / Installer</option><option>Other</option></select>
+    <label>Business address <span class="req">*</span></label><textarea id="rg-addr" rows="2" placeholder="Shop / office address"></textarea>
+    <div class="frow">
+      <div><label>City <span class="req">*</span></label><input id="rg-city" placeholder="City"></div>
+      <div><label>State <span class="req">*</span></label><input id="rg-state" placeholder="State"></div>
+    </div>
+    <label>Pincode <span class="req">*</span></label><input id="rg-pincode" inputmode="numeric" maxlength="6" placeholder="6-digit pincode">
+    <div class="err" id="rg-err"></div>
+    <button class="wide" onclick="doRegister()">Create account</button>
+    <div class="hint" style="text-align:center;margin-top:8px">By continuing, you agree to our terms and privacy policy.</div>
+  </div>
+</div>
+
+<div class="modal" id="modal-checkout"><div class="mbox lg" id="checkoutBox"></div></div>
+<div class="modal" id="modal-pay"><div class="mbox lg" id="payBox"></div></div>
+<div class="modal" id="modal-gen"><div class="mbox" id="genBox"></div></div>
+<div id="toast"></div>
+<div id="printArea"></div>
+
+<script>
+/* ============ API LAYER ============ */
+let token=localStorage.getItem('bw_token')||'';
+const state={products:[],role:null,user:null,payInfo:null,transports:[]};
+async function api(path,method='GET',body){
+  const r=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
+  let d={};try{d=await r.json()}catch(e){}
+  if(r.status===401&&token&&path!=='/login'){token='';localStorage.removeItem('bw_token');state.role=null;state.user=null}
+  if(!r.ok)throw new Error(d.error||'Something went wrong — check your connection.');
+  return d;
+}
+async function refreshMe(){const d=await api('/me');state.role=d.role;state.user=d.user||null}
+async function refreshProducts(){state.products=await api('/products')}
+async function refreshTransports(){try{state.transports=await api('/transports')}catch(e){state.transports=[]}}
+
+/* ============ HELPERS ============ */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{maximumFractionDigits:2});
+function currentUser(){return state.role==='user'?state.user:null}
+function isAdmin(){return state.role==='admin'}
+function isDealer(){const u=currentUser();return !!u&&u.status==='approved'}
+function priceFor(p){return p.dealer!==undefined?p.dealer:p.mrp}
+function gstPct(){return state.payInfo&&isFinite(state.payInfo.gstPercent)?state.payInfo.gstPercent:18}
+function inclGst(amount){const r=gstPct();return Math.round((amount-amount/(1+r/100))*100)/100}
+function toast(msg,err){const t=$('toast');t.textContent=msg;t.className=err?'err on':'on';clearTimeout(t._t);t._t=setTimeout(()=>t.className='',3400)}
+function openModal(id){$(id).classList.add('on')}
+function closeModal(id){$(id).classList.remove('on')}
+const STATUS_LABEL={awaiting_payment:'Awaiting Payment',payment_submitted:'Payment Submitted',paid:'Paid — Online',confirmed:'Confirmed',shipped:'Shipped',delivered:'Delivered',cancelled:'Cancelled'};
+const USTATUS_LABEL={pending:'Pending Approval',approved:'Approved Dealer',rejected:'Rejected'};
+function copyTxt(t){navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>toast('Copied: '+t)).catch(()=>{})}
+let cart=[];try{cart=JSON.parse(localStorage.getItem('bw_cart_v3'))||[]}catch(e){}
+function saveCart(){localStorage.setItem('bw_cart_v3',JSON.stringify(cart))}
+function packOf(p,packId){return p&&p.options&&p.options.packs?(p.options.packs.find(x=>x.id===packId)||p.options.packs[0]):null}
+function lineRate(c){const p=state.products.find(x=>x.id===c.pid);if(!p)return 0;const pk=packOf(p,c.pack);return priceFor(p)+(pk?pk.add||0:0)}
+function lineLabel(c){const p=state.products.find(x=>x.id===c.pid);if(!p)return '';let l=p.name;const pk=packOf(p,c.pack);if(pk)l+=' · '+(pk.id==='box'?'Box':'Gunny bag');if(c.size)l+=' · '+c.size;return l}
+let wish=new Set();try{wish=new Set(JSON.parse(localStorage.getItem('bw_wish')||'[]'))}catch(e){}
+function toggleWish(pid){if(wish.has(pid))wish.delete(pid);else wish.add(pid);localStorage.setItem('bw_wish',JSON.stringify([...wish]));if(currentView==='shop')renderShopGrid()}
+const catEmoji=c=>c.toLowerCase().includes('bracket')?'❄️':'🧺';
+const prodIcon=(p,size)=>p.image?`<img src="${p.image}" alt="" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:8px">`:`<span style="font-size:${Math.round(size*0.75)}px">${p.emoji}</span>`;
+
+/* ============ GSTIN VERIFICATION ============ */
+const GST_STATES={'01':'Jammu & Kashmir','02':'Himachal Pradesh','03':'Punjab','04':'Chandigarh','05':'Uttarakhand','06':'Haryana','07':'Delhi','08':'Rajasthan','09':'Uttar Pradesh','10':'Bihar','11':'Sikkim','12':'Arunachal Pradesh','13':'Nagaland','14':'Manipur','15':'Mizoram','16':'Tripura','17':'Meghalaya','18':'Assam','19':'West Bengal','20':'Jharkhand','21':'Odisha','22':'Chhattisgarh','23':'Madhya Pradesh','24':'Gujarat','25':'Daman & Diu','26':'Dadra & Nagar Haveli and Daman & Diu','27':'Maharashtra','28':'Andhra Pradesh','29':'Karnataka','30':'Goa','31':'Lakshadweep','32':'Kerala','33':'Tamil Nadu','34':'Puducherry','35':'Andaman & Nicobar Islands','36':'Telangana','37':'Andhra Pradesh','38':'Ladakh'};
+const PAN_TYPE={C:'Private/Public company',P:'Proprietor / Individual',F:'Partnership firm',H:'HUF',A:'Association of persons',T:'Trust',B:'Body of individuals',L:'Local authority',J:'Artificial juridical person',G:'Government'};
+function gstinLocal(g){
+  g=String(g||'').toUpperCase().trim();
+  if(!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(g))return{valid:false};
+  const cs='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let sum=0;for(let i=0;i<14;i++){const m=cs.indexOf(g[i])*(i%2?2:1);sum+=Math.floor(m/36)+m%36}
+  return{valid:true,gstin:g,checksumOk:cs[(36-sum%36)%36]===g[14],stateCode:g.slice(0,2),stateName:GST_STATES[g.slice(0,2)]||'',pan:g.slice(2,12),entityType:PAN_TYPE[g[5]]||''};
+}
+let gstinReq=0;
+async function checkGstin(){
+  const el=document.getElementById('rg-gstin'),out=document.getElementById('gstin-info');
+  if(!el||!out)return;
+  const g=el.value.toUpperCase().trim();
+  if(g.length<15){out.innerHTML=g.length?'<div class="hint" style="margin:4px 0">'+(15-g.length)+' more characters…</div>':'';return}
+  const L=gstinLocal(g);
+  if(!L.valid){out.innerHTML='<div class="notice warn" style="margin:6px 0;padding:8px 12px">⚠️ GSTIN format looks invalid — expected like 36ABCDE1234F1Z5.</div>';return}
+  const base='<div class="notice '+(L.checksumOk?'ok':'warn')+'" style="margin:6px 0;padding:8px 12px">'+(L.checksumOk?'✅ GSTIN valid':'⚠️ Check digit doesn\'t match — please re-check the number')+' · '+esc(L.stateName)+' · PAN <b>'+esc(L.pan)+'</b>'+(L.entityType?' · '+esc(L.entityType):'')+'</div>';
+  const st=document.getElementById('rg-state');
+  if(st&&!st.value&&L.stateName)st.value=L.stateName;
+  out.innerHTML=base+'<div class="hint" style="margin:2px 0">Fetching GST records…</div>';
+  const myReq=++gstinReq;
+  try{
+    const d=await api('/gstin/'+g);
+    if(myReq!==gstinReq)return;
+    if(d.verified){
+      const co=document.getElementById('rg-company'),ad=document.getElementById('rg-addr');
+      if(co&&!co.value)co.value=d.tradeName||d.legalName||'';
+      if(ad&&!ad.value&&d.address)ad.value=d.address;
+      out.innerHTML=base+'<div class="notice ok" style="margin:6px 0;padding:8px 12px">🏢 GST records: <b>'+esc(d.legalName||d.tradeName)+'</b>'+(d.gstStatus?' · '+esc(d.gstStatus):'')+(d.address?'<br><span style="font-size:12px">'+esc(d.address)+'</span>':'')+'<br><span style="font-size:11.5px;color:var(--mut)">Company details filled automatically — please confirm.</span></div>';
+    }else out.innerHTML=base;
+  }catch(e){if(myReq===gstinReq)out.innerHTML=base}
+}
+async function verifyGstin(g){
+  try{
+    const d=await api('/gstin/'+g);
+    if(!d.valid)return alert('GSTIN '+g+'\n⚠️ Invalid format.');
+    let msg='GSTIN '+g+'\n'+(d.checksumOk?'✅ Check digit OK':'⚠️ Check digit mismatch')+'\nState: '+d.stateName+'\nPAN: '+d.pan+(d.entityType?'\nEntity: '+d.entityType:'');
+    msg+=d.verified?'\n\n🏢 GST records:\nLegal name: '+(d.legalName||'—')+'\nTrade name: '+(d.tradeName||'—')+'\nStatus: '+(d.gstStatus||'—')+'\nAddress: '+(d.address||'—')
+      :'\n\nLive GST-records lookup not configured — add a GST verification API key in Settings, or verify manually on the GST portal.';
+    alert(msg);
+  }catch(e){toast(e.message,1)}
+}
+
+/* ============ NAV / VIEWS ============ */
+let currentView='home';
+function showView(v){
+  if(currentView==='category'&&v!=='category'&&typeof stopCatSlides==='function')stopCatSlides();
+  if(currentView==='auth'&&v!=='auth'){const a=$('authPage');if(a)a.style.display='none'}
+  currentView=v;
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
+  $('view-'+v).classList.add('on');
+  if(v==='home')renderHome();
+  if(v==='shop')renderShop();
+  if(v==='category')renderCategory();
+  if(v==='orders')renderOrdersView();
+  if(v==='profile')renderProfile();
+  if(v==='admin')renderAdmin(adminTab);
+  renderNav();window.scrollTo(0,0);
+}
+/* black outline icons for the bottom navigation */
+const svgIcon=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICON={
+  home:svgIcon('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V20h5v-5.5h4V20h5V9.8"/>'),
+  category:svgIcon('<rect x="3.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.4"/>'),
+  cart:svgIcon('<path d="M3 4h2.2l2 11.2a1.6 1.6 0 0 0 1.6 1.3h8.5a1.6 1.6 0 0 0 1.6-1.3L20.5 7H6.2"/><circle cx="9.5" cy="20" r="1.4"/><circle cx="17.5" cy="20" r="1.4"/>'),
+  orders:svgIcon('<path d="M4 7.5 12 3.5l8 4v9L12 20.5l-8-4z"/><path d="M4 7.5 12 11.5l8-4"/><path d="M12 11.5v9"/>'),
+  profile:svgIcon('<circle cx="12" cy="8" r="3.7"/><path d="M4.5 20c0-3.6 3.4-6 7.5-6s7.5 2.4 7.5 6"/>'),
+  admin:svgIcon('<circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.2a1.5 1.5 0 0 0 .3 1.7l.1.1a1.8 1.8 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-2.6 1v.2a1.8 1.8 0 1 1-3.6 0v-.1a1.5 1.5 0 0 0-2.6-1l-.1.1a1.8 1.8 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0-1-2.6H4.5a1.8 1.8 0 1 1 0-3.6h.1a1.5 1.5 0 0 0 1-2.6l-.1-.1A1.8 1.8 0 1 1 8.1 4.5l.1.1a1.5 1.5 0 0 0 2.6-1V3.5a1.8 1.8 0 1 1 3.6 0v.1a1.5 1.5 0 0 0 2.6 1l.1-.1a1.8 1.8 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0 1 2.6h.2a1.8 1.8 0 1 1 0 3.6h-.1a1.5 1.5 0 0 0-1.3 1z"/>')
+};
+
+const PICON={
+  wallet:svgIcon('<rect x="2.6" y="6.2" width="18.8" height="13" rx="2.6"/><path d="M2.6 10.2h18.8"/><path d="M16.6 14.2h2.2"/>'),
+  lock:svgIcon('<rect x="4.6" y="10.4" width="14.8" height="10.2" rx="2.2"/><path d="M8 10.4V7.6a4 4 0 0 1 8 0v2.8"/><circle cx="12" cy="15.4" r="1.3"/>'),
+  pin:svgIcon('<path d="M12 21.2s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.7"/>'),
+  heart:svgIcon('<path d="M12 20.4 4.8 13.4a4.6 4.6 0 0 1 6.5-6.5l.7.7.7-.7a4.6 4.6 0 0 1 6.5 6.5z"/>'),
+  shield:svgIcon('<path d="M12 2.8 4.8 5.8v6.1c0 4.6 3 8.1 7.2 9.3 4.2-1.2 7.2-4.7 7.2-9.3V5.8z"/><path d="M9.2 12.2l2 2 3.6-3.8"/>'),
+  help:svgIcon('<circle cx="12" cy="12" r="9.2"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.3 2.4c-.7.3-1 .9-1 1.6v.4"/><circle cx="12" cy="17" r="1"/>'),
+  info:svgIcon('<circle cx="12" cy="12" r="9.2"/><path d="M12 11v5.6"/><circle cx="12" cy="7.9" r="1"/>'),
+  user:`<svg viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="48" cy="33" r="17"/>
+    <path d="M16 84c0-15.5 14.3-25 32-25s32 9.5 32 25"/>
+  </svg>`,
+  pencil:svgIcon('<path d="M16.4 4.4l3.2 3.2"/><path d="M4.6 19.4l1-3.8L16.2 5a1.6 1.6 0 0 1 2.3 0l.5.5a1.6 1.6 0 0 1 0 2.3L8.4 18.4z"/>'),
+  bell:svgIcon('<path d="M18 15.6V11a6 6 0 1 0-12 0v4.6L4.4 18h15.2z"/><path d="M10.2 20.6a2 2 0 0 0 3.6 0"/>'),
+  logout:svgIcon('<path d="M14.4 8.4V6.2a2 2 0 0 0-2-2H6.2a2 2 0 0 0-2 2v11.6a2 2 0 0 0 2 2h6.2a2 2 0 0 0 2-2v-2.2"/><path d="M9.6 12h10.2"/><path d="M17.2 9.2 20 12l-2.8 2.8"/>'),
+  key:svgIcon('<circle cx="8.4" cy="12" r="3.6"/><path d="M12 12h8.4"/><path d="M17.4 12v3"/><path d="M20 12v2.4"/>')
+};
+function navGo(v){
+  if(currentView==='auth')$('authPage').style.display='none';
+  /* always clear anything overlaying the app before switching */
+  ['modal-checkout','modal-pay','modal-gen'].forEach(closeModal);
+  if(v==='cart'){toggleCart(true);return}
+  toggleCart(false);
+  showView(v);
+}
+/* delegated handler — keeps the bar working even after re-renders */
+document.addEventListener('DOMContentLoaded',bindNav);
+function bindNav(){
+  const bar=$('bnav');if(!bar||bar._bound)return;
+  bar._bound=1;
+  bar.addEventListener('click',e=>{
+    const b=e.target.closest('button[data-nav]');
+    if(!b)return;
+    e.preventDefault();navGo(b.dataset.nav);
+  });
+}
+function renderNav(){
+  const n=cart.reduce((s,c)=>s+c.qty,0);
+  const items=isAdmin()
+    ?[['home',ICON.home,'Home'],['category',ICON.category,'Category'],['cart',ICON.cart,'Cart'],['orders',ICON.orders,'Orders'],['admin',ICON.admin,'Admin']]
+    :[['home',ICON.home,'Home'],['category',ICON.category,'Category'],['cart',ICON.cart,'Cart'],['orders',ICON.orders,'Orders'],['profile',ICON.profile,'Profile']];
+  $('bnav').innerHTML=items.map(t=>{
+    const on=(currentView===t[0]||(t[0]==='category'&&currentView==='shop'))&&t[0]!=='cart';
+    if(t[0]==='cart')return `<button type="button" class="bcart" data-nav="cart" onclick="navGo('cart')"><span class="ic">${t[1]}</span><span>${t[2]}</span>${n?`<span class="bcnt">${n}</span>`:''}</button>`;
+    return `<button type="button" class="${on?'on':''}" data-nav="${t[0]}" onclick="navGo('${t[0]}')"><span class="ic">${t[1]}</span><span>${t[2]}</span></button>`;
+  }).join('');
+  bindNav();
+}
+function renderHeader(){
+  const b=$('hdrBack');
+  if(b){b.style.display=['product','auth','checkout','shop'].includes(currentView)?'block':'none';
+    b.onclick=currentView==='auth'?closeAuth:currentView==='checkout'?closeCheckout:currentView==='shop'?()=>showView('category'):closeProduct;}
+  const h=$('hdrAuth');
+  h.innerHTML=`<button class="bellbtn" onclick="openNotifications()" title="Notifications">${PICON.bell}<span class="belldot" id="bellDot" style="display:none"></span></button>`;
+  updateBell();
+}
+function notifItems(){
+  const u=currentUser(),out=[];
+  if(isAdmin())return out;
+  if(!u)out.push(['👋','Welcome to Blue Wave','Register your business with GSTIN to unlock wholesale dealer pricing.']);
+  else if(u.status==='pending')out.push(['⏳','Approval pending','Our team is verifying your GSTIN. Dealer pricing unlocks on approval.']);
+  else if(u.status==='approved')out.push(['✅','Dealer pricing active','Wholesale rates are applied to your cart automatically.']);
+  else if(u.status==='rejected')out.push(['⚠️','Registration not approved',u.note||'Contact sales@hpmpmanufacturerspvtltd.com for help.']);
+  (lastOrders||[]).slice(0,4).forEach(o=>{
+    if(o.lrNumber)out.push(['🚚','Order '+o.id+' dispatched','Sent via '+(o.dispatchTransport||'transport')+' · LR '+o.lrNumber]);
+    else if(o.status==='awaiting_payment')out.push(['💳','Payment pending for '+o.id,'Complete payment to start processing your order.']);
+    else out.push(['📦','Order '+o.id,STATUS_LABEL[o.status]]);
+  });
+  return out;
+}
+function updateBell(){
+  const dot=$('bellDot');if(!dot)return;
+  const n=notifItems().length;
+  dot.style.display=n?'block':'none';
+}
+function openNotifications(){
+  const items=notifItems();
+  genModal('🔔 Notifications',items.length?items.map(i=>`<div class="citem" style="align-items:flex-start">
+    <div style="font-size:20px">${i[0]}</div>
+    <div style="flex:1"><div class="nm">${esc(i[1])}</div><div class="pr">${esc(i[2])}</div></div></div>`).join('')
+    :'<div class="empty"><span class="big">🔔</span>No new notifications.</div>');
+}
+let lastOrders=[];
+async function logout(){
+  if(!confirm('Log out?'))return;
+  try{await api('/logout','POST')}catch(e){}
+  token='';localStorage.removeItem('bw_token');state.role=null;state.user=null;
+  await refreshProducts();renderHeader();showView('home');toast('Logged out');
+}
+
+/* ============ HOME ============ */
+function renderHome(){
+  renderHeader();
+  const u=currentUser();
+  const cats=[...new Set(state.products.map(p=>p.cat))];
+  const welcome=isAdmin()?`<div class="notice info">⚙️ Logged in as <b>Admin</b> — open the Admin tab to manage approvals, orders and pricing.</div>`
+    :u&&u.status==='approved'?`<div class="notice ok">✅ Welcome back, <b>${esc(u.company)}</b> — dealer pricing is active.</div>`
+    :u&&u.status==='pending'?`<div class="notice warn">⏳ Your dealer account is pending approval — you can order at MRP meanwhile.</div>`:'';
+  $('view-home').innerHTML=`
+  <div class="hero">
+    <div class="rating">⭐ Trusted by dealers &amp; distributors across India</div>
+    <h1>Premium AC brackets &amp; heavy-duty appliance trolleys, built to perform</h1>
+    <p>Industrial-grade mounting brackets and trolleys with 7-tank powder coating, made in India at our Hyderabad facility.</p>
+    <div class="cta">
+      <button class="hbtn solid" onclick="showView('shop')">Our products</button>
+      ${!u&&!isAdmin()?`<button class="hbtn" onclick="openAuth('register')">Become a dealer</button>`:''}
+    </div>
+  </div>
+  ${welcome}
+  <div class="sect"><div class="kick">Our products</div><h2>Brackets &amp; Trolleys. Redefined.</h2></div>
+  ${cats.map(c=>{
+    const items=state.products.filter(p=>p.cat===c);
+    return `<div class="railhead"><h3>${esc(c)}</h3><a href="javascript:goCat('${esc(c)}')">See all ${items.length} →</a></div>
+      <div class="rail">${items.map(p=>railCard(p)).join('')}</div>`;
+  }).join('')}
+  <div class="statband">
+    <div><b>500+ kg</b><span>Load capacity</span></div>
+    <div><b>7-tank</b><span>Powder coating</span></div>
+    <div><b>${state.products.length}+</b><span>Product lines</span></div>
+    <div><b>Pan-India</b><span>Delivery</span></div>
+  </div>
+  <div class="sect"><div class="kick">Why choose us</div><h2>Why dealers choose Blue Wave</h2></div>
+  <div class="whyrow">
+    <div class="whycard"><span class="ic">🛡️</span><div><b>Anti-rust technology</b>7-tank powder coating resists rust even in coastal and humid climates.</div></div>
+    <div class="whycard"><span class="ic">⚙️</span><div><b>Precision engineering</b>High-grade steel up to 2 mm thickness, tested for perfect fit and long life.</div></div>
+    <div class="whycard"><span class="ic">🏭</span><div><b>Own manufacturing</b>In-house production at IDA Medchal, Hyderabad with multi-stage quality control.</div></div>
+    <div class="whycard"><span class="ic">🤝</span><div><b>Dealer-first pricing</b>Wholesale rates, flexible MOQ from 50 units, and a dedicated B2B manager.</div></div>
+  </div>
+  <div class="appband">
+    <div class="t"><b>Order anytime, anywhere</b><p>Browse the full range, check dealer pricing and track your dispatches — all from your phone.</p></div>
+    <button class="hbtn" onclick="showView('shop')">Browse products</button>
+  </div>`;
+}
+function goCat(c){activeCat=c;showView('shop')}
+function railCard(p){
+  const hasDealer=p.dealer!==undefined;
+  const save=hasDealer?Math.round((1-p.dealer/p.mrp)*100):0;
+  const price=hasDealer
+    ?`<span class="mrp-strike">${fmt(p.mrp)}</span><span class="dealerprice">${fmt(p.dealer)}</span><span class="save">${save}%</span>`
+    :`<span class="mrp-only">${fmt(p.mrp)}</span>`;
+  return `<div class="pcard" onclick="openProduct('${p.id}')" style="cursor:pointer">
+    <div class="pimg">${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:p.emoji}
+      <button class="wishbtn" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist">${wish.has(p.id)?'❤️':'🤍'}</button></div>
+    <div class="pbody"><div class="pname" style="font-size:12.5px">${esc(p.name)}</div>
+      <div>${price}</div><div class="plabel">incl. GST</div>
+      <div class="addrow"><button class="addbtn">View details ›</button></div></div></div>`;
+}
+
+/* ============ SHOP ============ */
+let activeCat='All',searchQ='';/* search box removed from the category view */
+function renderShop(){
+  renderHeader();
+  const u=currentUser();
+  let notice='';
+  if(!u&&!isAdmin())notice=`<div class="notice info">💡 Prices shown are <b>MRP</b>. <a href="javascript:openAuth('register')">Create an account</a> with GSTIN to unlock wholesale dealer pricing after approval.</div>`;
+  else if(u&&u.status==='pending')notice=`<div class="notice warn">⏳ Registration <b>pending admin approval</b> — MRP applies until our team verifies your GSTIN.</div>`;
+  else if(u&&u.status==='rejected')notice=`<div class="notice warn">⚠️ Your registration was not approved${u.note?': '+esc(u.note):''}. Contact sales@hpmpmanufacturerspvtltd.com.</div>`;
+  else if(u)notice=`<div class="notice ok">✅ Dealer pricing active for <b>${esc(u.company)}</b>.</div>`;
+  const title=activeCat==='All'?'All products':activeCat;
+  const count=state.products.filter(p=>activeCat==='All'||p.cat===activeCat).length;
+  $('view-shop').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;padding:2px 0 8px">
+      <button class="hdrback" onclick="showView('category')" title="Back to categories" aria-label="Back to categories">←</button>
+      <div><h2 style="font-size:18px;color:var(--navy)">${esc(title)}</h2>
+        <div class="hint" style="margin:0">${count} product${count>1?'s':''}</div></div>
+    </div>
+    ${notice}
+    <div class="grid" id="shopGrid"></div>`;
+  renderShopGrid();
+}
+function renderShopGrid(){
+  const u=currentUser(),dealer=isDealer();
+  const list=state.products.filter(p=>(activeCat==='All'||p.cat===activeCat)&&(!searchQ||p.name.toLowerCase().includes(searchQ)));
+  $('shopGrid').innerHTML=list.map(p=>{
+    const hasDealer=p.dealer!==undefined;
+    const save=hasDealer?Math.round((1-p.dealer/p.mrp)*100):0;
+    const priceHtml=hasDealer
+      ?`<span class="mrp-strike">${fmt(p.mrp)}</span><span class="dealerprice">${fmt(p.dealer)}</span><span class="save">${save}% OFF</span><div class="plabel">Dealer price · per unit · incl. GST</div>`
+      :`<span class="mrp-only">${fmt(p.mrp)}</span><div class="plabel">MRP · per unit · incl. GST</div>`;
+    const hasOpts=!!(p.options&&(p.options.packs||p.options.sizes));
+    return `<div class="pcard"><div class="pimg" onclick="openProduct('${p.id}')" style="cursor:pointer">${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:p.emoji}<button class="wishbtn" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist">${wish.has(p.id)?'❤️':'🤍'}</button></div><div class="pbody">
+      <div class="pcat">${esc(p.cat)}</div><div class="pname" onclick="openProduct('${p.id}')" style="cursor:pointer">${esc(p.name)}</div>
+      <div onclick="openProduct('${p.id}')" style="cursor:pointer">${priceHtml}</div>
+      <div class="moq">MOQ ${p.moq}+ for dealer rates · <a href="javascript:openProduct('${p.id}')">details</a></div>
+      <div class="addrow"><button class="addbtn" onclick="openProduct('${p.id}')">View details ›</button></div>
+    </div></div>`;
+  }).join('')||'<div class="empty"><span class="big">🔍</span>No products match your search.</div>';
+}
+
+/* ============ PRODUCT DETAIL POPUP ============ */
+let productBackTo='home';
+function openProduct(pid){
+  const p=state.products.find(x=>x.id===pid);if(!p)return;
+  if(currentView!=='product')productBackTo=currentView;
+  const dealer=p.dealer!==undefined;
+  const o=p.options||{};
+  let html=`<div style="padding:2px 0 10px">
+      <h2 style="font-size:17px;color:var(--blue);font-weight:800">Product details</h2>
+    </div>
+    <div style="text-align:center;margin-bottom:8px">${p.image?`<img src="${p.image}" alt="${esc(p.name)}" style="width:100%;max-height:300px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--line);padding:8px">`:`<div style="font-size:74px;background:var(--blue-lt);border-radius:12px;padding:26px 0">${p.emoji}</div>`}</div>
+    <div class="pcat">${esc(p.cat)}</div>
+    <div class="mtitle" style="margin-bottom:4px">${esc(p.name)}</div>
+    <div id="pp-price" style="margin-bottom:6px"></div>
+    ${p.descr?`<div class="msub" style="margin-bottom:8px">${esc(p.descr)}</div>`:''}
+    ${p.packing?`<div class="regdetail" style="font-size:12.5px"><b>📦 Master packing details</b><br>${esc(p.packing).replace(/\n/g,'<br>')}</div>`:''}`;
+  if(o.packs)html+=`<label>Packing type</label>`+o.packs.map((pk,i)=>`<label style="display:flex;gap:9px;align-items:center;font-weight:400;font-size:13.5px;margin:5px 0;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer">
+      <input type="radio" name="pp-pack" value="${pk.id}" ${i===0?'checked':''} style="width:auto" onchange="ppPrice('${p.id}')">
+      <span style="flex:1"><b>${esc(pk.label)}</b><br><span class="hint">${esc(pk.master)}${pk.add?` · +₹${pk.add} per pc`:' · standard price'}</span></span></label>`).join('');
+  if(o.sizes)html+=`<label>Select size</label><select id="pp-size">${o.sizes.map(s=>`<option>${esc(s)}</option>`).join('')}</select>`;
+  html+=`<label>Quantity</label><input id="pp-qty" type="number" min="1" value="${dealer?p.moq:1}">
+    <button class="wide" style="margin-top:12px" onclick="ppAdd('${p.id}')">🛒 Add to cart</button>
+    <div id="pp-added"></div>
+    <button class="wide ghost" style="margin-top:8px" onclick="closeProduct()">← Back</button>`;
+  $('view-product').innerHTML=html;
+  currentView='product';
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
+  $('view-product').classList.add('on');
+  toggleCart(false);closeModal('modal-gen');
+  renderNav();renderHeader();window.scrollTo(0,0);
+  ppPrice(pid);
+  try{history.pushState({bwProduct:pid},'','#product')}catch(e){}
+}
+function closeProduct(){showView(productBackTo||'home');renderHeader()}
+window.addEventListener('popstate',()=>{if(currentView==='product')closeProduct();else if(currentView==='auth')closeAuth();else if(currentView==='checkout')closeCheckout()});
+function ppSelPack(p){if(!(p.options&&p.options.packs))return null;const r=document.querySelector('input[name=pp-pack]:checked');return p.options.packs.find(x=>x.id===(r?r.value:''))||p.options.packs[0]}
+function ppPrice(pid){
+  const p=state.products.find(x=>x.id===pid);if(!p||!$('pp-price'))return;
+  const pk=ppSelPack(p);const add=pk?pk.add||0:0;
+  $('pp-price').innerHTML=p.dealer!==undefined
+    ?`<span class="mrp-strike">${fmt(p.mrp+add)}</span><span class="dealerprice">${fmt(p.dealer+add)}</span> <span class="plabel">per pc · incl. GST${add?` · includes +₹${add} box packing`:''}</span>`
+    :`<span class="mrp-only">${fmt(p.mrp+add)}</span> <span class="plabel">MRP · per pc · incl. GST${add?` · includes +₹${add} box packing`:''}</span>`;
+}
+function ppAdd(pid){
+  const p=state.products.find(x=>x.id===pid);if(!p)return;
+  const qty=Math.max(1,parseInt($('pp-qty').value)||1);
+  const pk=ppSelPack(p);const pack=pk?pk.id:'';
+  const size=$('pp-size')?$('pp-size').value:'';
+  const ex=cart.find(c=>c.pid===pid&&(c.pack||'')===pack&&(c.size||'')===size);
+  if(ex)ex.qty+=qty;else cart.push({pid,qty,pack,size});
+  saveCart();renderNav();closeModal('modal-gen');
+  /* stay on the product page — just confirm, so more can be added */
+  toast('✅ Added to cart · '+qty+' pc'+(qty>1?'s':''));
+  const note=$('pp-added');
+  if(note){
+    const n=cart.reduce((s,c)=>s+c.qty,0);
+    note.innerHTML=`<div class="notice ok" style="margin:10px 0;padding:10px 12px">✅ Added to cart — ${n} item${n>1?'s':''} in your cart.
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="smallbtn ok-btn" onclick="toggleCart(true)">🛒 View cart</button>
+        <button class="smallbtn gr-btn" onclick="closeProduct()">← Continue shopping</button>
+      </div></div>`;
+  }
+}
+
+/* ============ CART ============ */
+function addToCart(pid){
+  const p=state.products.find(x=>x.id===pid);
+  if(p&&p.options&&(p.options.packs||p.options.sizes))return openProduct(pid);
+  const q=Math.max(1,parseInt($('q-'+pid).value)||1);
+  const ex=cart.find(c=>c.pid===pid&&!c.pack&&!c.size);
+  if(ex)ex.qty+=q;else cart.push({pid,qty:q,pack:'',size:''});
+  saveCart();renderNav();toast('Added to cart');toggleCart(true);
+}
+function setQtyI(i,d){const c=cart[i];if(!c)return;c.qty+=d;if(c.qty<1)cart.splice(i,1);saveCart();renderCart();renderNav()}
+function rmItemI(i){cart.splice(i,1);saveCart();renderCart();renderNav()}
+function cartSubtotal(){return cart.reduce((s,c)=>s+lineRate(c)*c.qty,0)}
+function toggleCart(on){$('overlay').classList.toggle('on',on);$('drawer').classList.toggle('on',on);if(on)renderCart()}
+function renderCart(){
+  const body=$('cartBody'),foot=$('cartFoot');
+  cart=cart.filter(c=>state.products.find(p=>p.id===c.pid));
+  $('cartTitle').textContent='🛒 Your cart ('+String(cart.reduce((s,c)=>s+c.qty,0)).padStart(2,'0')+')';
+  if(!cart.length){body.innerHTML='<div class="empty"><span class="big">🛒</span>Your cart is empty.<br>Browse products and add items.</div>';foot.innerHTML='';return}
+  body.innerHTML=cart.map((c,i)=>{const p=state.products.find(x=>x.id===c.pid);const r=lineRate(c);
+    return `<div class="citem"><div>${prodIcon(p,34)}</div>
+      <div style="flex:1"><div class="nm">${esc(lineLabel(c))}</div><div class="pr">${fmt(r)} × ${c.qty} = <b>${fmt(r*c.qty)}</b></div></div>
+      <button class="qbtn" onclick="setQtyI(${i},-1)">−</button><b style="min-width:24px;text-align:center">${c.qty}</b><button class="qbtn" onclick="setQtyI(${i},1)">+</button>
+      <button class="rm" onclick="rmItemI(${i})" title="Remove">🗑</button></div>`;}).join('');
+  const sub=cartSubtotal(),gst=inclGst(sub);
+  foot.innerHTML=`<div class="trow"><span>Pricing tier</span><b>${isDealer()?'Dealer (wholesale)':'MRP'}</b></div>
+    <div class="trow big"><span>Total</span><span>${fmt(sub)} <span class="gsttag">incl. GST</span></span></div>
+    <div class="trow"><span class="gsttag">Includes GST ${gstPct()}%</span><span class="gsttag">${fmt(gst)}</span></div>
+    <button class="wide" onclick="openCheckout()">Checkout</button>`;
+}
+
+/* ============ CHECKOUT ============ */
+function openCheckout(){
+  if(!cart.length)return toast('Cart is empty',1);
+  if(isAdmin())return toast('Admin cannot place orders — log in as a customer',1);
+  toggleCart(false);
+  const u=currentUser();
+  const rows=cart.map(c=>{const r=lineRate(c);return `<tr><td>${esc(lineLabel(c))}</td><td>${c.qty}</td><td>${fmt(r)}</td><td><b>${fmt(r*c.qty)}</b></td></tr>`}).join('');
+  const sub=cartSubtotal(),gst=inclGst(sub),total=sub;
+  const contact=u?`<div class="regdetail"><b>${esc(u.company)}</b> · ${esc(u.name)}<br>📞 ${esc(u.phone)} · 📧 ${esc(u.email)}<br>GSTIN: <span class="gstin-code">${esc(u.gstin)}</span></div>
+    <label>Delivery address <span class="req">*</span></label><textarea id="co-addr" rows="2">${esc(u.addr)}, ${esc(u.city)}, ${esc(u.state)}</textarea>`
+  :`<div class="notice info" style="margin-bottom:6px">Ordering as <b>guest at MRP</b>. <a href="javascript:openAuth('register')">Create an account</a> for wholesale rates.</div>
+    <div class="frow"><div><label>Full name <span class="req">*</span></label><input id="co-name"></div>
+    <div><label>Mobile number <span class="req">*</span></label><input id="co-phone"></div></div>
+    <label>Email</label><input id="co-email" type="email">
+    <label>Delivery address <span class="req">*</span></label><textarea id="co-addr" rows="2"></textarea>`;
+  $('view-checkout').innerHTML=`
+    <div class="pf-head" style="justify-content:flex-start;gap:10px;padding:4px 0 10px">
+      <button class="hdrback" onclick="closeCheckout()" title="Go back" aria-label="Go back">←</button>
+      <h2 style="font-size:19px">Checkout</h2>
+    </div>
+    <div class="msub">Review your order and confirm. Pay online or by bank transfer next.</div>
+    <div class="tblwrap" style="box-shadow:none;border:1px solid var(--line)"><table><thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="trow" style="margin-top:10px"><span>Taxable value</span><span>${fmt(Math.round((sub-gst)*100)/100)}</span></div>
+    <div class="trow"><span>GST ${gstPct()}% (included)</span><span>${fmt(gst)}</span></div>
+    <div class="trow big"><span>Order total (incl. GST)</span><span>${fmt(total)}</span></div>
+    ${contact}
+    <label>🚚 Dispatch through (transport)</label>
+    <select id="co-transport">
+      <option value="">No preference — let HPMP arrange transport</option>
+      ${state.transports.map(t=>`<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('')}
+    </select>
+    <div class="hint">Pick the transport service you'd like your material dispatched with.</div>
+    <label>Order notes (optional)</label><input id="co-notes" placeholder="e.g., preferred delivery date">
+    <div class="err" id="co-err"></div>
+    <button class="wide" id="placeBtn" onclick="placeOrder()">Place order → payment</button>
+    <button class="wide ghost" style="margin-top:8px" onclick="closeCheckout()">← Back to cart</button>`;
+  if(currentView!=='checkout')checkoutBackTo=currentView;
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
+  $('view-checkout').classList.add('on');
+  currentView='checkout';
+  renderNav();renderHeader();window.scrollTo(0,0);
+  try{history.pushState({bwCheckout:1},'','#checkout')}catch(e){}
+}
+let checkoutBackTo='shop';
+function closeCheckout(){showView(checkoutBackTo||'shop');renderHeader()}
+async function placeOrder(){
+  const u=currentUser();const err=$('co-err');err.style.display='none';
+  const body={items:cart.map(c=>({pid:c.pid,qty:c.qty,pack:c.pack||'',size:c.size||''})),addr:$('co-addr').value.trim(),notes:$('co-notes').value.trim(),transport:$('co-transport')?$('co-transport').value:''};
+  if(!u){body.name=$('co-name').value.trim();body.phone=$('co-phone').value.trim();body.email=$('co-email').value.trim();
+    if(!body.name||!body.phone||!body.addr){err.textContent='Fill name, mobile number and delivery address.';err.style.display='block';return}}
+  if(!body.addr){err.textContent='Delivery address is required.';err.style.display='block';return}
+  const btn=$('placeBtn');btn.disabled=true;btn.textContent='Placing order…';
+  try{
+    const d=await api('/orders','POST',body);
+    cart=[];saveCart();renderNav();showView(checkoutBackTo||'shop');
+    openPayment(d.order,true);
+  }catch(e){err.textContent=e.message;err.style.display='block';btn.disabled=false;btn.textContent='Place order → payment'}
+}
+async function openPaymentById(id){try{openPayment(await api('/orders/'+id),false)}catch(e){toast(e.message,1)}}
+function openPayment(o,fresh){
+  const s=state.payInfo||{};
+  const rzp=s.razorpay&&s.razorpay.enabled;
+  const bank=(s.bankName||s.accountNo)?`<div class="row"><b>Bank transfer:</b> ${esc(s.bankName)} · A/c ${esc(s.accountNo)} · IFSC ${esc(s.ifsc)} <button class="copybtn" onclick="copyTxt('${esc(s.accountNo)}')">Copy A/c</button></div>`:'';
+  const gstLine=(o.gst?`<div class="trow"><span>Taxable value</span><span>${fmt(Math.round((o.total-o.gst)*100)/100)}</span></div><div class="trow"><span>GST ${o.gstPercent||gstPct()}% (included)</span><span>${fmt(o.gst)}</span></div><div class="trow big"><span>Total payable (incl. GST)</span><span>${fmt(o.total)}</span></div>`:'')
+    +(o.transport&&!o.lrNumber?`<div class="trow" style="margin-bottom:8px"><span>🚚 Preferred transport</span><b>${esc(o.transport)}</b></div>`:'')
+    +(o.dispatchMode==='local'&&o.vehicleNo?`<div class="notice ok" style="margin-bottom:10px">🛺 <b>Out for local delivery!</b>${o.dispatchedAt?' Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}.<br>Vehicle: <b style="font-family:Consolas,monospace">${esc(o.vehicleNo)}</b>${o.driverName?'<br>Driver: <b>'+esc(o.driverName)+'</b>':''}${o.driverPhone?` · <a href="tel:${esc(o.driverPhone)}">${esc(o.driverPhone)}</a>`:''}<br><span style="font-size:12px">Your material is on the way within the city.</span></div>`
+    :o.lrNumber?`<div class="notice ok" style="margin-bottom:10px">🚚 <b>Dispatched!</b> Sent via <b>${esc(o.dispatchTransport||o.transport||'transport')}</b>${o.dispatchedAt?' on '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}.<br>LR number: <b style="font-family:Consolas,monospace">${esc(o.lrNumber)}</b> <button class="copybtn" onclick="copyTxt('${esc(o.lrNumber)}')">Copy</button><br><span style="font-size:12px">Quote this LR number with the transporter to track and collect your material.</span></div>`:'');
+  const cu=currentUser();
+  const creditBtn=(cu&&cu.status==='approved'&&cu.terms==='credit'&&o.status==='awaiting_payment')?`
+    <button class="wide" style="background:#5b3fb0" onclick="orderOnCredit('${o.id}')">🧾 Confirm on credit — pay within ${cu.creditDays||30} days</button>
+    <div class="hint" style="text-align:center;margin:6px 0 2px">Your approved credit facility · order ships without advance payment</div>
+    <div class="ordiv">or pay now</div>`:'';
+  const online=rzp&&o.status==='awaiting_payment'?`
+    <button class="wide" id="rzpBtn" onclick="payOnline('${o.id}')">💳 Pay online ${fmt(o.total)} — UPI / card / netbanking</button>
+    <div class="hint" style="text-align:center;margin:6px 0 2px">Instant confirmation via secure Razorpay checkout</div>
+    <div class="ordiv">or pay by direct transfer</div>`:'';
+  const manual=`<div class="paybox">
+      <div class="row"><b>Pay by bank transfer to:</b></div>
+      <div class="row">Account name: <b>${esc(s.payeeName||'')}</b></div>
+      ${bank||'<div class="row" style="color:var(--mut)">Bank details will be shared with your invoice — WhatsApp us for them.</div>'}
+      <div class="row" style="margin-top:6px">Questions? WhatsApp <b>${esc(s.whatsapp||'')}</b> with your Order ID.</div>
+    </div>`;
+  $('payBox').innerHTML=`<button class="mx" onclick="closeModal('modal-pay')">✕</button>
+    ${fresh?`<div class="notice ok">🎉 Order <b>${o.id}</b> created — save this Order ID.<br><span style="font-size:12px">It reaches HPMP for processing once payment is completed${cu&&cu.status==='approved'&&cu.terms==='credit'?' or confirmed on your credit account':''}.</span></div>`:''}
+    <div class="mtitle">Pay ${fmt(o.total)} — Order ${o.id}</div>
+    <div class="msub">Status: <span class="badge b-${o.status}">${STATUS_LABEL[o.status]}</span></div>
+    ${gstLine}
+    ${creditBtn}
+    ${online}
+    ${o.status==='awaiting_payment'?`
+    ${manual}
+    <label>Payment reference / UTR number <span class="req">*</span></label>
+    <input id="pay-ref" placeholder="e.g., UPI Ref 415223344556">
+    <div class="hint">Paid by bank transfer? Enter the UTR / transaction reference from your bank app.</div>
+    <div class="err" id="pay-err"></div>
+    <button class="wide blue" onclick="submitPayment('${o.id}')">✅ I have paid — submit reference</button>
+    ${cu&&cu.status==='approved'&&cu.terms==='credit'?''
+      :`<div class="hint" style="text-align:center;margin-top:10px">Payment is required before this order is processed. Deferred payment is available only to customers approved by HPMP for credit terms.</div>`}`
+    :`${o.status==='paid'?`<div class="notice ok">✅ Payment received online (${esc(o.payRef)}). We are processing your order.</div>`:`${manual}<div class="notice info">Payment reference on file: <b>${esc(o.payRef)||'—'}</b>. Our team will verify and confirm your order.</div>`}`}
+  `;
+  openModal('modal-pay');
+}
+async function payOnline(oid){
+  const btn=$('rzpBtn');if(btn){btn.disabled=true;btn.textContent='Opening secure checkout…'}
+  try{
+    if(typeof Razorpay==='undefined')throw new Error('Payment gateway is loading — try again in a moment.');
+    const d=await api('/orders/'+oid+'/rzp-order','POST');
+    new Razorpay({
+      key:d.keyId,amount:d.amount,currency:d.currency,order_id:d.rzpOrderId,
+      name:d.name||'HPMP Manufacturers Pvt Ltd',description:'Order '+oid,
+      prefill:{name:d.contact.name||'',contact:d.contact.phone||'',email:d.contact.email||''},
+      theme:{color:'#0b2a4a'},
+      handler:async r=>{
+        try{
+          await api('/orders/'+oid+'/rzp-verify','POST',r);
+          closeModal('modal-pay');toast('✅ Payment successful! Your order is confirmed.');
+          if(currentUser())showView('orders');
+        }catch(e){toast(e.message,1)}
+      },
+      modal:{ondismiss:()=>{if(btn){btn.disabled=false;btn.textContent='💳 Pay online — UPI / card / netbanking'}}}
+    }).open();
+  }catch(e){toast(e.message,1);if(btn){btn.disabled=false;btn.textContent='💳 Pay online — UPI / card / netbanking'}}
+}
+async function orderOnCredit(orderId){
+  if(!confirm('Confirm this order on your credit account? Payment will be due as per your credit period.'))return;
+  try{
+    await api('/orders/'+orderId+'/credit','POST');
+    closeModal('modal-pay');toast('🧾 Order confirmed on credit — we will dispatch shortly.');
+    showView('orders');
+  }catch(e){toast(e.message,1)}
+}
+async function submitPayment(orderId){
+  const ref=$('pay-ref').value.trim();
+  if(!ref){$('pay-err').textContent='Enter the payment reference / UTR.';$('pay-err').style.display='block';return}
+  try{
+    await api('/orders/'+orderId+'/payment','POST',{payRef:ref});
+    closeModal('modal-pay');toast('Payment reference submitted — we will verify and confirm shortly.');
+    if(currentUser())showView('orders');
+  }catch(e){$('pay-err').textContent=e.message;$('pay-err').style.display='block'}
+}
+
+/* ============ AUTH ============ */
+function openAuth(tab){
+  if(currentView!=='auth')authBackTo=currentView;
+  const host=$('view-auth'),page=$('authPage');
+  page.style.display='block';
+  if(page.parentNode!==host)host.appendChild(page);
+  ['modal-checkout','modal-pay','modal-gen'].forEach(closeModal);
+  toggleCart(false);
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
+  host.classList.add('on');
+  currentView='auth';
+  authTab(tab);renderNav();renderHeader();window.scrollTo(0,0);
+  try{history.pushState({bwAuth:1},'','#account')}catch(e){}
+}
+let authBackTo='home';
+function closeAuth(){showView(authBackTo||'home');renderHeader()}
+function authTab(t){
+  $('tab-login').classList.toggle('on',t==='login');$('tab-register').classList.toggle('on',t==='register');
+  $('pane-login').style.display=t==='login'?'block':'none';$('pane-register').style.display=t==='register'?'block':'none';
+}
+async function doLogin(){
+  const err=$('li-err');err.style.display='none';
+  try{
+    const d=await api('/login','POST',{email:$('li-email').value.trim(),password:$('li-pass').value});
+    token=d.token;localStorage.setItem('bw_token',token);
+    state.role=d.role;state.user=d.user||null;
+    await refreshProducts();renderHeader();
+    if(d.role==='admin'){showView('admin');toast('Welcome, Admin')}
+    else if(d.user.status==='approved'){showView('shop');toast('Welcome back — dealer pricing active')}
+    else{showView('profile');toast('Signed in — account '+USTATUS_LABEL[d.user.status].toLowerCase())}
+  }catch(e){err.textContent=e.message;err.style.display='block'}
+}
+async function doRegister(){
+  const err=$('rg-err');err.style.display='none';
+  try{
+    const d=await api('/register','POST',{
+      name:$('rg-name').value.trim(),phone:$('rg-phone').value.trim(),email:$('rg-email').value.trim(),
+      password:$('rg-pass').value,company:$('rg-company').value.trim(),gstin:$('rg-gstin').value.trim(),
+      type:$('rg-type').value,addr:$('rg-addr').value.trim(),city:$('rg-city').value.trim(),state:$('rg-state').value.trim(),
+      pincode:$('rg-pincode').value.trim(),whatsapp:$('rg-whatsapp').value.trim()});
+    token=d.token;localStorage.setItem('bw_token',token);
+    state.role='user';state.user=d.user;
+    renderHeader();showView('profile');
+    toast('✅ Account created! Our admin team will verify your GSTIN and approve dealer pricing.');
+  }catch(e){err.textContent=e.message;err.style.display='block'}
+}
+
+/* ============ CATEGORY ============ */
+function renderCategory(){
+  renderHeader();
+  stopCatSlides();
+  const cats=[...new Set(state.products.map(p=>p.cat))];
+  const cell=(key,title,items)=>{
+    const shots=items.filter(p=>p.image);
+    const inner=shots.length
+      ? `<div class="catshow" data-slide="${esc(key)}">
+           ${shots.map((p,i)=>`<img src="${p.image}" alt="${esc(p.name)}" class="${i===0?'on':''}">`).join('')}
+           ${shots.length>1?`<div class="dots">${shots.map((_,i)=>`<i class="${i===0?'on':''}"></i>`).join('')}</div>`:''}
+         </div>`
+      : `<div class="big">${key==='All'?'📦':catEmoji(key)}</div>`;
+    return `<div class="catcard" onclick="goCat('${esc(key)}')">
+      ${inner}<b>${esc(title)}</b><span>${items.length} product${items.length>1?'s':''}</span>
+      <br><span class="shopnow">${key==='All'?'View all':'Shop now'} →</span></div>`;
+  };
+  $('view-category').innerHTML=`<div class="pf-head"><h2>Category</h2></div>
+    <div class="catgrid">
+      ${cats.map(c=>cell(c,c,state.products.filter(p=>p.cat===c))).join('')}
+      ${cell('All','All products',state.products)}
+    </div>`;
+  startCatSlides();
+}
+
+/* category tiles cycle through that category's product photos every 5 seconds */
+let catSlideTimer=null;
+function stopCatSlides(){ if(catSlideTimer){clearInterval(catSlideTimer);catSlideTimer=null} }
+function startCatSlides(){
+  stopCatSlides();
+  const shows=[...document.querySelectorAll('#view-category .catshow')];
+  if(!shows.length)return;
+  catSlideTimer=setInterval(()=>{
+    if(currentView!=='category'){stopCatSlides();return}
+    shows.forEach(box=>{
+      const imgs=[...box.querySelectorAll('img')];
+      if(imgs.length<2)return;
+      const dots=[...box.querySelectorAll('.dots i')];
+      const cur=imgs.findIndex(i=>i.classList.contains('on'));
+      const next=(cur+1)%imgs.length;
+      imgs[cur].classList.remove('on');
+      imgs[next].classList.add('on');
+      if(dots.length){dots[cur]&&dots[cur].classList.remove('on');dots[next]&&dots[next].classList.add('on')}
+    });
+  },2500);
+}
+
+/* ============ ORDERS ============ */
+async function renderOrdersView(){
+  renderHeader();
+  const v=$('view-orders');
+  const head=`<div class="pf-head"><h2>Orders</h2></div>`;
+  if(isAdmin()){
+    /* admin sees full order management right here in the Orders tab */
+    v.innerHTML=head+'<div id="adminOrdersBody">Loading orders…</div>';
+    try{
+      const orders=await api('/admin/orders');
+      $('adminOrdersBody').innerHTML=`
+        <div class="hint" style="margin-bottom:12px">Only paid orders (and credit orders from approved customers) appear here — unpaid carts stay with the customer. Use <b>🖨 Print</b> for a picking/dispatch slip, then move the order Confirmed → Shipped → Delivered.</div>
+        ${orders.length?orders.map(o=>orderCard(o)).join(''):'<div class="empty"><span class="big">📦</span>No orders yet.</div>'}`;
+    }catch(e){$('adminOrdersBody').innerHTML='<div class="empty">⚠️ '+esc(e.message)+'</div>'}
+    return;
+  }
+  const u=currentUser();
+  if(!u){v.innerHTML=head+`<div class="empty"><span class="big">📦</span>Log in to see your orders.<br><br><button class="wide blue" style="max-width:240px" onclick="openAuth('login')">Login</button></div>`;return}
+  let myOrders=[];try{myOrders=await api('/my/orders');lastOrders=myOrders;updateBell()}catch(e){}
+  v.innerHTML=head+(myOrders.length?myOrders.map(o=>myOrderCard(o)).join('')
+    :`<div class="empty"><span class="big">📦</span>No orders yet — your orders will appear here.<br><br><button class="wide blue" style="max-width:240px" onclick="showView('shop')">Start shopping</button></div>`);
+}
+
+/* ============ PROFILE ============ */
+function genModal(title,html){$('genBox').innerHTML=`<button class="mx" onclick="closeModal('modal-gen')">✕</button><div class="mtitle">${title}</div>${html}`;openModal('modal-gen')}
+async function renderProfile(){
+  renderHeader();
+  const v=$('view-profile');
+  if(currentUser()){try{await refreshMe()}catch(e){}}
+  const u=currentUser();
+  const name=isAdmin()?'Admin':u?u.name:'Guest';
+  const av=isAdmin()?ICON.admin:u?esc(u.name.trim().split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase()):PICON.user;
+  const badges=u?`<div style="margin:0 0 10px">
+      <span class="badge b-${u.status}">${USTATUS_LABEL[u.status]}</span>
+      ${u.status==='approved'?(u.terms==='credit'?`<span class="badge b-shipped">💳 Credit · ${u.creditDays||30} days</span>`:`<span class="badge b-approved">💰 Advance payment</span>`):''}
+    </div>`:'';
+  const rows=[
+    [PICON.wallet,'Wallet','pfWallet()'],
+    [PICON.lock,'Change Password','pfPassword()'],
+    [PICON.pin,'Delivery Addresses','pfAddress()'],
+    [PICON.heart,'My WishList','pfWish()'],
+    [PICON.shield,'Policy','pfPolicy()'],
+    [PICON.help,'Contact Us','pfContact()'],
+    [PICON.info,'About Us','pfAbout()']
+  ];
+  v.innerHTML=`<div class="pf-head"><h2>Profile</h2></div>
+    <div class="pf-user">
+      <div class="pf-av">${av}</div>
+      <div style="flex:1"><div class="pf-name">${esc(name)}</div>${u?`<div class="hint">${esc(u.company)}</div>`:''}</div>
+      <button class="pf-edit" onclick="${u?'pfAddress()':`openAuth('register')`}" title="Edit">${PICON.pencil}</button>
+    </div>
+    ${badges}
+    <div class="plist">${rows.map(r=>`<button class="prow" onclick="${r[2]}"><span class="pi">${r[0]}</span><span class="pl">${r[1]}</span><span class="chev">›</span></button>`).join('')}</div>
+    <div style="margin-top:30px">${(u||isAdmin())?`<button class="wide ghost" onclick="logout()"><span class="btn-ic">${PICON.logout}</span> Logout</button>`:`<button class="wide blue" onclick="openAuth('login')"><span class="btn-ic">${PICON.key}</span> Login</button>`}</div>`;
+}
+async function pfWallet(){
+  const u=currentUser();
+  if(!u)return genModal('Wallet',`<div class="msub">Log in to view your payment account and credit terms.</div><button class="wide blue" onclick="closeModal('modal-gen');openAuth('login')">Login</button>`);
+  let dues=[];try{dues=(await api('/my/orders')).filter(o=>o.payRef&&o.payRef.indexOf('On credit')===0&&!['cancelled','delivered'].includes(o.status))}catch(e){}
+  const total=dues.reduce((s,o)=>s+o.total,0);
+  genModal('Wallet',`<div class="msub">Your payment account with HPMP.</div>
+    ${u.status!=='approved'?'<div class="notice warn">⏳ Account pending approval — payment terms are set on approval.</div>'
+    :u.terms==='credit'?`<div class="notice ok">💳 <b>Credit account</b> — pay within ${u.creditDays||30} days of ordering.</div>`
+    :'<div class="notice info">💰 <b>Advance payment account</b> — orders are dispatched after payment is received.</div>'}
+    ${dues.length?`<div class="regdetail"><b>Credit orders outstanding:</b><br>${dues.map(o=>o.id+' · '+fmt(o.total)).join('<br>')}<br><b>Total due: ${fmt(total)}</b></div>`:u.terms==='credit'?'<div class="hint">No outstanding credit orders. 🎉</div>':''}`);
+}
+function pfPassword(){
+  if(!currentUser())return genModal('Change Password',`<div class="msub">Log in first to change your password.</div><button class="wide blue" onclick="closeModal('modal-gen');openAuth('login')">Login</button>`);
+  genModal('Change Password',`
+    <label>Current password</label><input id="cp-old" type="password">
+    <label>New password</label><input id="cp-new" type="password" placeholder="Min 6 characters">
+    <label>Confirm new password</label><input id="cp-new2" type="password" placeholder="Re-enter new password">
+    <div class="err" id="cp-err"></div>
+    <button class="wide blue" onclick="doChangePass()">Update password</button>`);
+}
+async function doChangePass(){
+  const e=$('cp-err');e.style.display='none';
+  const np=$('cp-new').value,np2=$('cp-new2').value;
+  if(np.length<6){e.textContent='New password must be at least 6 characters.';e.style.display='block';return}
+  if(np!==np2){e.textContent='New password and confirm password do not match.';e.style.display='block';return}
+  try{
+    await api('/me/password','POST',{current:$('cp-old').value,newPassword:np});
+    closeModal('modal-gen');toast('🔒 Password updated');
+  }catch(x){e.textContent=x.message;e.style.display='block'}
+}
+function pfAddress(){
+  const u=currentUser();
+  if(!u)return genModal('Delivery Addresses',`<div class="msub">Log in to manage your delivery address.</div><button class="wide blue" onclick="closeModal('modal-gen');openAuth('login')">Login</button>`);
+  genModal('Delivery Addresses',`
+    <div class="msub">Orders are delivered to your business address below.</div>
+    <label>Address</label><textarea id="ad-addr" rows="2">${esc(u.addr)}</textarea>
+    <div class="frow"><div><label>City</label><input id="ad-city" value="${esc(u.city)}"></div>
+    <div><label>State</label><input id="ad-state" value="${esc(u.state)}"></div></div>
+    <div class="frow"><div><label>Pincode</label><input id="ad-pincode" maxlength="6" inputmode="numeric" value="${esc(u.pincode||'')}"></div>
+    <div><label>Phone</label><input id="ad-phone" value="${esc(u.phone)}"></div></div>
+    <label>WhatsApp number</label><input id="ad-whatsapp" maxlength="10" inputmode="numeric" value="${esc(u.whatsapp||u.phone||'')}">
+    <div class="err" id="ad-err"></div>
+    <button class="wide blue" onclick="doSaveAddr()">Save address</button>`);
+}
+async function doSaveAddr(){
+  const e=$('ad-err');e.style.display='none';
+  try{
+    const d=await api('/me','PUT',{addr:$('ad-addr').value.trim(),city:$('ad-city').value.trim(),state:$('ad-state').value.trim(),phone:$('ad-phone').value.trim(),pincode:$('ad-pincode').value.trim(),whatsapp:$('ad-whatsapp').value.trim()});
+    if(d.user)state.user=d.user;
+    closeModal('modal-gen');toast('📍 Address updated');renderProfile();
+  }catch(x){e.textContent=x.message;e.style.display='block'}
+}
+function pfWish(){
+  const items=[...wish].map(id=>state.products.find(p=>p.id===id)).filter(Boolean);
+  genModal('My WishList',items.length?items.map(p=>`<div class="citem"><div>${prodIcon(p,34)}</div>
+    <div style="flex:1"><div class="nm">${esc(p.name)}</div><div class="pr">${fmt(priceFor(p))}</div></div>
+    <button class="smallbtn ok-btn" onclick="wishAdd('${p.id}')">Add to cart</button>
+    <button class="rm" onclick="toggleWish('${p.id}');pfWish()">🗑</button></div>`).join('')
+    :'<div class="empty"><span class="big">🤍</span>Tap the heart on any product to save it here.</div>');
+}
+function wishAdd(pid){const ex=cart.find(c=>c.pid===pid);if(ex)ex.qty+=1;else cart.push({pid,qty:1});saveCart();renderNav();toast('Added to cart')}
+function pfPolicy(){
+  genModal('Policy',`<div class="msub">Our policies at a glance.</div>
+    <div class="regdetail"><b>Orders &amp; pricing</b><br>All prices are inclusive of GST. Dealer pricing applies to approved business accounts only. MOQ may apply for wholesale rates.</div>
+    <div class="regdetail"><b>Payments</b><br>Pay online, by UPI/bank transfer, or on credit if your account has an approved credit facility. Orders are processed after payment confirmation (or credit confirmation).</div>
+    <div class="regdetail"><b>Dispatch &amp; delivery</b><br>Material is dispatched via your preferred transport where possible. The LR number is shared in the app for tracking. Damage in transit must be reported within 48 hours of delivery.</div>`);
+}
+function pfContact(){
+  const s=state.payInfo||{};
+  genModal('Contact Us',`<div class="msub">We respond within 24 hours on business days.</div>
+    <div class="regdetail">📞 / WhatsApp: <b>${esc(s.whatsapp||'—')}</b><br>📧 <b>sales@hpmpmanufacturerspvtltd.com</b></div>
+    <a href="https://wa.me/${esc(String(s.whatsapp||'').replace(/\D/g,''))}?text=Hi%20HPMP%2C%20I%20have%20a%20question" target="_blank"><button class="wide" style="background:var(--green)">💬 Chat on WhatsApp</button></a>`);
+}
+function pfAbout(){
+  genModal('About Us',`<div class="msub">Blue Wave · Quality Trust</div>
+    <div class="regdetail">HPMP Manufacturers Pvt Ltd is a manufacturer and B2B supplier of premium AC wall-mounting brackets and heavy-duty appliance trolleys, made in India at our Hyderabad facility.<br><br>
+    🛡️ 7-tank powder coating for rust protection<br>⚙️ High-grade steel up to 2 mm, 500+ kg load capacity<br>🏭 In-house production with multi-stage quality control<br>🤝 Dealer &amp; distributor network across India</div>`);
+}
+
+/* ============ ACCOUNT (legacy, unused) ============ */
+async function renderAccount(){
+  renderHeader();
+  const u=currentUser();const v=$('view-account');
+  if(!u&&!isAdmin()){v.innerHTML=`<div class="empty"><span class="big">👤</span>Sign in to view your account.<br><br><button class="wide blue" style="max-width:240px" onclick="openAuth('login')">Sign in</button><button class="wide ghost" style="max-width:240px" onclick="openAuth('register')">Create an account</button></div>`;return}
+  if(isAdmin()){v.innerHTML='<div class="empty"><span class="big">⚙️</span>You are the admin — use the Admin tab.</div>';return}
+  try{await refreshMe()}catch(e){}
+  const uu=currentUser();if(!uu)return showView('home');
+  let myOrders=[];try{myOrders=await api('/my/orders');lastOrders=myOrders;updateBell()}catch(e){}
+  const statusMsg={pending:'⏳ Our admin team is verifying your GSTIN and business details. Dealer pricing unlocks automatically on approval.',
+    approved:'✅ You are an approved dealer — wholesale pricing is active storewide.',
+    rejected:'⚠️ Your registration was not approved.'+(uu.note?' Reason: '+esc(uu.note):'')+' Contact sales@hpmpmanufacturerspvtltd.com.'};
+  v.innerHTML=`<div class="acc-grid">
+    <div class="cardbox"><h3>👤 My business</h3>
+      <span class="badge b-${uu.status}">${USTATUS_LABEL[uu.status]}</span>
+      ${uu.status==='approved'?(uu.terms==='credit'?`<span class="badge b-shipped">💳 Credit customer · pay within ${uu.creditDays||30} days</span>`:`<span class="badge b-approved">💰 Advance payment customer</span>`):''}
+      <div class="regdetail"><b>${esc(uu.company)}</b> (${esc(uu.type)})<br>${esc(uu.name)} · 📞 ${esc(uu.phone)}<br>💬 ${esc(uu.whatsapp||uu.phone)}<br>📧 ${esc(uu.email)}<br>
+      GSTIN: <span class="gstin-code">${esc(uu.gstin)}</span><br>${esc(uu.addr)},<br>${esc(uu.city)}, ${esc(uu.state)}${uu.pincode?' - '+esc(uu.pincode):''}</div>
+      <div class="hint">${statusMsg[uu.status]}</div>
+      <button class="wide blue" style="margin-top:12px" onclick="refreshProducts().then(()=>showView('shop'))">🛍 Continue shopping</button>
+    </div>
+    <div class="cardbox"><h3>📦 My orders (${myOrders.length})</h3>
+      ${myOrders.length?myOrders.map(o=>myOrderCard(o)).join(''):'<div class="empty"><span class="big">📦</span>No orders yet — your orders will appear here.</div>'}
+    </div></div>`;
+}
+
+/* ============ ADMIN ============ */
+let adminTab='regs';
+async function renderAdmin(tab){
+  adminTab=tab||'regs';
+  if(adminTab==='orders'){return showView('orders')}
+  renderHeader();
+  const v=$('view-admin');
+  if(!isAdmin()){v.innerHTML='<div class="empty"><span class="big">🔒</span>Admin access only. <a href="javascript:openAuth(\'login\')">Sign in</a> with admin credentials.</div>';return}
+  let ov={users:0,pending:0,orders:0,paySubmitted:0,revenue:0};
+  try{ov=await api('/admin/overview')}catch(e){toast(e.message,1)}
+  let credOverdue=0;try{credOverdue=(await api('/admin/credit')).overdue}catch(e){}
+  const tabs=[['regs','🧾 Registrations',ov.pending],['credit','💳 Credit',credOverdue],['pricing','💰 Pricing',0],['logistics','🚚 Logistics',0],['settings','⚙️ Settings',0]];
+  v.innerHTML=`<div class="pf-head" style="justify-content:space-between;padding:6px 2px 12px">
+      <h2 style="font-size:19px">⚙️ Admin panel</h2>
+      <button class="smallbtn gr-btn" onclick="logout()">↪ Logout</button>
+    </div>
+    <div class="stats">
+    <div class="stat"><b>${ov.users}</b><span>Registered businesses</span></div>
+    <div class="stat"><b>${ov.pending}</b><span>Pending approvals</span></div>
+    <div class="stat" style="cursor:pointer" onclick="showView('orders')"><b>${ov.orders}</b><span>Accepted orders — open ›</span></div>
+    <div class="stat"><b>${fmt(ov.revenue)}</b><span>Paid/confirmed order value</span></div></div>
+    <div class="atabs">${tabs.map(t=>`<button class="atab ${adminTab===t[0]?'on':''}" onclick="renderAdmin('${t[0]}')">${t[1]}${t[2]?`<span class="n">${t[2]}</span>`:''}</button>`).join('')}</div>
+    <div id="adminBody">Loading…</div>
+    <button class="wide ghost" style="margin-top:22px" onclick="logout()">↪ Logout of admin</button>`;
+  try{
+    if(adminTab==='regs')await renderRegs();
+    if(adminTab==='pricing')await renderPricing();
+    if(adminTab==='credit')await renderCredit();
+    if(adminTab==='logistics')await renderLogistics();
+    if(adminTab==='settings')await renderSettings();
+  }catch(e){$('adminBody').innerHTML='<div class="empty">⚠️ '+esc(e.message)+'</div>'}
+}
+async function renderRegs(){
+  const users=await api('/admin/users');
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>Dealer registration approvals</h3>
+    <div class="hint" style="margin-bottom:10px">Verify each GSTIN on the <a href="https://services.gst.gov.in/services/searchtp" target="_blank">GST portal</a> before approving. Approved dealers instantly see wholesale pricing.</div>
+    ${users.length?users.map(u=>`
+      <div class="regdetail" style="background:#fff;border:1px solid var(--line)">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center">
+          <div><b>${esc(u.company)}</b> · ${esc(u.type)} <span class="badge b-${u.status}">${USTATUS_LABEL[u.status]}</span>
+          ${u.status==='approved'?(u.terms==='credit'?`<span class="badge b-shipped">💳 Credit · ${u.creditDays||30} days</span>`:`<span class="badge b-approved">💰 Advance payment</span>`):''}</div>
+          <div>
+            ${u.status!=='approved'?`<button class="smallbtn ok-btn" onclick="setUserStatus('${u.id}','approved','advance')">✓ Approve · Advance</button>
+            <button class="smallbtn ok-btn" style="background:#5b3fb0" onclick="setUserStatus('${u.id}','approved','credit')">✓ Approve · Credit</button>`
+            :`<button class="smallbtn gr-btn" onclick="setUserStatus('${u.id}','approved','${u.terms==='credit'?'advance':'credit'}')">↔ Switch to ${u.terms==='credit'?'Advance':'Credit'}</button>`}
+            ${u.status!=='rejected'?`<button class="smallbtn no-btn" onclick="setUserStatus('${u.id}','rejected')">✕ Reject</button>`:''}
+            ${u.status==='approved'?`<button class="smallbtn gr-btn" onclick="dealerPrices('${u.id}')">💰 Set prices</button>`:''}
+            <button class="smallbtn gr-btn" onclick="editDealer('${u.id}')">✏️ Edit details</button>
+            <button class="smallbtn no-btn" style="background:#7a1f1f" onclick="delUser('${u.id}','${esc(u.company)}')">🗑 Delete account</button>
+          </div>
+        </div>
+        👤 ${esc(u.name)} · 📞 ${esc(u.phone)} · 📧 ${esc(u.email)}<br>
+        💬 WhatsApp: <b>${esc(u.whatsapp||u.phone)}</b> <a href="https://wa.me/91${esc(String(u.whatsapp||u.phone).replace(/\D/g,'').slice(-10))}" target="_blank"><button class="copybtn">Chat</button></a><br>
+        GSTIN: <span class="gstin-code">${esc(u.gstin)}</span> <button class="copybtn" onclick="copyTxt('${esc(u.gstin)}')">Copy</button> <button class="copybtn" onclick="verifyGstin('${esc(u.gstin)}')">🔍 Verify</button><br>
+        📍 ${esc(u.addr)}, ${esc(u.city)}, ${esc(u.state)}${u.pincode?' - '+esc(u.pincode):''} · Registered ${new Date(u.createdAt).toLocaleDateString('en-IN')}
+        ${u.note?`<br>📝 Note: ${esc(u.note)}`:''}
+      </div>`).join(''):'<div class="empty"><span class="big">🧾</span>No registrations yet.</div>'}
+  </div>`;
+}
+async function editDealer(uid){
+  try{
+    const users=await api('/admin/users');
+    const u=users.find(x=>x.id===uid);
+    if(!u)return toast('Dealer not found',1);
+    const types=['Dealer','Distributor','Retailer','Contractor'];
+    genModal('✏️ Edit dealer details',`
+      <div class="msub">Correct anything the dealer entered wrongly at registration. Changes apply to their account immediately.</div>
+      <div class="frow"><div><label>Contact person name</label><input id="ed-name" value="${esc(u.name)}"></div>
+      <div><label>Business / company name</label><input id="ed-company" value="${esc(u.company)}"></div></div>
+      <div class="frow"><div><label>Mobile number</label><input id="ed-phone" value="${esc(u.phone)}"></div>
+      <div><label>WhatsApp number</label><input id="ed-wa" value="${esc(u.whatsapp||u.phone)}"></div></div>
+      <div><label>Email (login ID)</label><input id="ed-email" value="${esc(u.email)}"></div>
+      <div class="frow"><div><label>GSTIN</label><input id="ed-gstin" value="${esc(u.gstin)}" style="text-transform:uppercase"></div>
+      <div><label>Business type</label><select id="ed-type">${types.map(t=>`<option${t===u.type?' selected':''}>${t}</option>`).join('')}</select></div></div>
+      <div><label>Address</label><input id="ed-addr" value="${esc(u.addr||'')}"></div>
+      <div class="frow"><div><label>City</label><input id="ed-city" value="${esc(u.city||'')}"></div>
+      <div><label>State</label><input id="ed-state" value="${esc(u.state||'')}"></div></div>
+      <div><label>Pincode</label><input id="ed-pin" value="${esc(u.pincode||'')}" maxlength="6"></div>
+      <div class="hint">Verify the corrected GSTIN on the <a href="https://services.gst.gov.in/services/searchtp" target="_blank">GST portal</a> before saving.</div>
+      <button class="wide blue" onclick="saveDealerEdit('${uid}')">💾 Save corrections</button>
+      <button class="wide ghost" onclick="closeModal('modal-gen')">Cancel</button>`);
+  }catch(e){toast(e.message,1)}
+}
+async function saveDealerEdit(uid){
+  const g=id=>($(id)?$(id).value.trim():'');
+  const body={name:g('ed-name'),company:g('ed-company'),phone:g('ed-phone'),whatsapp:g('ed-wa'),
+    email:g('ed-email'),gstin:g('ed-gstin').toUpperCase(),type:g('ed-type'),
+    addr:g('ed-addr'),city:g('ed-city'),state:g('ed-state'),pincode:g('ed-pin')};
+  if(!body.name||!body.company)return toast('Name and company are required',1);
+  try{await api('/admin/users/'+uid,'PUT',body);closeModal('modal-gen');toast('✅ Dealer details corrected');renderAdmin('regs')}
+  catch(e){toast(e.message,1)}
+}
+async function dealerPrices(uid){
+  try{
+    const d=await api('/admin/users/'+uid+'/prices');
+    genModal('💰 Pricing for '+esc(d.user.company),`
+      <div class="msub">Set special rates for this ${esc(d.user.type.toLowerCase())}. Leave a box empty to use the standard dealer price.</div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Product</th><th>MRP</th><th>Standard</th><th>This dealer ₹</th></tr></thead><tbody id="dpRows">
+      ${d.products.map(p=>`<tr data-pid="${p.id}">
+        <td style="font-size:12.5px">${esc(p.name)}</td>
+        <td class="oitems">${fmt(p.mrp)}</td>
+        <td class="oitems">${fmt(p.standard)}</td>
+        <td><input class="dp pin" type="number" min="0" step="0.01" value="${p.custom!==null?p.custom:''}" placeholder="${p.standard}"></td>
+      </tr>`).join('')}
+      </tbody></table></div>
+      <button class="wide blue" onclick="saveDealerPrices('${uid}')">💾 Save this dealer's prices</button>
+      <button class="wide ghost" onclick="clearDealerPrices('${uid}')">↺ Reset all to standard</button>`);
+  }catch(e){toast(e.message,1)}
+}
+async function saveDealerPrices(uid){
+  const prices={};
+  document.querySelectorAll('#dpRows tr').forEach(tr=>{prices[tr.dataset.pid]=tr.querySelector('.dp').value.trim()});
+  try{await api('/admin/users/'+uid+'/prices','PUT',{prices});closeModal('modal-gen');toast('💰 Dealer pricing saved — live for that dealer now')}
+  catch(e){toast(e.message,1)}
+}
+async function clearDealerPrices(uid){
+  if(!confirm('Reset this dealer to the standard dealer price list?'))return;
+  const prices={};
+  document.querySelectorAll('#dpRows tr').forEach(tr=>{prices[tr.dataset.pid]=''});
+  try{await api('/admin/users/'+uid+'/prices','PUT',{prices});closeModal('modal-gen');toast('↺ Reset to standard prices')}
+  catch(e){toast(e.message,1)}
+}
+async function delUser(id,company){
+  if(!confirm('Delete the account of "'+company+'" permanently? Their past orders keep their records.'))return;
+  const pw=prompt('🔐 Enter the ADMIN password to verify this deletion:');
+  if(pw===null)return;
+  try{await api('/admin/users/'+id+'/delete','POST',{password:pw});toast('🗑 Account deleted: '+company);renderAdmin('regs')}
+  catch(e){toast(e.message,1)}
+}
+async function setUserStatus(id,st,terms){
+  let note='',creditDays=0;
+  if(st==='rejected'){note=prompt('Reason for rejection (shown to the applicant):','Details could not be verified');if(note===null)return}
+  if(st==='approved'&&terms==='credit'){
+    const d=prompt('Credit period in days for this customer:','30');
+    if(d===null)return;
+    creditDays=Math.max(1,parseInt(d)||30);
+  }
+  try{
+    await api('/admin/users/'+id+'/status','POST',{status:st,note,...(terms?{terms,creditDays}:{})});
+    toast(st==='rejected'?'Registration rejected':terms==='credit'?'✅ Approved as credit customer ('+creditDays+' days)':'✅ Approved on advance payment basis');
+    renderAdmin('regs');
+  }catch(e){toast(e.message,1)}
+}
+async function renderOrders(){
+  const orders=await api('/admin/orders');
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>Order management</h3>
+    <div class="hint" style="margin-bottom:12px">Only paid orders (and credit orders from approved customers) appear here — unpaid carts stay with the customer. Verify the payment reference, then move the order Confirmed → Shipped → Delivered.</div>
+    ${orders.length?orders.map(o=>orderCard(o)).join(''):'<div class="empty"><span class="big">📦</span>No orders yet.</div>'}
+  </div>`;
+}
+function orderCard(o){
+  const wa=String(o.contact.whatsapp||o.contact.phone||'').replace(/\D/g,'').slice(-10);
+  const taxable=o.gst?Math.round((o.total-o.gst)*100)/100:o.total;
+  return `<div class="ocard">
+    <div class="ohead">
+      <div><b>${o.id}</b><span class="oitems"> · ${new Date(o.createdAt).toLocaleDateString('en-IN')}</span></div>
+      <div>${o.tier==='dealer'?'<span class="badge b-approved">Dealer</span>':'<span class="badge b-cancelled">MRP</span>'}
+        <span class="badge b-${o.status}">${STATUS_LABEL[o.status]}</span></div>
+    </div>
+
+    <div class="osec">
+      <div class="olabel">Customer</div>
+      <b>${esc(o.contact.company||o.contact.name)}</b>${o.contact.company?' · '+esc(o.contact.name):''}<br>
+      📞 ${esc(o.contact.phone)} <a href="https://wa.me/91${wa}" target="_blank">💬 WhatsApp</a>
+      ${o.contact.gstin?'<br>GSTIN: <span class="gstin-code">'+esc(o.contact.gstin)+'</span>':''}
+      <br>📍 ${esc(o.addr)}
+      ${o.notes?'<br>📝 '+esc(o.notes):''}
+    </div>
+
+    <div class="osec">
+      <div class="olabel">Items ordered</div>
+      <table class="otable"><thead><tr><th>#</th><th>Product</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead><tbody>
+      ${o.items.map((i,n)=>{
+        const parts=String(i.name).split(' — ');
+        const nm=parts.shift();
+        const extra=parts.join(' — ');
+        return `<tr>
+          <td>${n+1}</td>
+          <td><b>${esc(nm)}</b>${extra?'<br><span class="oitems">'+esc(extra)+'</span>':''}</td>
+          <td class="r"><b>${i.qty}</b></td>
+          <td class="r">${fmt(i.rate)}</td>
+          <td class="r"><b>${fmt(i.rate*i.qty)}</b></td></tr>`}).join('')}
+      </tbody></table>
+      <div class="ototals">
+        <div><span>Taxable value</span><span>${fmt(taxable)}</span></div>
+        ${o.gst?`<div><span>GST ${o.gstPercent||18}% (included)</span><span>${fmt(o.gst)}</span></div>`:''}
+        <div class="big"><span>Order total (incl. GST)</span><span>${fmt(o.total)}</span></div>
+      </div>
+    </div>
+
+    <div class="osec">
+      <div class="olabel">Payment &amp; dispatch</div>
+      Payment ref: <b>${esc(o.payRef)||'—'}</b>
+      ${o.creditDue&&!o.creditSettled?'<br>🧾 Credit — due '+new Date(o.creditDue).toLocaleDateString('en-IN'):''}
+      <br>🚚 Preferred transport: <b>${o.transport?esc(o.transport):'No preference'}</b>
+      ${dispatchLine(o)}
+    </div>
+
+    <div class="osec" style="border:0">
+      <div class="olabel">Actions</div>
+      <div class="orow">
+        <select onchange="setOrderStatus('${o.id}',this.value)" style="width:auto;max-width:180px">
+          ${Object.keys(STATUS_LABEL).map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${STATUS_LABEL[s]}</option>`).join('')}
+        </select>
+        <button class="smallbtn gr-btn" onclick="printOrder('${o.id}')">🖨 Print</button>
+      </div>
+      <div class="olabel" style="margin-top:6px">Dispatch details</div>
+      <div class="orow">
+        <select id="dm-${o.id}" onchange="dispatchMode('${o.id}')" style="width:auto;max-width:230px">
+          <option value="local" ${o.dispatchMode==='local'?'selected':''}>🛺 Local — same city (Porter / vehicle)</option>
+          <option value="outstation" ${o.dispatchMode!=='local'?'selected':''}>🚚 Outstation — other district / state (LR)</option>
+        </select>
+      </div>
+      <div id="dloc-${o.id}" style="display:${o.dispatchMode==='local'?'block':'none'}">
+        <div class="orow">
+          <input id="veh-${o.id}" placeholder="Vehicle number (TS09AB1234)" value="${esc(o.vehicleNo||'')}" style="width:190px;text-transform:uppercase">
+          <input id="drv-${o.id}" placeholder="Driver name" value="${esc(o.driverName||'')}" style="width:150px">
+          <input id="dph-${o.id}" placeholder="Driver phone" value="${esc(o.driverPhone||'')}" style="width:140px" inputmode="numeric">
+        </div>
+        <div class="hint">Porter or own vehicle for same-city delivery — the customer sees the vehicle and driver in the app.</div>
+      </div>
+      <div id="dout-${o.id}" style="display:${o.dispatchMode==='local'?'none':'block'}">
+        <div class="orow">
+          <select id="dt-${o.id}" style="width:auto;max-width:190px">
+            <option value="">Transport…</option>
+            ${state.transports.map(t=>`<option value="${esc(t.name)}" ${(o.dispatchTransport||o.transport)===t.name?'selected':''}>${esc(t.name)}</option>`).join('')}
+          </select>
+          <input id="lr-${o.id}" placeholder="LR number" value="${esc(o.lrNumber||'')}" style="width:160px">
+        </div>
+        <div class="hint">Transporter LR / builty number for other districts and states — the customer tracks with this number.</div>
+      </div>
+      <div class="orow">
+        <button class="smallbtn ok-btn" onclick="saveDispatch('${o.id}')">🚚 ${o.dispatchedAt?'Update dispatch':'Save + mark shipped'}</button>
+      </div>
+      <div class="orow"><button class="smallbtn no-btn" onclick="deleteOrder('${o.id}')">🗑 Delete order</button></div>
+    </div>
+  </div>`;
+}
+
+/* printable order slip — used by admin and by the customer */
+async function printOrder(id){
+  let o;
+  try{o=(await api('/admin/orders')).find(x=>x.id===id)}catch(e){return toast(e.message,1)}
+  if(!o)return toast('Order not found',1);
+  printSlip(o);
+}
+function printSlip(o){
+  const taxable=o.gst?Math.round((o.total-o.gst)*100)/100:o.total;
+  const wa=String(o.contact&&(o.contact.whatsapp||o.contact.phone)||'').replace(/\D/g,'').slice(-10);
+  const c=o.contact||{};
+  $('printArea').innerHTML=`
+    <div class="pr-head">
+      <div><div class="pr-brand">Blue Wave · HPMP Manufacturers Pvt Ltd</div>
+        <div class="pr-sub">AC brackets &amp; appliance trolleys</div></div>
+      <div class="pr-right"><div class="pr-title">ORDER SLIP</div>
+        <div class="pr-sub">${o.id}<br>${new Date(o.createdAt).toLocaleString('en-IN')}</div></div>
+    </div>
+    <table class="pr-two"><tr>
+      <td><b>Customer</b><br>${esc(c.company||c.name||'')}<br>${c.company&&c.name?esc(c.name)+'<br>':''}
+        ${c.phone?'Phone: '+esc(c.phone):''}${wa&&c.phone&&wa!==String(c.phone).replace(/\D/g,'').slice(-10)?'<br>WhatsApp: '+esc(wa):''}
+        ${c.gstin?'<br>GSTIN: '+esc(c.gstin):''}
+        <br>${esc(o.addr)}</td>
+      <td><b>Dispatch</b><br>Preferred transport: ${o.transport?esc(o.transport):'—'}
+        <br>Mode: ${o.dispatchMode==='local'?'Local (same city)':o.dispatchMode==='outstation'?'Outstation':'—'}
+        <br>Sent via: ${esc(o.dispatchTransport||'—')}
+        ${o.dispatchMode==='local'?`<br>Vehicle: <b>${esc(o.vehicleNo)||'—'}</b><br>Driver: ${esc(o.driverName||'—')}${o.driverPhone?' · '+esc(o.driverPhone):''}`
+          :`<br>LR number: <b>${esc(o.lrNumber)||'—'}</b>`}
+        <br>Status: ${STATUS_LABEL[o.status]}
+        <br>Pricing: ${o.tier==='dealer'?'Dealer':'MRP'}</td>
+    </tr></table>
+    <table class="pr-items"><thead><tr><th>#</th><th>Product</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead><tbody>
+      ${o.items.map((i,n)=>{
+        const parts=String(i.name).split(' — ');const nm=parts.shift();const extra=parts.join(' — ');
+        return `<tr><td>${n+1}</td><td>${esc(nm)}${extra?'<br><span class="pr-sub">'+esc(extra)+'</span>':''}</td>
+        <td class="r"><b>${i.qty}</b></td><td class="r">${fmt(i.rate)}</td><td class="r">${fmt(i.rate*i.qty)}</td></tr>`}).join('')}
+      <tr><td colspan="3"></td><td class="r">Taxable</td><td class="r">${fmt(taxable)}</td></tr>
+      ${o.gst?`<tr><td colspan="3"></td><td class="r">GST ${o.gstPercent||18}%</td><td class="r">${fmt(o.gst)}</td></tr>`:''}
+      <tr class="pr-total"><td colspan="3"></td><td class="r">TOTAL (incl. GST)</td><td class="r">${fmt(o.total)}</td></tr>
+    </tbody></table>
+    ${o.notes?`<p><b>Order notes:</b> ${esc(o.notes)}</p>`:''}
+    <p><b>Payment:</b> ${esc(o.payRef)||'—'}${o.creditDue&&!o.creditSettled?' · Credit due '+new Date(o.creditDue).toLocaleDateString('en-IN'):''}</p>
+    <div class="pr-sign"><div>Packed by ______________</div><div>Checked by ______________</div><div>Received by ______________</div></div>`;
+  /* inside the iPhone app, hand the slip to iOS printing (AirPrint / Save as PDF) */
+  if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.BlueWavePrint){
+    try{
+      window.webkit.messageHandlers.BlueWavePrint.postMessage(printDocument($('printArea').innerHTML));
+      toast('🖨 Opening print…');
+      return;
+    }catch(e){/* fall through */}
+  }
+  /* inside the Android app, hand a self-contained slip to Android's print service */
+  if(window.BlueWavePrint&&window.BlueWavePrint.printHtml){
+    try{
+      window.BlueWavePrint.printHtml(printDocument($('printArea').innerHTML));
+      toast('🖨 Opening print…');
+      return;
+    }catch(e){/* fall through to browser printing */}
+  }
+  document.body.classList.add('printing');
+  setTimeout(()=>{window.print();setTimeout(()=>document.body.classList.remove('printing'),400)},60);
+}
+/* wraps the slip in a standalone page with its own print styles */
+function printDocument(inner){
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  @page{size:A4;margin:10mm}
+  body{font-family:'Britannic Bold','Britannic','Arial Narrow','Segoe UI Semibold',system-ui,-apple-system,'Segoe UI',sans-serif;color:#000;font-size:12px;margin:0}
+  .pr-head{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}
+  .pr-brand{font-size:16px;font-weight:bold}
+  .pr-title{font-size:15px;font-weight:bold;text-align:right}
+  .pr-right{text-align:right}
+  .pr-sub{font-size:10px;color:#444}
+  .pr-two{width:100%;border-collapse:collapse;margin-bottom:10px}
+  .pr-two td{width:50%;vertical-align:top;border:1px solid #000;padding:6px;font-size:11px}
+  .pr-items{width:100%;border-collapse:collapse}
+  .pr-items th,.pr-items td{border:1px solid #000;padding:5px 6px;font-size:11px}
+  .pr-items th{background:#eee}
+  .pr-items .r{text-align:right}
+  .pr-total td{font-weight:bold;font-size:12.5px}
+  .pr-sign{display:flex;justify-content:space-between;margin-top:26px;font-size:11px}
+  p{margin:6px 0}
+</style></head><body>${inner}</body></html>`;
+}
+
+/* customer-facing order card — same clear item-wise layout the admin sees */
+function myOrderCard(o){
+  const taxable=o.gst?Math.round((o.total-o.gst)*100)/100:o.total;
+  return `<div class="ocard">
+    <div class="ohead">
+      <div><b>${o.id}</b><span class="oitems"> · ${new Date(o.createdAt).toLocaleDateString('en-IN')}</span></div>
+      <div><span class="badge b-${o.status}">${STATUS_LABEL[o.status]}</span></div>
+    </div>
+    <div class="osec">
+      <div class="olabel">Items ordered</div>
+      <table class="otable"><thead><tr><th>#</th><th>Product</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead><tbody>
+      ${o.items.map((i,n)=>{
+        const parts=String(i.name).split(' — ');const nm=parts.shift();const extra=parts.join(' — ');
+        return `<tr><td>${n+1}</td>
+          <td><b>${esc(nm)}</b>${extra?'<br><span class="oitems">'+esc(extra)+'</span>':''}</td>
+          <td class="r"><b>${i.qty}</b></td><td class="r">${fmt(i.rate)}</td><td class="r"><b>${fmt(i.rate*i.qty)}</b></td></tr>`}).join('')}
+      </tbody></table>
+      <div class="ototals">
+        <div><span>Taxable value</span><span>${fmt(taxable)}</span></div>
+        ${o.gst?`<div><span>GST ${o.gstPercent||18}% (included)</span><span>${fmt(o.gst)}</span></div>`:''}
+        <div class="big"><span>Order total (incl. GST)</span><span>${fmt(o.total)}</span></div>
+      </div>
+    </div>
+    <div class="osec">
+      <div class="olabel">Delivery &amp; payment</div>
+      📍 ${esc(o.addr)}
+      <br>🚚 Preferred transport: <b>${o.transport?esc(o.transport):'No preference'}</b>
+      ${o.dispatchMode==='local'&&o.vehicleNo
+        ? `<br><span class="badge b-shipped">🛺 Local delivery · ${esc(o.vehicleNo)}</span>${o.driverName?'<br>Driver: <b>'+esc(o.driverName)+'</b>':''}${o.driverPhone?` · <a href="tel:${esc(o.driverPhone)}">${esc(o.driverPhone)}</a>`:''}${o.dispatchedAt?'<br><span class="oitems">Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN')+'</span>':''}`
+        : o.lrNumber
+        ? `<br><span class="badge b-shipped">🚚 LR ${esc(o.lrNumber)}</span> ${esc(o.dispatchTransport||'')}${o.dispatchedAt?'<br><span class="oitems">Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN')+'</span>':''}<br><span class="oitems">Quote this LR number with the transporter to track your material.</span>`
+        : ''}
+      <br>Payment: <b>${esc(o.payRef)||'Pending'}</b>
+      ${o.creditDue&&!o.creditSettled?`<br><span class="badge b-pending">🧾 Pay by ${new Date(o.creditDue).toLocaleDateString('en-IN')}</span>`:''}
+      ${o.notes?'<br>📝 '+esc(o.notes):''}
+    </div>
+    <div class="osec" style="border:0">
+      <div class="orow">
+        ${o.status==='awaiting_payment'
+          ? `<button class="smallbtn ok-btn" onclick="openPaymentById('${o.id}')">💳 Pay now</button>`
+          : `<button class="smallbtn gr-btn" onclick="openPaymentById('${o.id}')">Order details</button>`}
+        <button class="smallbtn gr-btn" onclick="printMyOrder('${o.id}')">🖨 Print</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function printMyOrder(id){
+  let o;try{o=(await api('/my/orders')).find(x=>x.id===id)}catch(e){return toast(e.message,1)}
+  if(!o)return toast('Order not found',1);
+  printSlip(o);
+}
+
+/* ---- dispatch helpers (local Porter vehicle / outstation LR) ---- */
+function dispatchLine(o){
+  if(o.dispatchMode==='local'&&o.vehicleNo)
+    return `<br><span class="badge b-shipped">🛺 Local · ${esc(o.vehicleNo)}</span> ${esc(o.driverName||'')}${o.driverPhone?' · '+esc(o.driverPhone):''}${o.dispatchedAt?' · '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}`;
+  if(o.lrNumber)
+    return `<br><span class="badge b-shipped">🚚 LR ${esc(o.lrNumber)}</span> ${esc(o.dispatchTransport||'')}${o.dispatchedAt?' · '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}`;
+  return '';
+}
+function dispatchMode(id){
+  const local=$('dm-'+id).value==='local';
+  $('dloc-'+id).style.display=local?'block':'none';
+  $('dout-'+id).style.display=local?'none':'block';
+}
+async function saveDispatch(id){
+  const mode=$('dm-'+id)?$('dm-'+id).value:'outstation';
+  const body={mode};
+  if(mode==='local'){
+    const veh=$('veh-'+id).value.trim().toUpperCase();
+    if(!veh)return toast('Enter the vehicle number',1);
+    body.vehicleNo=veh;
+    body.driverName=$('drv-'+id).value.trim();
+    body.driverPhone=$('dph-'+id).value.trim();
+    body.transport='Porter (local delivery)';
+  }else{
+    const lr=$('lr-'+id).value.trim();
+    if(!lr)return toast('Enter the LR number',1);
+    body.lrNumber=lr;
+    body.transport=$('dt-'+id).value;
+  }
+  try{
+    await api('/admin/orders/'+id+'/dispatch','POST',body);
+    toast(mode==='local'?('🛺 Local dispatch saved — vehicle '+body.vehicleNo):('🚚 Dispatch saved — LR '+body.lrNumber));
+    refreshOrdersScreen();
+  }catch(e){toast(e.message,1)}
+}
+function refreshOrdersScreen(){currentView==='orders'?renderOrdersView():renderAdmin(adminTab||'regs')}
+async function deleteOrder(id){
+  if(!confirm('Delete order '+id+' permanently? This cannot be undone.'))return;
+  try{await api('/admin/orders/'+id,'DELETE');toast('Order '+id+' deleted');refreshOrdersScreen()}
+  catch(e){toast(e.message,1)}
+}
+
+async function setOrderStatus(id,st){
+  try{await api('/admin/orders/'+id+'/status','POST',{status:st});toast('Order '+id+' → '+STATUS_LABEL[st]);refreshOrdersScreen()}
+  catch(e){toast(e.message,1)}
+}
+async function renderPricing(){
+  const products=await api('/admin/products');
+  _adminProds=products;
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>Product &amp; price editor</h3>
+    <div class="hint" style="margin-bottom:10px">Edit any value and click <b>Save all changes</b>. New prices apply instantly for every customer. Untick "Live" to hide a product.</div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Photo</th><th>Product</th><th>Category</th><th>MRP ₹</th><th>Dealer ₹</th><th>Margin</th><th>MOQ</th><th>Live</th><th></th></tr></thead><tbody id="priceRows">
+    ${products.map(p=>`<tr data-pid="${p.id}">
+      <td style="text-align:center">${p.image?`<img src="${p.image}" style="width:44px;height:44px;object-fit:cover;border-radius:8px">`:`<span style="font-size:26px">${p.emoji}</span>`}<br>
+        <input type="file" accept="image/*" style="display:none" id="img-${p.id}" onchange="uploadImg('${p.id}',this)">
+        <button class="copybtn" style="margin:3px 0 0" onclick="$('img-${p.id}').click()">📷 ${p.image?'Change':'Add'}</button>
+        ${p.image?`<button class="copybtn" style="margin:3px 0 0;color:var(--red);border-color:var(--red)" onclick="removeImg('${p.id}')">✕</button>`:''}</td>
+      <td><input class="pr-name" value="${esc(p.name)}" style="min-width:190px"><br><button class="copybtn" style="margin-top:3px" onclick="editMeta('${p.id}')">📝 Description &amp; packing</button></td>
+      <td><input class="pr-cat" value="${esc(p.cat)}" style="min-width:130px"></td>
+      <td><input class="pr-mrp pin" type="number" min="0" value="${p.mrp}"></td>
+      <td><input class="pr-dealer pin" type="number" min="0" value="${p.dealer}"></td>
+      <td><b>${Math.round((1-p.dealer/p.mrp)*100)}%</b> off MRP</td>
+      <td><input class="pr-moq pin" type="number" min="1" value="${p.moq}"></td>
+      <td style="text-align:center"><input type="checkbox" class="pr-active" style="width:18px;height:18px" ${p.active?'checked':''}></td>
+      <td><button class="smallbtn no-btn" onclick="deleteProduct('${p.id}')" title="Delete">🗑</button></td>
+    </tr>`).join('')}
+    </tbody></table></div>
+    <button class="wide blue" style="max-width:280px" onclick="savePrices()">💾 Save all changes</button>
+  </div>
+  <div class="cardbox"><h3>➕ Add new product</h3>
+    <div class="frow">
+      <div><label>Product name</label><input id="np-name" placeholder="e.g., XEON AC Bracket (4 Kg)"></div>
+      <div><label>Category</label><input id="np-cat" value="AC Brackets"></div>
+    </div>
+    <div class="frow">
+      <div><label>MRP (₹)</label><input id="np-mrp" type="number" min="0"></div>
+      <div><label>Dealer price (₹)</label><input id="np-dealer" type="number" min="0"></div>
+    </div>
+    <button class="wide" style="max-width:220px" onclick="addProduct()">Add product</button>
+  </div>`;
+}
+let _adminProds=[];
+function editMeta(pid){
+  const p=_adminProds.find(x=>x.id===pid);if(!p)return;
+  genModal('📝 '+esc(p.name),`
+    <label>Product description (shown to customers)</label>
+    <textarea id="em-descr" rows="4">${esc(p.descr||'')}</textarea>
+    <label>Master packing details</label>
+    <textarea id="em-pack" rows="4">${esc(p.packing||'')}</textarea>
+    <button class="wide blue" onclick="saveMeta('${pid}')">💾 Save details</button>`);
+}
+async function saveMeta(pid){
+  try{
+    await api('/admin/products/'+pid,'PUT',{descr:$('em-descr').value.trim(),packing:$('em-pack').value.trim()});
+    await refreshProducts();closeModal('modal-gen');toast('💾 Details saved — live in the store');renderAdmin('pricing');
+  }catch(e){toast(e.message,1)}
+}
+function uploadImg(pid,input){
+  const f=input.files&&input.files[0];if(!f)return;
+  if(!f.type.startsWith('image/'))return toast('Choose an image file',1);
+  const img=new Image();
+  img.onload=async()=>{
+    const max=500,scale=Math.min(1,max/Math.max(img.width,img.height));
+    const c=document.createElement('canvas');
+    c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const data=c.toDataURL('image/jpeg',0.82);
+    try{await api('/admin/products/'+pid,'PUT',{image:data});await refreshProducts();toast('📷 Photo updated — live in the store');renderAdmin('pricing')}
+    catch(e){toast(e.message,1)}
+  };
+  img.onerror=()=>toast('Could not read that image',1);
+  img.src=URL.createObjectURL(f);
+}
+async function removeImg(pid){
+  if(!confirm('Remove this product photo?'))return;
+  try{await api('/admin/products/'+pid,'PUT',{image:''});await refreshProducts();renderAdmin('pricing');toast('Photo removed')}
+  catch(e){toast(e.message,1)}
+}
+async function savePrices(){
+  const rows=[...document.querySelectorAll('#priceRows tr')];
+  try{
+    await Promise.all(rows.map(tr=>api('/admin/products/'+tr.dataset.pid,'PUT',{
+      name:tr.querySelector('.pr-name').value.trim(),
+      cat:tr.querySelector('.pr-cat').value.trim(),
+      mrp:parseFloat(tr.querySelector('.pr-mrp').value),
+      dealer:parseFloat(tr.querySelector('.pr-dealer').value),
+      moq:parseInt(tr.querySelector('.pr-moq').value),
+      active:tr.querySelector('.pr-active').checked
+    })));
+    await refreshProducts();
+    toast('💾 Prices updated — live for all customers now');renderAdmin('pricing');
+  }catch(e){toast(e.message,1)}
+}
+async function addProduct(){
+  try{
+    await api('/admin/products','POST',{name:$('np-name').value.trim(),cat:$('np-cat').value.trim(),mrp:parseFloat($('np-mrp').value),dealer:parseFloat($('np-dealer').value)});
+    await refreshProducts();toast('Product added');renderAdmin('pricing');
+  }catch(e){toast(e.message,1)}
+}
+async function deleteProduct(id){
+  if(!confirm('Delete this product? Past orders keep their records. Tip: untick "Live" to hide instead.'))return;
+  try{await api('/admin/products/'+id,'DELETE');await refreshProducts();renderAdmin('pricing');toast('Product deleted')}
+  catch(e){toast(e.message,1)}
+}
+async function renderCredit(){
+  const d=await api('/admin/credit');
+  const auto=d.provider?`<div class="notice ok">🤖 Automatic reminders are <b>ON</b> via ${d.provider==='whatsapp'?'WhatsApp Business API':'SMS (MSG91)'} — messages go out on their own before and after each due date.</div>`
+    :`<div class="notice info">💬 Automatic sending isn't connected yet, so use the green <b>WhatsApp</b> button to send a ready-written reminder in one tap. To make it fully automatic, add WhatsApp or SMS keys in <b>Settings → Payment reminders</b>.</div>`;
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>💳 Credit customers — payments due</h3>
+    ${auto}
+    <div class="stats" style="margin-bottom:12px">
+      <div class="stat"><b>${d.orders.length}</b><span>Open credit orders</span></div>
+      <div class="stat"><b>${fmt(d.totalDue)}</b><span>Total outstanding</span></div>
+      <div class="stat"><b style="color:${d.overdue?'var(--red)':'var(--navy)'}">${d.overdue}</b><span>Overdue</span></div>
+    </div>
+    ${d.orders.length?`<div style="overflow-x:auto"><table><thead><tr><th>Order</th><th>Customer</th><th>Amount</th><th>Due date</th><th>Status</th><th>Last reminder</th><th>Actions</th></tr></thead><tbody>
+    ${d.orders.map(o=>{
+      const late=o.dueDays<0;
+      const badge=late?`<span class="badge b-rejected">Overdue ${Math.abs(o.dueDays)}d</span>`
+        :o.dueDays===0?`<span class="badge b-pending">Due today</span>`
+        :`<span class="badge b-approved">In ${o.dueDays}d</span>`;
+      return `<tr>
+        <td><b>${o.id}</b></td>
+        <td>${esc(o.company)}<br><span class="oitems">📞 ${esc(o.phone)}</span></td>
+        <td><b>${fmt(o.total)}</b></td>
+        <td>${new Date(o.dueAt).toLocaleDateString('en-IN')}<br><span class="oitems">${o.creditDays}-day terms</span></td>
+        <td>${badge}</td>
+        <td class="oitems">${o.lastReminder?esc(o.lastReminder.kind)+'<br>'+new Date(o.lastReminder.at).toLocaleDateString('en-IN')+' · '+esc(o.lastReminder.status):'—'}</td>
+        <td>
+          <a href="${o.waLink}" target="_blank"><button class="smallbtn ok-btn">💬 WhatsApp</button></a>
+          <button class="smallbtn gr-btn" onclick="sendRemind('${o.id}')">📤 Send now</button>
+          <button class="smallbtn gr-btn" onclick="settleCredit('${o.id}')">✅ Mark paid</button>
+        </td></tr>`}).join('')}
+    </tbody></table></div>`
+    :'<div class="empty"><span class="big">💳</span>No outstanding credit orders.</div>'}
+    <button class="wide blue" style="max-width:280px;margin-top:14px" onclick="runReminders()">🤖 Run reminder check now</button>
+  </div>`;
+}
+async function sendRemind(id){
+  try{await api('/admin/credit/'+id+'/remind','POST');toast('📤 Reminder sent');renderAdmin('credit')}
+  catch(e){toast(e.message,1)}
+}
+async function settleCredit(id){
+  if(!confirm('Mark this credit order as paid? It stops all further reminders.'))return;
+  try{await api('/admin/credit/'+id+'/settle','POST');toast('✅ Marked as paid');renderAdmin('credit')}
+  catch(e){toast(e.message,1)}
+}
+async function runReminders(){
+  try{const r=await api('/admin/credit/run','POST');toast('Checked '+(r.checked||0)+' credit orders · '+(r.sent||0)+' reminder(s) sent');renderAdmin('credit')}
+  catch(e){toast(e.message,1)}
+}
+async function renderLogistics(){
+  const ts=await api('/admin/transports');
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>🚚 Logistics — transport list</h3>
+    <div class="hint" style="margin-bottom:12px">Add the transport services you dispatch with. Customers pick their preferred transport from this list at checkout, and their choice shows on every order.</div>
+    ${ts.length?ts.map(t=>`<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px 14px;margin-bottom:6px">
+      <b style="color:var(--navy)">🚚 ${esc(t.name)}</b>
+      <button class="smallbtn no-btn" onclick="delTransport('${t.id}')">🗑 Remove</button></div>`).join('')
+    :'<div class="empty"><span class="big">🚚</span>No transports yet — add your first one below.</div>'}
+    <div class="frow" style="margin-top:14px">
+      <div><label>Transport name</label><input id="tr-name" placeholder="e.g., VRL Logistics, Navata, TCI Express"></div>
+      <div><label>&nbsp;</label><button class="wide blue" style="margin-top:0" onclick="addTransport()">➕ Add transport</button></div>
+    </div>
+  </div>`;
+  const inp=$('tr-name');if(inp)inp.addEventListener('keydown',e=>{if(e.key==='Enter')addTransport()});
+}
+async function addTransport(){
+  const n=$('tr-name').value.trim();
+  if(!n)return toast('Enter a transport name',1);
+  try{await api('/admin/transports','POST',{name:n});await refreshTransports();toast('🚚 Transport added: '+n);renderAdmin('logistics')}
+  catch(e){toast(e.message,1)}
+}
+async function delTransport(id){
+  if(!confirm('Remove this transport from the list? Past orders keep their records.'))return;
+  try{await api('/admin/transports/'+id,'DELETE');await refreshTransports();renderAdmin('logistics');toast('Transport removed')}
+  catch(e){toast(e.message,1)}
+}
+async function renderSettings(){
+  const s=await api('/admin/settings');
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>💳 Payment details (shown to customers at checkout)</h3>
+    <div class="frow">
+      <div><label>Payee / account name</label><input id="st-payee" value="${esc(s.payeeName)}"></div>
+      <div><label>WhatsApp number</label><input id="st-wa2" value="${esc(s.whatsapp)}" disabled style="display:none"></div>
+    </div>
+    <div class="frow">
+      <div><label>Bank name (optional)</label><input id="st-bank" value="${esc(s.bankName)}"></div>
+      <div><label>Account number (optional)</label><input id="st-acc" value="${esc(s.accountNo)}"></div>
+    </div>
+    <div class="frow">
+      <div><label>IFSC (optional)</label><input id="st-ifsc" value="${esc(s.ifsc)}"></div>
+      <div><label>WhatsApp number</label><input id="st-wa" value="${esc(s.whatsapp)}"></div>
+    </div>
+    <div class="frow">
+      <div><label>GST % included in your prices</label><input id="st-gst" type="number" min="0" max="100" value="${s.gstPercent}"><div class="hint">MRP and dealer prices are treated as GST-inclusive — the app shows the GST portion inside each total automatically.</div></div>
+    </div>
+  </div>
+  <div class="cardbox"><h3>💳 Razorpay gateway (online payments — UPI, cards, netbanking)</h3>
+    <div class="notice ${s.rzpSecretSet&&s.rzpKeyId?'ok':'info'}" style="margin-bottom:8px">
+      ${s.rzpSecretSet&&s.rzpKeyId?'✅ Razorpay is <b>enabled</b> — customers see a "Pay online" button with instant confirmation.':'⭕ Not enabled yet. Get free API keys at <b>dashboard.razorpay.com → Account &amp; Settings → API Keys</b>, paste them below, and online payments switch on automatically.'}
+    </div>
+    <div class="frow">
+      <div><label>Key ID</label><input id="st-rzpid" value="${esc(s.rzpKeyId)}" placeholder="rzp_live_XXXXXXXXXXXX"></div>
+      <div><label>Key secret ${s.rzpSecretSet?'(saved — leave blank to keep)':''}</label><input id="st-rzpsecret" type="password" placeholder="${s.rzpSecretSet?'••••••••••••':'Paste key secret'}"></div>
+    </div>
+    <div class="hint">Use <b>rzp_test_…</b> keys first to try it safely, then switch to <b>rzp_live_…</b> keys.</div>
+  </div>
+  <div class="cardbox"><h3>🔔 Payment reminders for credit customers</h3>
+    <div class="notice ${s.remProvider?'ok':'info'}" style="margin-bottom:8px">
+      ${s.remProvider?'✅ Automatic reminders are <b>ON</b> — the app messages credit customers by itself based on their credit days.'
+      :'⭕ Automatic sending is off. Reminders are still tracked in the <b>Credit</b> tab with one-tap WhatsApp buttons. Choose a channel below to make them fully automatic.'}
+    </div>
+    <label>Sending channel</label>
+    <select id="st-remprov">
+      <option value="" ${!s.remProvider?'selected':''}>Manual — one-tap WhatsApp buttons only (free)</option>
+      <option value="whatsapp" ${s.remProvider==='whatsapp'?'selected':''}>WhatsApp Business API (Meta Cloud)</option>
+      <option value="msg91" ${s.remProvider==='msg91'?'selected':''}>SMS via MSG91</option>
+    </select>
+    <div class="frow">
+      <div><label>Remind days BEFORE due date</label><input id="st-rembefore" value="${esc(s.remBefore)}" placeholder="3"><div class="hint">Comma separated, e.g. 7,3,1</div></div>
+      <div><label>Remind days AFTER due date</label><input id="st-remafter" value="${esc(s.remAfter)}" placeholder="1,3,7"></div>
+    </div>
+    <div class="frow">
+      <div><label>Send on the due date itself</label><select id="st-remondue"><option value="1" ${String(s.remOnDue)!=='0'?'selected':''}>Yes</option><option value="0" ${String(s.remOnDue)==='0'?'selected':''}>No</option></select></div>
+      <div><label>Time of day (0–23)</label><input id="st-remhour" type="number" min="0" max="23" value="${esc(s.remHour)}"></div>
+    </div>
+    <label>Message template</label>
+    <textarea id="st-remtpl" rows="4">${esc(s.remTemplate)}</textarea>
+    <div class="hint">Placeholders: <b>{name}</b> {order} {amount} {date} {dueDate} {due}</div>
+    <div id="remKeys" style="margin-top:10px"></div>
+  </div>
+  <div class="cardbox"><h3>🧾 GSTIN auto-verification (optional)</h3>
+    <div class="notice ${s.gstApiKeySet?'ok':'info'}" style="margin-bottom:8px">
+      ${s.gstApiKeySet?'✅ Live GST-records lookup is <b>enabled</b> — registration forms auto-fill the legal name and address from GST records.':'⭕ Not configured. The app already validates GSTIN format &amp; check digit and auto-fills the state. To also auto-fill <b>legal name and address from GST records</b>, get a GST verification API key (e.g. from <b>appyflow.in</b>) and paste it below.'}
+    </div>
+    <label>GST verification API key ${s.gstApiKeySet?'(saved — leave blank to keep)':''}</label>
+    <input id="st-gstkey" type="password" placeholder="${s.gstApiKeySet?'••••••••••••':'Paste key secret'}">
+  </div>
+  <div class="cardbox"><h3>🔐 Admin login</h3>
+    <div class="frow">
+      <div><label>Admin email</label><input id="st-aemail" value="${esc(s.adminEmail)}"></div>
+      <div><label>New admin password (leave blank to keep current)</label><input id="st-apass" type="password" placeholder="••••••••"></div>
+    </div>
+    <div class="hint">Share only with your backend/approval team.</div>
+  </div>
+  <button class="wide blue" style="max-width:260px" onclick="saveSettings()">💾 Save settings</button>
+  <div class="cardbox" style="margin-top:16px;border:1px solid #f0c0c0"><h3 style="color:var(--red)">⚠️ Danger zone</h3>
+    <div class="hint" style="margin-bottom:10px">Each action asks for the admin password before deleting. Products, prices, transports and settings are always kept. Deletions cannot be undone.</div>
+    <button class="smallbtn no-btn" onclick="resetData('accounts')">🗑 Delete ALL accounts</button>
+    <button class="smallbtn no-btn" onclick="resetData('orders')">🗑 Delete ALL orders</button>
+  </div>`;
+  const sel=$('st-remprov');
+  if(sel){remKeysUI(s);sel.addEventListener('change',()=>remKeysUI(s))}
+}
+async function resetData(scope){
+  const what=scope==='accounts'?'ALL registered business accounts':'ALL orders';
+  if(!confirm('This permanently deletes '+what+'. Continue?'))return;
+  const pw=prompt('🔐 Enter the ADMIN password to verify this deletion:');
+  if(pw===null)return;
+  try{await api('/admin/reset','POST',{scope,password:pw});toast('🗑 Deleted '+what.toLowerCase());renderAdmin(scope==='accounts'?'regs':'orders')}
+  catch(e){toast(e.message,1)}
+}
+function remKeysUI(s){
+  const box=$('remKeys');if(!box)return;
+  const v=$('st-remprov').value;
+  box.innerHTML=v==='whatsapp'?`<div class="frow">
+      <div><label>WhatsApp Phone Number ID</label><input id="st-waphone" value="${esc(s.waPhoneId)}" placeholder="From Meta → WhatsApp → API Setup"></div>
+      <div><label>Permanent access token ${s.waTokenSet?'(saved — blank keeps it)':''}</label><input id="st-watoken" type="password" placeholder="${s.waTokenSet?'••••••••':'Paste token'}"></div>
+    </div><div class="hint">Create a free WhatsApp Business (Cloud API) app at developers.facebook.com. Business-initiated messages need an approved template in some cases.</div>`
+  :v==='msg91'?`<div class="frow">
+      <div><label>MSG91 Auth Key ${s.smsKeySet?'(saved — blank keeps it)':''}</label><input id="st-smskey" type="password" placeholder="${s.smsKeySet?'••••••••':'Paste auth key'}"></div>
+      <div><label>Sender ID</label><input id="st-smssender" value="${esc(s.smsSender)}" placeholder="HPMPMF"></div>
+    </div><div class="hint">Get an account at msg91.com — DLT-registered sender ID and template are required for Indian SMS.</div>`
+  :`<div class="hint">No keys needed. Open the <b>Credit</b> tab and tap the WhatsApp button next to any due order to send the ready-written reminder.</div>`;
+}
+async function saveSettings(){
+  try{
+    await api('/admin/settings','PUT',{
+      remProvider:$('st-remprov').value,remBefore:$('st-rembefore').value.trim(),
+      remAfter:$('st-remafter').value.trim(),remOnDue:$('st-remondue').value,
+      remHour:$('st-remhour').value,remTemplate:$('st-remtpl').value,
+      ...($('st-waphone')?{waPhoneId:$('st-waphone').value.trim()}:{}),
+      ...($('st-watoken')&&$('st-watoken').value.trim()?{waToken:$('st-watoken').value.trim()}:{}),
+      ...($('st-smskey')&&$('st-smskey').value.trim()?{smsKey:$('st-smskey').value.trim()}:{}),
+      ...($('st-smssender')?{smsSender:$('st-smssender').value.trim()}:{}),
+      payeeName:$('st-payee').value.trim(),bankName:$('st-bank').value.trim(),
+      accountNo:$('st-acc').value.trim(),ifsc:$('st-ifsc').value.trim(),whatsapp:$('st-wa').value.trim(),
+      gstPercent:parseFloat($('st-gst').value),
+      adminEmail:$('st-aemail').value.trim(),rzpKeyId:$('st-rzpid').value.trim(),
+      ...($('st-rzpsecret').value.trim()?{rzpKeySecret:$('st-rzpsecret').value.trim()}:{}),
+      ...($('st-gstkey').value.trim()?{gstApiKey:$('st-gstkey').value.trim()}:{}),
+      ...($('st-apass').value?{adminPassword:$('st-apass').value}:{})
+    });
+    state.payInfo=await api('/pay-info');
+    toast('💾 Settings saved');
+  }catch(e){toast(e.message,1)}
+}
+
+/* ============ SHOW PASSWORD ============ */
+function addPwToggles(root){
+  (root||document).querySelectorAll('input[type=password]').forEach(inp=>{
+    if(inp.dataset.pw)return;
+    inp.dataset.pw='1';
+    const wrap=document.createElement('div');
+    wrap.className='pwwrap';
+    inp.parentNode.insertBefore(wrap,inp);
+    wrap.appendChild(inp);
+    const eye=document.createElement('button');
+    eye.type='button';eye.className='pweye';eye.textContent='👁';
+    eye.title='Show password';eye.setAttribute('aria-label','Show password');
+    eye.onclick=()=>{
+      const show=inp.type==='password';
+      inp.type=show?'text':'password';
+      eye.textContent=show?'🙈':'👁';
+      eye.title=show?'Hide password':'Show password';
+      inp.focus();
+    };
+    wrap.appendChild(eye);
+  });
+}
+/* keep working as screens re-render */
+new MutationObserver(()=>addPwToggles()).observe(document.body,{childList:true,subtree:true});
+addPwToggles();
+
+/* ============ PWA install ============ */
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+/* ============ INIT ============ */
+(async function init(){
+  try{
+    await Promise.all([refreshProducts(),refreshMe(),refreshTransports(),api('/pay-info').then(d=>state.payInfo=d)]);
+  }catch(e){toast('Could not reach the server — check your connection.',1)}
+  renderHeader();showView('home');
+})();
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('mousedown',e=>{if(e.target===m)m.classList.remove('on')}));
+
+/* opening animation — fades away once the first screen is ready */
+(function(){
+  const s=document.getElementById('splash');
+  if(!s)return;
+  const hide=()=>{s.classList.add('gone');setTimeout(()=>{s.style.display='none'},700)};
+  setTimeout(hide,5000);   /* opening animation ~5 seconds */
+  document.addEventListener('click',()=>{if(!s.classList.contains('gone'))hide()},{once:true});
+})();
+</script>
+</body>
+</html>
