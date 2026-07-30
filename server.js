@@ -157,6 +157,9 @@ try { db.exec("ALTER TABLE users ADD COLUMN mobile_code TEXT DEFAULT ''"); } cat
 try { db.exec("ALTER TABLE users ADD COLUMN email_code TEXT DEFAULT ''"); } catch (e) { /* exists */ }
 try { db.exec('ALTER TABLE users ADD COLUMN mobile_ok INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
 try { db.exec('ALTER TABLE users ADD COLUMN email_ok INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
+/* password reset by code */
+try { db.exec("ALTER TABLE users ADD COLUMN reset_code TEXT DEFAULT ''"); } catch (e) { /* exists */ }
+try { db.exec("ALTER TABLE users ADD COLUMN reset_at TEXT DEFAULT ''"); } catch (e) { /* exists */ }
 
 /* per-dealer custom price list (blank row = dealer uses the standard dealer price) */
 db.exec(`CREATE TABLE IF NOT EXISTS dealer_prices(
@@ -293,7 +296,8 @@ app.get('/api/pay-info', (req, res) => {
     payeeName: getSetting('payeeName'),
     bankName: getSetting('bankName'), accountNo: getSetting('accountNo'),
     ifsc: getSetting('ifsc'), whatsapp: getSetting('whatsapp'), gstPercent: gstPercent(),
-    razorpay: { enabled: rzpEnabled(), keyId: rzpEnabled() ? rzpKeys().id : '' }
+    razorpay: { enabled: rzpEnabled(), keyId: rzpEnabled() ? rzpKeys().id : '' },
+    smsProvider: rs('remProvider') || ''
   });
 });
 
@@ -366,13 +370,30 @@ app.post('/api/register', (req, res) => {
     .run(id, f.name, f.phone, f.email, hashPw(f.password, salt), salt, f.company, f.gstin, f.type, f.addr, f.city, f.state, f.pincode, waNum.replace(/\D/g, '').slice(-10), mCode, eCode, now());
   notifyAdmin('registration', 'New dealer registration',
     f.company + ' (' + f.type + ') from ' + (f.city || '—') + ' — ' + f.name + ', ' + f.phone + '. Verify the GSTIN and approve.');
+  /* send the mobile code immediately; don't hold up the signup response */
+  const fresh = db.prepare('SELECT * FROM users WHERE id=?').get(id);
+  sendVerifyCode(fresh, 'mobile').catch(() => {});
   const token = crypto.randomBytes(24).toString('hex');
   db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, id, 'user', now());
   res.json({ token, role: 'user', user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)) });
 });
 
+/* Finds an account from whatever the customer typed: their registered email,
+ * their mobile number or their WhatsApp number, with or without +91. */
+function findAccount(idRaw) {
+  const id = String(idRaw || '').trim();
+  if (!id) return null;
+  if (id.includes('@'))
+    return db.prepare('SELECT * FROM users WHERE lower(email)=lower(?)').get(id) || null;
+  const ten = id.replace(/\D/g, '').slice(-10);
+  if (ten.length !== 10) return null;
+  return db.prepare(`SELECT * FROM users WHERE
+      substr(replace(replace(replace(phone,' ',''),'-',''),'+',''), -10)=?
+      OR substr(replace(replace(replace(whatsapp,' ',''),'-',''),'+',''), -10)=?`).get(ten, ten) || null;
+}
+
 app.post('/api/login', (req, res) => {
-  const email = String(req.body?.email || '').trim();
+  const email = String(req.body?.email || req.body?.id || '').trim();
   const password = String(req.body?.password || '');
   if (email.toLowerCase() === String(getSetting('adminEmail')).toLowerCase()) {
     if (hashPw(password, getSetting('adminSalt')) === getSetting('adminHash')) {
@@ -382,12 +403,31 @@ app.post('/api/login', (req, res) => {
     }
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
-  const u = db.prepare('SELECT * FROM users WHERE email=?').get(email);
-  if (!u || hashPw(password, u.salt) !== u.pass_hash) return res.status(401).json({ error: 'Invalid email or password.' });
+  const u = findAccount(email);
+  if (!u || hashPw(password, u.salt) !== u.pass_hash)
+    return res.status(401).json({ error: 'Those details did not match an account. Check the email or mobile number and password.' });
   const token = crypto.randomBytes(24).toString('hex');
   db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, u.id, 'user', now());
   res.json({ token, role: 'user', user: pubUser(u) });
 });
+
+/* Sends a verification code over whichever gateway is configured in
+ * Admin → Settings → Payment reminders (MSG91 SMS or WhatsApp Cloud API).
+ * If no gateway is set up the admin still sees the code and passes it on, so
+ * verification never gets stuck. */
+async function sendVerifyCode(u, kind) {
+  const code = kind === 'mobile' ? u.mobile_code : u.email_code;
+  if (!code) return { ok: false, status: 'no_code' };
+  const text = 'Blue Wave verification code: ' + code +
+    '. Enter it in the app under Profile to verify your ' +
+    (kind === 'mobile' ? 'mobile number' : 'email address') +
+    '. HPMP Manufacturers Pvt Ltd.';
+  const to = kind === 'mobile' ? (u.whatsapp || u.phone) : (u.whatsapp || u.phone);
+  const r = await sendMessage(to, text);
+  db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
+    .run('verify:' + u.id, 'verify_' + kind, rs('remProvider') || 'none', String(to || ''), text, r.ok ? 'sent' : r.status, now());
+  return r;
+}
 
 /* ---------- mobile & email verification ----------
  * No SMS/email gateway is needed: the admin sees each pending code in the
@@ -410,6 +450,39 @@ app.post('/api/verify', requireUser, (req, res) => {
   res.json({ ok: true, user: pubUser(after) });
 });
 
+/* customer taps "resend" — same code, sent again over the gateway */
+const resendAt = new Map();
+app.post('/api/verify/resend', requireUser, async (req, res) => {
+  const kind = String(req.body?.kind || '');
+  if (!['mobile', 'email'].includes(kind)) return res.status(400).json({ error: 'Bad verification type.' });
+  const key = req.user.id + ':' + kind;
+  const last = resendAt.get(key) || 0;
+  if (Date.now() - last < 60000)
+    return res.status(429).json({ error: 'Please wait a minute before asking for another code.' });
+  const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
+  if (kind === 'mobile' ? u.mobile_ok : u.email_ok) return res.status(400).json({ error: 'Already verified.' });
+  let code = kind === 'mobile' ? u.mobile_code : u.email_code;
+  if (!code) {
+    code = String(Math.floor(100000 + Math.random() * 900000));
+    db.prepare('UPDATE users SET ' + (kind === 'mobile' ? 'mobile_code=?' : 'email_code=?') + ' WHERE id=?').run(code, u.id);
+  }
+  resendAt.set(key, Date.now());
+  const r = await sendVerifyCode(db.prepare('SELECT * FROM users WHERE id=?').get(u.id), kind);
+  if (!r.ok) notifyAdmin('verify', 'Verification code needs sending by hand',
+    (u.company || u.name) + ' asked for their ' + kind + ' code again, and no SMS gateway is set up. Open their registration and send it on WhatsApp.');
+  res.json({ ok: true, sent: r.ok, status: r.status });
+});
+
+/* admin sends the code over the gateway on demand */
+app.post('/api/admin/users/:id/sendcode', requireAdmin, async (req, res) => {
+  const kind = String(req.body?.kind || '');
+  if (!['mobile', 'email'].includes(kind)) return res.status(400).json({ error: 'Bad verification type.' });
+  const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
+  if (!u) return res.status(404).json({ error: 'User not found.' });
+  const r = await sendVerifyCode(u, kind);
+  res.json({ ok: true, sent: r.ok, status: r.status });
+});
+
 /* admin issues a fresh code (e.g. the customer changed number) */
 app.post('/api/admin/users/:id/recode', requireAdmin, (req, res) => {
   const kind = String(req.body?.kind || '');
@@ -421,7 +494,64 @@ app.post('/api/admin/users/:id/recode', requireAdmin, (req, res) => {
     .run(code, u.id);
   notify(u.id, 'verify', 'New verification code issued',
     'We have sent you a fresh ' + kind + ' verification code. Enter it on your profile screen.');
+  const after = db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
+  sendVerifyCode(after, kind).then(r => { /* logged in reminders */ }).catch(() => {});
   res.json({ ok: true, code });
+});
+
+/* ---------- forgotten password ----------
+ * A 6-digit code goes to the registered mobile by SMS (same gateway as the
+ * verification codes). Codes last 15 minutes. If no gateway is configured the
+ * admin sees the code on the dealer's page and passes it on, so nobody is
+ * locked out. */
+const forgotAt = new Map();
+app.post('/api/forgot', async (req, res) => {
+  const idRaw = String(req.body?.id || '').trim();
+  if (!idRaw) return res.status(400).json({ error: 'Enter your registered email or mobile number.' });
+  const u = findAccount(idRaw);
+  /* Always answer the same way, so the form can't be used to discover
+     which numbers are registered. */
+  const generic = { ok: true, sent: false, hint: 'If that email or mobile is registered, a reset code is on its way.' };
+  if (!u) return res.json(generic);
+  const key = 'f:' + u.id;
+  if (Date.now() - (forgotAt.get(key) || 0) < 60000)
+    return res.status(429).json({ error: 'A code was just sent. Please wait a minute before trying again.' });
+  forgotAt.set(key, Date.now());
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  db.prepare('UPDATE users SET reset_code=?, reset_at=? WHERE id=?').run(code, now(), u.id);
+  const to = u.whatsapp || u.phone;
+  const text = 'Blue Wave password reset code: ' + code +
+    '. It is valid for 15 minutes. If you did not ask for this, ignore this message. HPMP Manufacturers Pvt Ltd.';
+  const r = await sendMessage(to, text);
+  db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
+    .run('reset:' + u.id, 'password_reset', rs('remProvider') || 'none', String(to || ''), text, r.ok ? 'sent' : r.status, now());
+  notifyAdmin('verify', 'Password reset requested',
+    (u.company || u.name) + ' asked to reset their password.' +
+    (r.ok ? ' The code was sent by SMS.' : ' No SMS gateway is set up — open their registration and pass the code on.'));
+  const mask = String(to || '').replace(/\D/g, '').slice(-10).replace(/^(\d{2})\d{6}(\d{2})$/, '$1******$2');
+  res.json({ ok: true, sent: r.ok, to: mask, hint: r.ok ? 'Code sent to the mobile ending ' + mask.slice(-2) : generic.hint });
+});
+
+app.post('/api/reset', (req, res) => {
+  const idRaw = String(req.body?.id || '').trim();
+  const code = String(req.body?.code || '').trim();
+  const password = String(req.body?.password || '');
+  if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit code.' });
+  if (password.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+  const u = findAccount(idRaw);
+  if (!u || !u.reset_code) return res.status(400).json({ error: 'No reset is pending for that account. Ask for a new code.' });
+  const age = Date.now() - new Date(u.reset_at || 0).getTime();
+  if (!(age >= 0 && age < 15 * 60 * 1000)) {
+    db.prepare("UPDATE users SET reset_code='' WHERE id=?").run(u.id);
+    return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
+  }
+  if (code !== String(u.reset_code)) return res.status(400).json({ error: 'That code does not match. Please check and try again.' });
+  const salt = crypto.randomBytes(8).toString('hex');
+  db.prepare("UPDATE users SET pass_hash=?, salt=?, reset_code='', reset_at='' WHERE id=?")
+    .run(hashPw(password, salt), salt, u.id);
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);   // sign out everywhere
+  notify(u.id, 'verify', 'Password changed', 'Your password was reset. Sign in with the new one.');
+  res.json({ ok: true });
 });
 
 app.get('/api/me', (req, res) => {
@@ -688,7 +818,8 @@ app.get('/api/admin/users', requireAdmin, (req, res) => {
   /* the admin also sees the pending verification codes, so they can pass them
      to the customer on WhatsApp or by email */
   res.json(db.prepare("SELECT * FROM users ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, created_at DESC")
-    .all().map(u => ({ ...pubUser(u), mobileCode: u.mobile_ok ? '' : (u.mobile_code || ''), emailCode: u.email_ok ? '' : (u.email_code || '') })));
+    .all().map(u => ({ ...pubUser(u), mobileCode: u.mobile_ok ? '' : (u.mobile_code || ''), emailCode: u.email_ok ? '' : (u.email_code || ''),
+      resetCode: u.reset_code || '', resetAt: u.reset_at || '' })));
 });
 
 /* Admin can correct a dealer's details (typos in name, company, GSTIN, address …) */

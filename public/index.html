@@ -488,14 +488,43 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   </div>
   <div id="pane-login">
     <div class="mtitle">Sign in to your account</div>
-    <div class="msub">Enter your email and password to get started.</div>
-    <label>Email <span class="req">*</span></label><input id="li-email" type="email" placeholder="you@business.com">
-    <label>Password <span class="req">*</span></label><input id="li-pass" type="password" placeholder="••••••••">
+    <div class="msub">Use the email address or the mobile number you registered with.</div>
+    <label>Email or mobile number <span class="req">*</span></label>
+    <input id="li-email" type="text" autocapitalize="none" autocomplete="username" placeholder="you@business.com or 98765 43210">
+    <label>Password <span class="req">*</span></label><input id="li-pass" type="password" autocomplete="current-password" placeholder="••••••••">
     <div class="err" id="li-err"></div>
     <button class="wide blue" onclick="doLogin()">Continue</button>
+    <div style="text-align:center;margin-top:8px">
+      <a href="javascript:authTab('forgot')" style="font-size:13px;color:var(--blue);font-weight:600">Forgot your password?</a>
+    </div>
     <div class="ordiv">OR</div>
     <div style="text-align:center;font-size:13px;color:var(--mut)">New to Blue Wave?<br>
       <a href="javascript:authTab('register')" style="font-weight:700">Create an account</a></div>
+  </div>
+  <div id="pane-forgot" style="display:none">
+    <div class="mtitle">Reset your password</div>
+    <div class="msub">We send a 6-digit code to the mobile number on your account.</div>
+    <div id="fg-step1">
+      <label>Registered email or mobile number <span class="req">*</span></label>
+      <input id="fg-id" type="text" autocapitalize="none" placeholder="you@business.com or 98765 43210">
+      <div class="err" id="fg-err1"></div>
+      <button class="wide blue" onclick="askReset()">Send reset code</button>
+    </div>
+    <div id="fg-step2" style="display:none">
+      <div class="notice info" id="fg-note"></div>
+      <label>6-digit code <span class="req">*</span></label>
+      <input id="fg-code" inputmode="numeric" maxlength="6" placeholder="123456">
+      <label>New password <span class="req">*</span></label>
+      <input id="fg-p1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
+      <label>Confirm new password <span class="req">*</span></label>
+      <input id="fg-p2" type="password" autocomplete="new-password" placeholder="Repeat the new password">
+      <div class="err" id="fg-err2"></div>
+      <button class="wide blue" onclick="doReset()">Set new password</button>
+      <button class="wide ghost" onclick="askReset(1)">Send the code again</button>
+    </div>
+    <div class="ordiv">OR</div>
+    <div style="text-align:center;font-size:13px;color:var(--mut)">
+      <a href="javascript:authTab('login')" style="font-weight:700">Back to sign in</a></div>
   </div>
   <div id="pane-register" style="display:none">
     <div class="mtitle">Create your account</div>
@@ -1248,8 +1277,44 @@ function openAuth(tab){
 let authBackTo='home';
 function closeAuth(){showView(authBackTo||'home');renderHeader()}
 function authTab(t){
-  $('tab-login').classList.toggle('on',t==='login');$('tab-register').classList.toggle('on',t==='register');
-  $('pane-login').style.display=t==='login'?'block':'none';$('pane-register').style.display=t==='register'?'block':'none';
+  $('tab-login').classList.toggle('on',t!=='register');$('tab-register').classList.toggle('on',t==='register');
+  $('pane-login').style.display=t==='login'?'block':'none';
+  $('pane-register').style.display=t==='register'?'block':'none';
+  const f=$('pane-forgot');
+  if(f){
+    f.style.display=t==='forgot'?'block':'none';
+    if(t==='forgot'){
+      $('fg-step1').style.display='block';$('fg-step2').style.display='none';
+      $('fg-err1').style.display='none';$('fg-err2').style.display='none';
+      const li=$('li-email');if(li&&li.value.trim())$('fg-id').value=li.value.trim();
+    }
+  }
+}
+async function askReset(again){
+  const err=$(again?'fg-err2':'fg-err1');err.style.display='none';
+  const id=$('fg-id').value.trim();
+  if(!id){err.textContent='Enter your registered email or mobile number.';err.style.display='block';return}
+  try{
+    const d=await api('/forgot','POST',{id});
+    $('fg-note').innerHTML=d.sent
+      ? 'Code sent by SMS to the mobile ending <b>'+esc(String(d.to||'').slice(-2))+'</b>. It is valid for 15 minutes.'
+      : esc(d.hint||'If that account exists, a code is on its way.')+' If you do not receive it, WhatsApp us and we will read it out.';
+    $('fg-step1').style.display='none';$('fg-step2').style.display='block';
+    toast(d.sent?'Reset code sent':'Reset requested');
+  }catch(e){err.textContent=e.message;err.style.display='block'}
+}
+async function doReset(){
+  const err=$('fg-err2');err.style.display='none';
+  const code=$('fg-code').value.trim(),p1=$('fg-p1').value,p2=$('fg-p2').value;
+  if(!/^\d{6}$/.test(code)){err.textContent='Enter the 6-digit code.';err.style.display='block';return}
+  if(p1.length<6){err.textContent='New password must be at least 6 characters.';err.style.display='block';return}
+  if(p1!==p2){err.textContent='The two passwords do not match.';err.style.display='block';return}
+  try{
+    await api('/reset','POST',{id:$('fg-id').value.trim(),code,password:p1});
+    toast('Password changed — please sign in');
+    authTab('login');
+    $('li-email').value=$('fg-id').value.trim();$('li-pass').value='';
+  }catch(e){err.textContent=e.message;err.style.display='block'}
 }
 async function doLogin(){
   const err=$('li-err');err.style.display='none';
@@ -1358,21 +1423,31 @@ function verifyPanel(){
   if(!u||(u.mobileOk&&u.emailOk))return '';
   return `<div class="cardbox" style="border:1px solid #ffd9a0;background:#fffaf0">
     <h3>🔐 Verify your contact details</h3>
-    <div class="hint" style="margin-bottom:10px">We send a 6-digit code to your WhatsApp number and your email. Entering them confirms we can reach you about orders and dispatch.</div>
+    <div class="hint" style="margin-bottom:10px">${state.payInfo&&state.payInfo.smsProvider
+      ?'A 6-digit code has been sent to your mobile by SMS. Enter it below to confirm we can reach you about orders and dispatch.'
+      :'We issue a 6-digit code for your mobile and your email. Entering them confirms we can reach you about orders and dispatch.'}</div>
     ${u.mobileOk?'<div class="notice ok">✓ Mobile number verified</div>':`
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
         <div style="max-width:190px"><label>Mobile code (${esc(u.whatsapp||u.phone)})</label>
           <input id="vf-mobile" inputmode="numeric" maxlength="6" placeholder="6 digits"></div>
         <button class="smallbtn ok-btn" onclick="submitVerify('mobile')">Verify mobile</button>
+        <button class="smallbtn gr-btn" onclick="resendCode('mobile')">Resend code</button>
       </div>`}
     ${u.emailOk?'<div class="notice ok" style="margin-top:8px">✓ Email verified</div>':`
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:10px">
         <div style="max-width:190px"><label>Email code (${esc(u.email)})</label>
           <input id="vf-email" inputmode="numeric" maxlength="6" placeholder="6 digits"></div>
         <button class="smallbtn ok-btn" onclick="submitVerify('email')">Verify email</button>
+        <button class="smallbtn gr-btn" onclick="resendCode('email')">Resend code</button>
       </div>`}
-    <div class="hint" style="margin-top:10px">Not received it? WhatsApp us on <b>${esc((state.payInfo&&state.payInfo.whatsapp)||'+91 79952 65800')}</b> and we'll resend.</div>
+    <div class="hint" style="margin-top:10px">Still not received it? WhatsApp us on <b>${esc((state.payInfo&&state.payInfo.whatsapp)||'+91 79952 65800')}</b>.</div>
   </div>`;
+}
+async function resendCode(kind){
+  try{
+    const d=await api('/verify/resend','POST',{kind});
+    toast(d.sent?'Code sent again to your mobile':'Request noted — our team will send you the code shortly');
+  }catch(e){toast(e.message,1)}
 }
 async function submitVerify(kind){
   const el=$('vf-'+kind);if(!el)return;
@@ -1620,10 +1695,19 @@ async function renderRegDetail(){
       ${u.note?row('Note',esc(u.note)):''}
     </div>
 
+    ${u.resetCode?`<div class="dtblock">
+      <div class="dtbt">Password reset pending</div>
+      <div class="hint" style="margin:0 0 8px">Asked for ${whenAgo(u.resetAt)}. Valid 15 minutes from then.</div>
+      ${row('Reset code',`<b class="gstin-code">${esc(u.resetCode)}</b>
+        <a class="lnk" href="https://wa.me/91${wa}?text=${encodeURIComponent('Blue Wave password reset code: '+u.resetCode+'. Valid for 15 minutes. Enter it in the app under Forgot your password.')}" target="_blank">Send on WhatsApp</a>`)}
+    </div>`:''}
     ${!(u.mobileOk&&u.emailOk)?`<div class="dtblock">
       <div class="dtbt">Pending verification</div>
-      <div class="hint" style="margin:0 0 8px">Pass the code to the applicant; they enter it under Profile in the app.</div>
+      <div class="hint" style="margin:0 0 8px">${state.payInfo&&state.payInfo.smsProvider
+        ?'The mobile code is sent by SMS automatically at signup. Resend it here if needed; the email code is passed on by you.'
+        :'No SMS gateway is set up yet, so pass the code to the applicant yourself. Set one up in Settings → Payment reminders and codes will send themselves.'}</div>
       ${!u.mobileOk?row('Mobile code',`<b class="gstin-code">${esc(u.mobileCode||'—')}</b>
+        ${state.payInfo&&state.payInfo.smsProvider?`<a class="lnk" href="javascript:sendCode('${u.id}','mobile')">Send by SMS</a>`:''}
         <a class="lnk" href="https://wa.me/91${wa}?text=${encodeURIComponent('Blue Wave verification code: '+(u.mobileCode||'')+'. Enter it in the app under Profile to verify your mobile number.')}" target="_blank">Send on WhatsApp</a>
         <a class="lnk" href="javascript:newCode('${u.id}','mobile')">Reissue</a>`):''}
       ${!u.emailOk?row('Email code',`<b class="gstin-code">${esc(u.emailCode||'—')}</b>
@@ -1731,6 +1815,12 @@ async function saveDiscount(id){
   try{await api('/admin/users/'+id+'/status','POST',{status:'approved',discount});
     toast(discount?discount+'% extra discount applied':'Extra discount removed');refreshRegScreen()}
   catch(e){toast(e.message,1)}
+}
+async function sendCode(id,kind){
+  try{
+    const d=await api('/admin/users/'+id+'/sendcode','POST',{kind});
+    toast(d.sent?'Code sent by SMS':'Could not send — '+(d.status||'gateway not configured'));
+  }catch(e){toast(e.message,1)}
 }
 async function newCode(id,kind){
   try{const d=await api('/admin/users/'+id+'/recode','POST',{kind});
@@ -2312,10 +2402,11 @@ async function renderSettings(){
     </div>
     <div class="hint">Use <b>rzp_test_…</b> keys first to try it safely, then switch to <b>rzp_live_…</b> keys.</div>
   </div>
-  <div class="cardbox"><h3>🔔 Payment reminders for credit customers</h3>
+  <div class="cardbox"><h3>Automatic messaging</h3>
+    <div class="hint" style="margin-bottom:8px">One channel powers two things: <b>credit payment reminders</b> and <b>mobile verification codes</b> sent to new registrations.</div>
     <div class="notice ${s.remProvider?'ok':'info'}" style="margin-bottom:8px">
-      ${s.remProvider?'✅ Automatic reminders are <b>ON</b> — the app messages credit customers by itself based on their credit days.'
-      :'⭕ Automatic sending is off. Reminders are still tracked in the <b>Credit</b> tab with one-tap WhatsApp buttons. Choose a channel below to make them fully automatic.'}
+      ${s.remProvider?'Automatic sending is <b>ON</b> ('+(s.remProvider==='msg91'?'SMS via MSG91':'WhatsApp Business API')+') — credit reminders go out on their due dates, and every new registration gets its verification code by itself.'
+      :'Automatic sending is <b>off</b>. Credit reminders are tracked in the <b>Credit</b> tab with one-tap WhatsApp buttons, and verification codes have to be passed to customers by hand. Choose a channel below to automate both.'}
     </div>
     <label>Sending channel</label>
     <select id="st-remprov">
@@ -2351,7 +2442,7 @@ async function renderSettings(){
     <div class="hint">Share only with your backend/approval team.</div>
   </div>
   <button class="wide blue" style="max-width:260px" onclick="saveSettings()">💾 Save settings</button>
-  <div class="cardbox" style="margin-top:16px"><h3>💾 Backup &amp; restore</h3>
+  <div class="cardbox" style="margin-top:16px"><h3>Backup &amp; restore</h3>
     <div class="hint" style="margin-bottom:10px">Saves every dealer, order, price and setting into one file. Keep a copy each week — if the hosting ever resets, restore puts everything back exactly as it was.${nativeApp()?' In the app the file goes to your phone\'s Downloads folder.':''}</div>
     <button class="smallbtn gr-btn" onclick="downloadBackup()">⬇ Download backup</button>
     <button class="smallbtn gr-btn" onclick="$('restoreFile').click()">⬆ Restore from backup</button>
