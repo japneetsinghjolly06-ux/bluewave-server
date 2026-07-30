@@ -20,9 +20,14 @@
   --ink:#2a3a46; --mut:#7a8b99; --line:#e2edf5; --bg:#f7fbfe; --card:#fff;
   --rad:14px; --shadow:0 4px 18px rgba(27,166,224,.10);
   --brand-dark:#155f8f;
+  /* kept so the newer screens keep rendering, tuned to the blue theme */
+  --ink-2:var(--ink); --faint:#9bacb9; --line-2:#d7e6f2; --raise:#f7fbfe;
+  --graphite:var(--blue); --accent-2:#e09a2e; --accent-soft:var(--blue-lt);
+  --green-soft:#e3f6ec; --amber:#7a5a10; --amber-soft:#fdf3dd; --red-soft:#fbe4e4;
+  --shadow-sm:0 2px 10px rgba(27,166,224,.08);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Britannic Bold','Britannic','Arial Narrow','Segoe UI Semibold',system-ui,-apple-system,'Segoe UI',sans-serif;
+body{-webkit-font-smoothing:antialiased;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
   color:var(--ink);font-size:15px;padding-bottom:calc(78px + env(safe-area-inset-bottom,0px));min-height:100vh;position:relative;
   background:#ffffff}
 button{font-family:inherit;cursor:pointer}
@@ -51,7 +56,7 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .pwwrap input{padding-right:46px}
 .pweye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;padding:6px 8px;font-size:17px;line-height:1;color:var(--mut);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pweye:active{opacity:.6}
-.hdrback{background:none;border:none;font-size:25px;line-height:1;padding:2px 10px 2px 0;color:var(--brand-dark);font-weight:700;cursor:pointer;-webkit-tap-highlight-color:rgba(23,134,196,.15)}
+.hdrback{background:none;border:none;font-size:25px;line-height:1;padding:2px 10px 2px 0;color:var(--brand-dark);font-weight:700;cursor:pointer;-webkit-tap-highlight-color:rgba(17,20,24,.08)}
 .hdrback:active{opacity:.55}
 .bellbtn{position:relative;background:none;border:none;font-size:21px;line-height:1;padding:4px 2px;color:var(--brand-dark)}
 .belldot{position:absolute;top:-2px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:var(--red);
@@ -60,7 +65,7 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 /* on-screen notification popups */
 #npops{position:fixed;top:8px;left:0;right:0;z-index:400;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
 .npop{pointer-events:auto;width:min(94%,430px);display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid var(--line);
-  border-left:4px solid var(--blue);border-radius:12px;padding:11px 12px;box-shadow:0 10px 30px rgba(11,42,74,.18);
+  border-left:4px solid var(--blue);border-radius:12px;padding:11px 12px;box-shadow:0 10px 30px rgba(17,20,24,.18);
   transform:translateY(-16px);opacity:0;transition:transform .28s ease,opacity .28s ease;cursor:pointer}
 .npop.on{transform:translateY(0);opacity:1}
 .npop .ni{font-size:19px;line-height:1.1}
@@ -68,7 +73,21 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .npop .nt b{font-size:13.5px}
 .npop .nt span{color:var(--mut);font-size:12.5px;line-height:1.45}
 .npop .nx{background:none;border:none;color:var(--mut);font-size:14px;padding:0 2px;line-height:1}
-.citem.unread{background:#f2fbff;border-radius:10px}
+.citem.unread{background:var(--accent-soft);border-radius:10px}
+
+/* line-art placeholders and icons */
+.phold{display:inline-flex;align-items:center;justify-content:center;color:#1c2733}
+.phold svg{width:78%;height:78%;stroke:currentColor}
+.catart{display:flex;align-items:center;justify-content:center;padding:12px 0}
+.pholdbig{display:flex;justify-content:center;padding:24px 0;background:var(--blue-lt);border-radius:12px;color:#1c2733}
+.wishbtn{position:absolute;top:8px;right:9px;background:rgba(255,255,255,.9);border:1px solid var(--line);
+  border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--mut);padding:0}
+.wishbtn svg{width:17px;height:17px}
+.wishbtn.on{color:var(--red);border-color:#eed6d6}
+.nico svg,.npop .ni svg{width:18px;height:18px;stroke:var(--mut)}
+.citem>div:first-child svg{width:18px;height:18px;stroke:var(--mut)}
+
+
 
 /* ===== sign-in screen ===== */
 #authPage.centered{min-height:calc(100vh - 210px);display:flex;flex-direction:column;justify-content:center}
@@ -97,13 +116,13 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .otpboxes{display:flex;gap:9px;justify-content:center;margin:22px 0 6px}
 .otpbox{width:46px;height:56px;text-align:center;font-size:22px;font-weight:700;color:var(--ink);
   border:1.5px solid var(--line);border-radius:12px;background:#fff;padding:0;margin:0;
-  box-shadow:0 2px 8px rgba(11,42,74,.05);transition:border-color .15s,box-shadow .15s}
-.otpbox:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(27,166,224,.15)}
+  box-shadow:0 2px 8px rgba(17,20,24,.05);transition:border-color .15s,box-shadow .15s}
+.otpbox:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(62,92,118,.15)}
 .otpbox:not(:placeholder-shown){border-color:var(--navy)}
 @media(max-width:380px){.otpbox{width:42px;height:52px;font-size:20px}.otpboxes{gap:7px}}
 @media (max-height:640px){.otpwrap{min-height:0;padding-top:14px}}
 .ccpanel{position:relative;margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:10px;
-  box-shadow:0 10px 30px rgba(11,42,74,.16);overflow:hidden;z-index:60}
+  box-shadow:0 10px 30px rgba(17,20,24,.16);overflow:hidden;z-index:60}
 .ccpanel input{margin:8px;width:calc(100% - 16px);font-size:14px}
 .ccrows{max-height:230px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .ccrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:none;
@@ -134,7 +153,7 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 @keyframes spin{to{transform:rotate(360deg)}}
 /* pull-to-refresh indicator */
 #ptr{position:fixed;top:-40px;left:50%;margin-left:-19px;width:38px;height:38px;border-radius:50%;
-  background:#fff;border:1px solid var(--line);box-shadow:0 4px 14px rgba(11,42,74,.14);
+  background:#fff;border:1px solid var(--line);box-shadow:0 4px 14px rgba(17,20,24,.14);
   display:flex;align-items:center;justify-content:center;z-index:250;opacity:0;pointer-events:none;
   transition:opacity .18s ease}
 #ptr .ptrs{display:flex;transition:transform .18s ease}
@@ -170,7 +189,7 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .dtv{display:block;font-size:14px;color:var(--ink);line-height:1.55}
 .dtv .gstin-code{display:inline-block;max-width:100%}
 .lnk{display:inline-block;margin:2px 0 0 8px;font-size:12px;color:var(--blue);text-decoration:none;
-  border-bottom:1px solid rgba(27,166,224,.4);white-space:nowrap}
+  border-bottom:1px solid rgba(62,92,118,.45);white-space:nowrap}
 .dtblock .wide{margin-top:8px;max-width:100%}
 
 /* order tracking timeline */
@@ -194,8 +213,8 @@ main{max-width:1100px;margin:0 auto;padding:16px 14px 40px}
 .view.on{display:block}
 
 /* bottom nav (app style) */
-.bnav{position:fixed;bottom:0;left:0;right:0;z-index:120;background:#fff;border-top:1px solid var(--line);display:flex;box-shadow:0 -4px 16px rgba(11,42,74,.06);padding-bottom:env(safe-area-inset-bottom,0)}
-.bnav button{flex:1;border:none;background:none;padding:9px 0 10px;font-size:10.5px;font-weight:600;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;-webkit-tap-highlight-color:rgba(23,134,196,.15);touch-action:manipulation;min-height:52px}
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:120;background:#fff;border-top:1px solid var(--line);display:flex;box-shadow:0 -4px 16px rgba(17,20,24,.06);padding-bottom:env(safe-area-inset-bottom,0)}
+.bnav button{flex:1;border:none;background:none;padding:9px 0 10px;font-size:10.5px;font-weight:600;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;-webkit-tap-highlight-color:rgba(17,20,24,.08);touch-action:manipulation;min-height:52px}
 .bnav button:active{background:var(--blue-lt)}
 .bnav button .ic{font-size:19px;line-height:1;pointer-events:none;display:flex;align-items:center;justify-content:center}
 .bnav button .ic svg{width:22px;height:22px;display:block}
@@ -215,7 +234,7 @@ main{max-width:1100px;margin:0 auto;padding:16px 14px 40px}
 .hero .cta{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
 .sect{margin:26px 0 12px}
 .sect .kick{font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase}
-.sect h2{font-size:19px;color:var(--navy);margin-top:3px}
+.sect h2{letter-spacing:-.2px;font-size:19px;color:var(--navy);margin-top:3px}
 .catgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .catcard{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px;text-align:center;cursor:pointer;transition:transform .15s}
 .catcard:hover{transform:translateY(-3px)}
@@ -289,7 +308,7 @@ main{max-width:1100px;margin:0 auto;padding:16px 14px 40px}
 .rm{background:none;border:none;color:var(--red);font-size:16px}
 .dfoot{padding:14px 18px;border-top:1px solid var(--line)}
 .trow{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:5px}
-.trow.big{font-size:16px;font-weight:800;color:var(--navy)}
+.trow.big{font-size:16px;font-weight:700;color:var(--navy)}
 .trow .gsttag{color:var(--mut);font-size:12px}
 .wide{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14.5px;font-weight:700;margin-top:8px}
 .wide.blue{background:var(--blue)}
@@ -301,7 +320,7 @@ main{max-width:1100px;margin:0 auto;padding:16px 14px 40px}
 .mbox{background:#fff;border-radius:18px;width:100%;max-width:500px;padding:24px 24px;position:relative;margin:auto}
 .mbox.lg{max-width:640px}
 .mx{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;color:var(--mut)}
-.mtitle{font-size:19px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.mtitle{font-size:19px;font-weight:700;letter-spacing:-.2px;color:var(--navy);margin-bottom:4px}
 .msub{font-size:13px;color:var(--mut);margin-bottom:12px}
 .tabs{display:flex;gap:6px;background:var(--bg);padding:5px;border-radius:10px;margin-bottom:14px}
 .tab{flex:1;border:none;background:transparent;padding:9px;border-radius:8px;font-weight:700;font-size:13px;color:var(--mut)}
@@ -352,7 +371,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 .regdetail{font-size:13px;line-height:1.7;background:var(--bg);border-radius:10px;padding:10px 14px;margin:8px 0}
 .gstin-code{font-family:Consolas,monospace;background:var(--blue-lt);padding:2px 8px;border-radius:6px;font-weight:700;color:var(--navy)}
 .paybox{background:var(--blue-lt);border:1px dashed var(--blue);border-radius:12px;padding:15px;margin:12px 0;font-size:13.5px}
-.paybox .upi{font-size:19px;font-weight:800;color:var(--navy);font-family:Consolas,monospace;background:#fff;padding:7px 13px;border-radius:8px;display:inline-block;margin:6px 0}
+.paybox .upi{font-size:19px;font-weight:700;color:var(--navy);font-family:Consolas,monospace;background:#fff;padding:7px 13px;border-radius:8px;display:inline-block;margin:6px 0}
 .paybox .row{margin:3px 0}
 .copybtn{border:1px solid var(--blue);background:#fff;color:var(--blue);border-radius:7px;padding:4px 10px;font-size:11.5px;font-weight:700;margin-left:8px}
 .acc-grid{display:grid;grid-template-columns:300px 1fr;gap:16px}
@@ -426,7 +445,7 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   body>*{display:none!important}
   body.printing #printArea{display:block!important}
   body{background:#fff;padding:0;margin:0}
-  #printArea{font-family:'Britannic Bold','Britannic','Arial Narrow','Segoe UI Semibold',system-ui,-apple-system,'Segoe UI',sans-serif;color:#000;font-size:12px;padding:6mm}
+  #printArea{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;color:#000;font-size:12px;padding:6mm}
   .pr-head{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}
   .pr-brand{font-size:16px;font-weight:bold}
   .pr-title{font-size:15px;font-weight:bold;text-align:right}
@@ -540,7 +559,7 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
 
 <div class="overlay" id="overlay" onclick="toggleCart(false)"></div>
 <aside class="drawer" id="drawer">
-  <div class="dhead"><b id="cartTitle">🛒 Your cart</b><button class="mx" style="position:static;color:#fff" onclick="toggleCart(false)">✕</button></div>
+  <div class="dhead"><b id="cartTitle">Your cart</b><button class="mx" style="position:static;color:#fff" onclick="toggleCart(false)"></button></div>
   <div class="dbody" id="cartBody"></div>
   <div class="dfoot" id="cartFoot"></div>
 </aside>
@@ -669,7 +688,7 @@ function offerBanner(){
   const o=state.offer;
   if(!o||!o.percent)return '';
   return `<div class="notice ok" style="background:linear-gradient(120deg,#fff3d9,#ffe6bd);border-color:#ffcf85;color:#7a4a00">
-    🎉 <b>${esc(o.name)}</b> — extra <b>${o.percent}% off</b> your dealer prices${o.ends?' until '+esc(o.ends):''}. Already applied to every rate you see.</div>`;
+    <b>${esc(o.name)}</b> — extra <b>${o.percent}% off</b> your dealer prices${o.ends?' until '+esc(o.ends):''}. Already applied to every rate you see.</div>`;
 }
 async function refreshTransports(){try{state.transports=await api('/transports')}catch(e){state.transports=[]}}
 
@@ -696,8 +715,22 @@ function lineRate(c){const p=state.products.find(x=>x.id===c.pid);if(!p)return 0
 function lineLabel(c){const p=state.products.find(x=>x.id===c.pid);if(!p)return '';let l=p.name;const pk=packOf(p,c.pack);if(pk)l+=' · '+(pk.id==='box'?'Box':'Gunny bag');if(c.size)l+=' · '+c.size;return l}
 let wish=new Set();try{wish=new Set(JSON.parse(localStorage.getItem('bw_wish')||'[]'))}catch(e){}
 function toggleWish(pid){if(wish.has(pid))wish.delete(pid);else wish.add(pid);localStorage.setItem('bw_wish',JSON.stringify([...wish]));if(currentView==='shop')renderShopGrid()}
-const catEmoji=c=>c.toLowerCase().includes('bracket')?'❄️':'🧺';
-const prodIcon=(p,size)=>p.image?`<img src="${p.image}" alt="" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:8px">`:`<span style="font-size:${Math.round(size*0.75)}px">${p.emoji}</span>`;
+/* Line-art marks in place of the old emoji — same idea, drawn properly.
+   The icon matches what the product actually is. */
+const LINE=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON_BRACKET=LINE('<path d="M3.2 3.5v17"/><path d="M3.2 8.2h3.4v7.6"/><path d="M3.2 15.8h3.4"/><rect x="7.6" y="6.4" width="13.2" height="8.4" rx="1.4"/><path d="M10.4 9.4h7.6M10.4 11.9h7.6"/>');
+const ICON_TROLLEY=LINE('<rect x="6.2" y="3.4" width="11.6" height="10.2" rx="1.4"/><circle cx="12" cy="8.5" r="2.4"/><path d="M3.6 16.6h16.8"/><path d="M6.4 16.6v1.6M17.6 16.6v1.6"/><circle cx="7.6" cy="20" r="1.7"/><circle cx="16.4" cy="20" r="1.7"/>');
+const ICON_BOX=LINE('<path d="M12 3.2 20.4 7.4v9.2L12 20.8 3.6 16.6V7.4z"/><path d="M3.6 7.4 12 11.6l8.4-4.2M12 11.6v9.2"/>');
+function catIcon(cat){
+  const c=String(cat||'').toLowerCase();
+  if(c.includes('bracket'))return ICON_BRACKET;
+  if(c.includes('trolley')||c.includes('trolly'))return ICON_TROLLEY;
+  return ICON_BOX;
+}
+const boxArt=(size,cat)=>`<span class="phold" style="width:${size}px;height:${size}px">${catIcon(cat)}</span>`;
+const catEmoji=()=>'';
+const prodIcon=(p,size)=>p.image?`<img src="${p.image}" alt="" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:8px">`:boxArt(size,p.cat);
 
 /* ============ GSTIN VERIFICATION ============ */
 const GST_STATES={'01':'Jammu & Kashmir','02':'Himachal Pradesh','03':'Punjab','04':'Chandigarh','05':'Uttarakhand','06':'Haryana','07':'Delhi','08':'Rajasthan','09':'Uttar Pradesh','10':'Bihar','11':'Sikkim','12':'Arunachal Pradesh','13':'Nagaland','14':'Manipur','15':'Mizoram','16':'Tripura','17':'Meghalaya','18':'Assam','19':'West Bengal','20':'Jharkhand','21':'Odisha','22':'Chhattisgarh','23':'Madhya Pradesh','24':'Gujarat','25':'Daman & Diu','26':'Dadra & Nagar Haveli and Daman & Diu','27':'Maharashtra','28':'Andhra Pradesh','29':'Karnataka','30':'Goa','31':'Lakshadweep','32':'Kerala','33':'Tamil Nadu','34':'Puducherry','35':'Andaman & Nicobar Islands','36':'Telangana','37':'Andhra Pradesh','38':'Ladakh'};
@@ -716,8 +749,8 @@ async function checkGstin(){
   const g=el.value.toUpperCase().trim();
   if(g.length<15){out.innerHTML=g.length?'<div class="hint" style="margin:4px 0">'+(15-g.length)+' more characters…</div>':'';return}
   const L=gstinLocal(g);
-  if(!L.valid){out.innerHTML='<div class="notice warn" style="margin:6px 0;padding:8px 12px">⚠️ GSTIN format looks invalid — expected like 36ABCDE1234F1Z5.</div>';return}
-  const base='<div class="notice '+(L.checksumOk?'ok':'warn')+'" style="margin:6px 0;padding:8px 12px">'+(L.checksumOk?'✅ GSTIN valid':'⚠️ Check digit doesn\'t match — please re-check the number')+' · '+esc(L.stateName)+' · PAN <b>'+esc(L.pan)+'</b>'+(L.entityType?' · '+esc(L.entityType):'')+'</div>';
+  if(!L.valid){out.innerHTML='<div class="notice warn" style="margin:6px 0;padding:8px 12px">GSTIN format looks invalid — expected like 36ABCDE1234F1Z5.</div>';return}
+  const base='<div class="notice '+(L.checksumOk?'ok':'warn')+'" style="margin:6px 0;padding:8px 12px">'+(L.checksumOk?'GSTIN valid':'Check digit doesn\'t match — please re-check the number')+' · '+esc(L.stateName)+' · PAN <b>'+esc(L.pan)+'</b>'+(L.entityType?' · '+esc(L.entityType):'')+'</div>';
   const st=document.getElementById('rg-state');
   if(st&&!st.value&&L.stateName)st.value=L.stateName;
   out.innerHTML=base+'<div class="hint" style="margin:2px 0">Fetching GST records…</div>';
@@ -729,16 +762,16 @@ async function checkGstin(){
       const co=document.getElementById('rg-company'),ad=document.getElementById('rg-addr');
       if(co&&!co.value)co.value=d.tradeName||d.legalName||'';
       if(ad&&!ad.value&&d.address)ad.value=d.address;
-      out.innerHTML=base+'<div class="notice ok" style="margin:6px 0;padding:8px 12px">🏢 GST records: <b>'+esc(d.legalName||d.tradeName)+'</b>'+(d.gstStatus?' · '+esc(d.gstStatus):'')+(d.address?'<br><span style="font-size:12px">'+esc(d.address)+'</span>':'')+'<br><span style="font-size:11.5px;color:var(--mut)">Company details filled automatically — please confirm.</span></div>';
+      out.innerHTML=base+'<div class="notice ok" style="margin:6px 0;padding:8px 12px">GST records: <b>'+esc(d.legalName||d.tradeName)+'</b>'+(d.gstStatus?' · '+esc(d.gstStatus):'')+(d.address?'<br><span style="font-size:12px">'+esc(d.address)+'</span>':'')+'<br><span style="font-size:11.5px;color:var(--mut)">Company details filled automatically — please confirm.</span></div>';
     }else out.innerHTML=base;
   }catch(e){if(myReq===gstinReq)out.innerHTML=base}
 }
 async function verifyGstin(g){
   try{
     const d=await api('/gstin/'+g);
-    if(!d.valid)return alert('GSTIN '+g+'\n⚠️ Invalid format.');
-    let msg='GSTIN '+g+'\n'+(d.checksumOk?'✅ Check digit OK':'⚠️ Check digit mismatch')+'\nState: '+d.stateName+'\nPAN: '+d.pan+(d.entityType?'\nEntity: '+d.entityType:'');
-    msg+=d.verified?'\n\n🏢 GST records:\nLegal name: '+(d.legalName||'—')+'\nTrade name: '+(d.tradeName||'—')+'\nStatus: '+(d.gstStatus||'—')+'\nAddress: '+(d.address||'—')
+    if(!d.valid)return alert('GSTIN '+g+'\nInvalid format.');
+    let msg='GSTIN '+g+'\n'+(d.checksumOk?'Check digit OK':'Check digit mismatch')+'\nState: '+d.stateName+'\nPAN: '+d.pan+(d.entityType?'\nEntity: '+d.entityType:'');
+    msg+=d.verified?'\n\nGST records:\nLegal name: '+(d.legalName||'—')+'\nTrade name: '+(d.tradeName||'—')+'\nStatus: '+(d.gstStatus||'—')+'\nAddress: '+(d.address||'—')
       :'\n\nLive GST-records lookup not configured — add a GST verification API key in Settings, or verify manually on the GST portal.';
     alert(msg);
   }catch(e){toast(e.message,1)}
@@ -1037,16 +1070,25 @@ function notifPopup(n){
   const box=$('npops')||(()=>{const d=document.createElement('div');d.id='npops';document.body.appendChild(d);return d})();
   const el=document.createElement('div');
   el.className='npop';
-  el.innerHTML=`<span class="ni">${NICON[n.kind]||'🔔'}</span>
+  el.innerHTML=`<span class="ni">${NICON[n.kind]||''}</span>
     <span class="nt"><b>${esc(n.title)}</b><span>${esc(n.body)}</span></span>
-    <button class="nx" aria-label="Dismiss">✕</button>`;
+    <button class="nx" aria-label="Dismiss"></button>`;
   el.querySelector('.nx').onclick=e=>{e.stopPropagation();el.remove()};
   el.onclick=()=>{el.remove();openNotifications()};
   box.appendChild(el);
   requestAnimationFrame(()=>el.classList.add('on'));
   setTimeout(()=>{el.classList.remove('on');setTimeout(()=>el.remove(),400)},7000);
 }
-const NICON={registration:'🧾',order:'📦',approval:'✅',offer:'🎉',credit:'💳',verify:'🔐'};
+const NI=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const NICON={
+  registration:NI('<path d="M4 20V7a2 2 0 0 1 2-2h8l6 6v9a2 2 0 0 1-2 2z"/><path d="M14 5v6h6"/><path d="M8 14h8M8 17h5"/>'),
+  order:NI('<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/>'),
+  approval:NI('<path d="M20 7L10 17l-5-5"/>'),
+  offer:NI('<path d="M12 3l2.4 5 5.6.8-4 3.9 1 5.5-5-2.6-5 2.6 1-5.5-4-3.9 5.6-.8z"/>'),
+  credit:NI('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/>'),
+  verify:NI('<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'),
+  info:NI('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>')
+};
 function updateBell(){
   const dot=$('bellDot');if(!dot)return;
   const n=(state.notifs&&state.notifs.unread)||0;
@@ -1079,7 +1121,7 @@ async function renderNotifPage(){
     </div>
     ${items.length?`<div class="nlist">${items.map(n=>`
       <div class="nrow ${n.read?'':'unread'}">
-        <span class="nico">${NICON[n.kind]||'🔔'}</span>
+        <span class="nico">${NICON[n.kind]||''}</span>
         <span class="nbody">
           <span class="ntitle">${esc(n.title)}</span>
           <span class="ntext">${esc(n.body)}</span>
@@ -1088,7 +1130,7 @@ async function renderNotifPage(){
       </div>`).join('')}</div>
       <button class="wide ghost" style="margin-top:14px" onclick="markNotifsRead()">Mark all as read</button>
       <button class="wide ghost" onclick="clearNotifs()">Clear the list</button>`
-    :`<div class="empty"><span class="big">🔔</span>Nothing new right now.<br><span class="hint">Order updates, approvals and offers appear here.</span></div>`}
+    :`<div class="empty"><span class="big"></span>Nothing new right now.<br><span class="hint">Order updates, approvals and offers appear here.</span></div>`}
     ${pushPrompt()}`;
   window.scrollTo(0,0);
   if(unread)markNotifsRead(true);
@@ -1126,9 +1168,9 @@ function renderHome(){
   renderHeader();
   const u=currentUser();
   const cats=[...new Set(state.products.map(p=>p.cat))];
-  const welcome=isAdmin()?`<div class="notice info">⚙️ Logged in as <b>Admin</b> — open the Admin tab to manage approvals, orders and pricing.</div>`
-    :u&&u.status==='approved'?`<div class="notice ok">✅ Welcome back, <b>${esc(u.company)}</b> — dealer pricing is active.</div>`
-    :u&&u.status==='pending'?`<div class="notice warn">⏳ Your dealer account is pending approval — you can order at MRP meanwhile.</div>`:'';
+  const welcome=isAdmin()?`<div class="notice info">Logged in as <b>Admin</b> — open the Admin tab to manage approvals, orders and pricing.</div>`
+    :u&&u.status==='approved'?`<div class="notice ok">Welcome back, <b>${esc(u.company)}</b> — dealer pricing is active.</div>`
+    :u&&u.status==='pending'?`<div class="notice warn">Your dealer account is pending approval — you can order at MRP meanwhile.</div>`:'';
   $('view-home').innerHTML=`
   ${offerBanner()}
   <div class="hero">
@@ -1155,10 +1197,10 @@ function renderHome(){
   </div>
   <div class="sect"><div class="kick">Why choose us</div><h2>Why dealers choose Blue Wave</h2></div>
   <div class="whyrow">
-    <div class="whycard"><span class="ic">🛡️</span><div><b>Anti-rust technology</b>7-tank powder coating resists rust even in coastal and humid climates.</div></div>
-    <div class="whycard"><span class="ic">⚙️</span><div><b>Precision engineering</b>High-grade steel up to 2 mm thickness, tested for perfect fit and long life.</div></div>
-    <div class="whycard"><span class="ic">🏭</span><div><b>Own manufacturing</b>In-house production at IDA Medchal, Hyderabad with multi-stage quality control.</div></div>
-    <div class="whycard"><span class="ic">🤝</span><div><b>Dealer-first pricing</b>Wholesale rates, flexible MOQ from 50 units, and a dedicated B2B manager.</div></div>
+    <div class="whycard"><span class="ic"></span><div><b>Anti-rust technology</b>7-tank powder coating resists rust even in coastal and humid climates.</div></div>
+    <div class="whycard"><span class="ic"></span><div><b>Precision engineering</b>High-grade steel up to 2 mm thickness, tested for perfect fit and long life.</div></div>
+    <div class="whycard"><span class="ic"></span><div><b>Own manufacturing</b>In-house production at IDA Medchal, Hyderabad with multi-stage quality control.</div></div>
+    <div class="whycard"><span class="ic"></span><div><b>Dealer-first pricing</b>Wholesale rates, flexible MOQ from 50 units, and a dedicated B2B manager.</div></div>
   </div>
   <div class="appband">
     <div class="t"><b>Order anytime, anywhere</b><p>Browse the full range, check dealer pricing and track your dispatches — all from your phone.</p></div>
@@ -1173,8 +1215,9 @@ function railCard(p){
     ?`<span class="mrp-strike">${fmt(p.mrp)}</span><span class="dealerprice">${fmt(p.dealer)}</span><span class="save">${save}%</span>`
     :`<span class="mrp-only">${fmt(p.mrp)}</span>`;
   return `<div class="pcard" onclick="openProduct('${p.id}')" style="cursor:pointer">
-    <div class="pimg">${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:p.emoji}
-      <button class="wishbtn" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist">${wish.has(p.id)?'❤️':'🤍'}</button></div>
+    <div class="pimg">${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:boxArt(64,p.cat)}
+      <button class="wishbtn ${wish.has(p.id)?'on':''}" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist" aria-label="Save to wishlist">
+      <svg viewBox="0 0 24 24" fill="${wish.has(p.id)?'currentColor':'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-7-9.4A4.1 4.1 0 0 1 12 7a4.1 4.1 0 0 1 7 3.6C19 15.4 12 20 12 20z"/></svg></button></div>
     <div class="pbody"><div class="pname" style="font-size:12.5px">${esc(p.name)}</div>
       <div>${price}</div><div class="plabel">incl. GST</div>
       <div class="addrow"><button class="addbtn">View details ›</button></div></div></div>`;
@@ -1186,10 +1229,10 @@ function renderShop(){
   renderHeader();
   const u=currentUser();
   let notice='';
-  if(!u&&!isAdmin())notice=`<div class="notice info">💡 Prices shown are <b>MRP</b>. <a href="javascript:openAuth('register')">Create an account</a> with GSTIN to unlock wholesale dealer pricing after approval.</div>`;
-  else if(u&&u.status==='pending')notice=`<div class="notice warn">⏳ Registration <b>pending admin approval</b> — MRP applies until our team verifies your GSTIN.</div>`;
-  else if(u&&u.status==='rejected')notice=`<div class="notice warn">⚠️ Your registration was not approved${u.note?': '+esc(u.note):''}. Contact sales@hpmpmanufacturerspvtltd.com.</div>`;
-  else if(u)notice=`<div class="notice ok">✅ Dealer pricing active for <b>${esc(u.company)}</b>.</div>`;
+  if(!u&&!isAdmin())notice=`<div class="notice info">Prices shown are <b>MRP</b>. <a href="javascript:openAuth('register')">Create an account</a> with GSTIN to unlock wholesale dealer pricing after approval.</div>`;
+  else if(u&&u.status==='pending')notice=`<div class="notice warn">Registration <b>pending admin approval</b> — MRP applies until our team verifies your GSTIN.</div>`;
+  else if(u&&u.status==='rejected')notice=`<div class="notice warn">Your registration was not approved${u.note?': '+esc(u.note):''}. Contact sales@hpmpmanufacturerspvtltd.com.</div>`;
+  else if(u)notice=`<div class="notice ok">Dealer pricing active for <b>${esc(u.company)}</b>.</div>`;
   const title=activeCat==='All'?'All products':activeCat;
   const count=state.products.filter(p=>activeCat==='All'||p.cat===activeCat).length;
   $('view-shop').innerHTML=`
@@ -1211,13 +1254,14 @@ function renderShopGrid(){
       ?`<span class="mrp-strike">${fmt(p.mrp)}</span><span class="dealerprice">${fmt(p.dealer)}</span><span class="save">${save}% OFF</span><div class="plabel">Dealer price · per unit · incl. GST</div>`
       :`<span class="mrp-only">${fmt(p.mrp)}</span><div class="plabel">MRP · per unit · incl. GST</div>`;
     const hasOpts=!!(p.options&&(p.options.packs||p.options.sizes));
-    return `<div class="pcard"><div class="pimg" onclick="openProduct('${p.id}')" style="cursor:pointer">${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:p.emoji}<button class="wishbtn" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist">${wish.has(p.id)?'❤️':'🤍'}</button></div><div class="pbody">
+    return `<div class="pcard"><div class="pimg" onclick="openProduct('${p.id}')" style="cursor:pointer">${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:boxArt(56,p.cat)}<button class="wishbtn ${wish.has(p.id)?'on':''}" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist" aria-label="Save to wishlist">
+      <svg viewBox="0 0 24 24" fill="${wish.has(p.id)?'currentColor':'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-7-9.4A4.1 4.1 0 0 1 12 7a4.1 4.1 0 0 1 7 3.6C19 15.4 12 20 12 20z"/></svg></button></div><div class="pbody">
       <div class="pcat">${esc(p.cat)}</div><div class="pname" onclick="openProduct('${p.id}')" style="cursor:pointer">${esc(p.name)}</div>
       <div onclick="openProduct('${p.id}')" style="cursor:pointer">${priceHtml}</div>
       <div class="moq">MOQ ${p.moq}+ for dealer rates · <a href="javascript:openProduct('${p.id}')">details</a></div>
       <div class="addrow"><button class="addbtn" onclick="openProduct('${p.id}')">View details ›</button></div>
     </div></div>`;
-  }).join('')||'<div class="empty"><span class="big">🔍</span>No products match your search.</div>';
+  }).join('')||'<div class="empty"><span class="big"></span>No products match your search.</div>';
 }
 
 /* ============ PRODUCT DETAIL POPUP ============ */
@@ -1230,18 +1274,18 @@ function openProduct(pid){
   let html=`<div style="padding:2px 0 10px">
       <h2 style="font-size:17px;color:var(--blue);font-weight:800">Product details</h2>
     </div>
-    <div style="text-align:center;margin-bottom:8px">${p.image?`<img src="${p.image}" alt="${esc(p.name)}" style="width:100%;max-height:300px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--line);padding:8px">`:`<div style="font-size:74px;background:var(--blue-lt);border-radius:12px;padding:26px 0">${p.emoji}</div>`}</div>
+    <div style="text-align:center;margin-bottom:8px">${p.image?`<img src="${p.image}" alt="${esc(p.name)}" style="width:100%;max-height:300px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--line);padding:8px">`:`<div class="pholdbig">${boxArt(104,p.cat)}</div>`}</div>
     <div class="pcat">${esc(p.cat)}</div>
     <div class="mtitle" style="margin-bottom:4px">${esc(p.name)}</div>
     <div id="pp-price" style="margin-bottom:6px"></div>
     ${p.descr?`<div class="msub" style="margin-bottom:8px">${esc(p.descr)}</div>`:''}
-    ${p.packing?`<div class="regdetail" style="font-size:12.5px"><b>📦 Master packing details</b><br>${esc(p.packing).replace(/\n/g,'<br>')}</div>`:''}`;
+    ${p.packing?`<div class="regdetail" style="font-size:12.5px"><b>Master packing details</b><br>${esc(p.packing).replace(/\n/g,'<br>')}</div>`:''}`;
   if(o.packs)html+=`<label>Packing type</label>`+o.packs.map((pk,i)=>`<label style="display:flex;gap:9px;align-items:center;font-weight:400;font-size:13.5px;margin:5px 0;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer">
       <input type="radio" name="pp-pack" value="${pk.id}" ${i===0?'checked':''} style="width:auto" onchange="ppPrice('${p.id}')">
       <span style="flex:1"><b>${esc(pk.label)}</b><br><span class="hint">${esc(pk.master)}${pk.add?` · +₹${pk.add} per pc`:' · standard price'}</span></span></label>`).join('');
   if(o.sizes)html+=`<label>Select size</label><select id="pp-size">${o.sizes.map(s=>`<option>${esc(s)}</option>`).join('')}</select>`;
   html+=`<label>Quantity</label><input id="pp-qty" type="number" min="1" value="${dealer?p.moq:1}">
-    <button class="wide" style="margin-top:12px" onclick="ppAdd('${p.id}')">🛒 Add to cart</button>
+    <button class="wide" style="margin-top:12px" onclick="ppAdd('${p.id}')">Add to cart</button>
     <div id="pp-added"></div>
     <button class="wide ghost" style="margin-top:8px" onclick="closeProduct()">← Back</button>`;
   $('view-product').innerHTML=html;
@@ -1272,13 +1316,13 @@ function ppAdd(pid){
   if(ex)ex.qty+=qty;else cart.push({pid,qty,pack,size});
   saveCart();renderNav();closeModal('modal-gen');
   /* stay on the product page — just confirm, so more can be added */
-  toast('✅ Added to cart · '+qty+' pc'+(qty>1?'s':''));
+  toast('Added to cart · '+qty+' pc'+(qty>1?'s':''));
   const note=$('pp-added');
   if(note){
     const n=cart.reduce((s,c)=>s+c.qty,0);
-    note.innerHTML=`<div class="notice ok" style="margin:10px 0;padding:10px 12px">✅ Added to cart — ${n} item${n>1?'s':''} in your cart.
+    note.innerHTML=`<div class="notice ok" style="margin:10px 0;padding:10px 12px">Added to cart — ${n} item${n>1?'s':''} in your cart.
       <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="smallbtn ok-btn" onclick="toggleCart(true)">🛒 View cart</button>
+        <button class="smallbtn ok-btn" onclick="toggleCart(true)">View cart</button>
         <button class="smallbtn gr-btn" onclick="closeProduct()">← Continue shopping</button>
       </div></div>`;
   }
@@ -1300,13 +1344,13 @@ function toggleCart(on){$('overlay').classList.toggle('on',on);$('drawer').class
 function renderCart(){
   const body=$('cartBody'),foot=$('cartFoot');
   cart=cart.filter(c=>state.products.find(p=>p.id===c.pid));
-  $('cartTitle').textContent='🛒 Your cart ('+String(cart.reduce((s,c)=>s+c.qty,0)).padStart(2,'0')+')';
-  if(!cart.length){body.innerHTML='<div class="empty"><span class="big">🛒</span>Your cart is empty.<br>Browse products and add items.</div>';foot.innerHTML='';return}
+  $('cartTitle').textContent='Your cart ('+String(cart.reduce((s,c)=>s+c.qty,0)).padStart(2,'0')+')';
+  if(!cart.length){body.innerHTML='<div class="empty"><span class="big"></span>Your cart is empty.<br>Browse products and add items.</div>';foot.innerHTML='';return}
   body.innerHTML=cart.map((c,i)=>{const p=state.products.find(x=>x.id===c.pid);const r=lineRate(c);
     return `<div class="citem"><div>${prodIcon(p,34)}</div>
       <div style="flex:1"><div class="nm">${esc(lineLabel(c))}</div><div class="pr">${fmt(r)} × ${c.qty} = <b>${fmt(r*c.qty)}</b></div></div>
       <button class="qbtn" onclick="setQtyI(${i},-1)">−</button><b style="min-width:24px;text-align:center">${c.qty}</b><button class="qbtn" onclick="setQtyI(${i},1)">+</button>
-      <button class="rm" onclick="rmItemI(${i})" title="Remove">🗑</button></div>`;}).join('');
+      <button class="rm" onclick="rmItemI(${i})" title="Remove"></button></div>`;}).join('');
   const sub=cartSubtotal(),gst=inclGst(sub);
   foot.innerHTML=`<div class="trow"><span>Pricing tier</span><b>${isDealer()?'Dealer (wholesale)':'MRP'}</b></div>
     <div class="trow big"><span>Total</span><span>${fmt(sub)} <span class="gsttag">incl. GST</span></span></div>
@@ -1322,7 +1366,7 @@ function openCheckout(){
   const u=currentUser();
   const rows=cart.map(c=>{const r=lineRate(c);return `<tr><td>${esc(lineLabel(c))}</td><td>${c.qty}</td><td>${fmt(r)}</td><td><b>${fmt(r*c.qty)}</b></td></tr>`}).join('');
   const sub=cartSubtotal(),gst=inclGst(sub),total=sub;
-  const contact=u?`<div class="regdetail"><b>${esc(u.company)}</b> · ${esc(u.name)}<br>📞 ${esc(u.phone)} · 📧 ${esc(u.email)}<br>GSTIN: <span class="gstin-code">${esc(u.gstin)}</span></div>
+  const contact=u?`<div class="regdetail"><b>${esc(u.company)}</b> · ${esc(u.name)}<br>${esc(u.phone)} · ${esc(u.email)}<br>GSTIN: <span class="gstin-code">${esc(u.gstin)}</span></div>
     <label>Delivery address <span class="req">*</span></label><textarea id="co-addr" rows="2">${esc(u.addr)}, ${esc(u.city)}, ${esc(u.state)}</textarea>`
   :`<div class="notice info" style="margin-bottom:6px">Ordering as <b>guest at MRP</b>. <a href="javascript:openAuth('register')">Create an account</a> for wholesale rates.</div>
     <div class="frow"><div><label>Full name <span class="req">*</span></label><input id="co-name"></div>
@@ -1339,7 +1383,7 @@ function openCheckout(){
     <div class="trow"><span>GST ${gstPct()}% (included)</span><span>${fmt(gst)}</span></div>
     <div class="trow big"><span>Order total (incl. GST)</span><span>${fmt(total)}</span></div>
     ${contact}
-    <label>🚚 Dispatch through (transport)</label>
+    <label>Dispatch through (transport)</label>
     <select id="co-transport">
       <option value="">No preference — let HPMP arrange transport</option>
       ${state.transports.map(t=>`<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('')}
@@ -1377,16 +1421,16 @@ function openPayment(o,fresh){
   const rzp=s.razorpay&&s.razorpay.enabled;
   const bank=(s.bankName||s.accountNo)?`<div class="row"><b>Bank transfer:</b> ${esc(s.bankName)} · A/c ${esc(s.accountNo)} · IFSC ${esc(s.ifsc)} <button class="copybtn" onclick="copyTxt('${esc(s.accountNo)}')">Copy A/c</button></div>`:'';
   const gstLine=(o.gst?`<div class="trow"><span>Taxable value</span><span>${fmt(Math.round((o.total-o.gst)*100)/100)}</span></div><div class="trow"><span>GST ${o.gstPercent||gstPct()}% (included)</span><span>${fmt(o.gst)}</span></div><div class="trow big"><span>Total payable (incl. GST)</span><span>${fmt(o.total)}</span></div>`:'')
-    +(o.transport&&!o.lrNumber?`<div class="trow" style="margin-bottom:8px"><span>🚚 Preferred transport</span><b>${esc(o.transport)}</b></div>`:'')
-    +(o.dispatchMode==='local'&&o.vehicleNo?`<div class="notice ok" style="margin-bottom:10px">🛺 <b>Out for local delivery!</b>${o.dispatchedAt?' Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}.<br>Vehicle: <b style="font-family:Consolas,monospace">${esc(o.vehicleNo)}</b>${o.driverName?'<br>Driver: <b>'+esc(o.driverName)+'</b>':''}${o.driverPhone?` · <a href="tel:${esc(o.driverPhone)}">${esc(o.driverPhone)}</a>`:''}<br><span style="font-size:12px">Your material is on the way within the city.</span></div>`
-    :o.lrNumber?`<div class="notice ok" style="margin-bottom:10px">🚚 <b>Dispatched!</b> Sent via <b>${esc(o.dispatchTransport||o.transport||'transport')}</b>${o.dispatchedAt?' on '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}.<br>LR number: <b style="font-family:Consolas,monospace">${esc(o.lrNumber)}</b> <button class="copybtn" onclick="copyTxt('${esc(o.lrNumber)}')">Copy</button><br><span style="font-size:12px">Quote this LR number with the transporter to track and collect your material.</span></div>`:'');
+    +(o.transport&&!o.lrNumber?`<div class="trow" style="margin-bottom:8px"><span>Preferred transport</span><b>${esc(o.transport)}</b></div>`:'')
+    +(o.dispatchMode==='local'&&o.vehicleNo?`<div class="notice ok" style="margin-bottom:10px"><b>Out for local delivery!</b>${o.dispatchedAt?' Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}.<br>Vehicle: <b style="font-family:Consolas,monospace">${esc(o.vehicleNo)}</b>${o.driverName?'<br>Driver: <b>'+esc(o.driverName)+'</b>':''}${o.driverPhone?` · <a href="tel:${esc(o.driverPhone)}">${esc(o.driverPhone)}</a>`:''}<br><span style="font-size:12px">Your material is on the way within the city.</span></div>`
+    :o.lrNumber?`<div class="notice ok" style="margin-bottom:10px"><b>Dispatched!</b> Sent via <b>${esc(o.dispatchTransport||o.transport||'transport')}</b>${o.dispatchedAt?' on '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}.<br>LR number: <b style="font-family:Consolas,monospace">${esc(o.lrNumber)}</b> <button class="copybtn" onclick="copyTxt('${esc(o.lrNumber)}')">Copy</button><br><span style="font-size:12px">Quote this LR number with the transporter to track and collect your material.</span></div>`:'');
   const cu=currentUser();
   const creditBtn=(cu&&cu.status==='approved'&&cu.terms==='credit'&&o.status==='awaiting_payment')?`
-    <button class="wide" style="background:#5b3fb0" onclick="orderOnCredit('${o.id}')">🧾 Confirm on credit — pay within ${cu.creditDays||30} days</button>
+    <button class="wide" style="background:#5b3fb0" onclick="orderOnCredit('${o.id}')">Confirm on credit — pay within ${cu.creditDays||30} days</button>
     <div class="hint" style="text-align:center;margin:6px 0 2px">Your approved credit facility · order ships without advance payment</div>
     <div class="ordiv">or pay now</div>`:'';
   const online=rzp&&o.status==='awaiting_payment'?`
-    <button class="wide" id="rzpBtn" onclick="payOnline('${o.id}')">💳 Pay online ${fmt(o.total)} — UPI / card / netbanking</button>
+    <button class="wide" id="rzpBtn" onclick="payOnline('${o.id}')">Pay online ${fmt(o.total)} — UPI / card / netbanking</button>
     <div class="hint" style="text-align:center;margin:6px 0 2px">Instant confirmation via secure Razorpay checkout</div>
     <div class="ordiv">or pay by direct transfer</div>`:'';
   const manual=`<div class="paybox">
@@ -1395,8 +1439,8 @@ function openPayment(o,fresh){
       ${bank||'<div class="row" style="color:var(--mut)">Bank details will be shared with your invoice — WhatsApp us for them.</div>'}
       <div class="row" style="margin-top:6px">Questions? WhatsApp <b>${esc(s.whatsapp||'')}</b> with your Order ID.</div>
     </div>`;
-  $('payBox').innerHTML=`<button class="mx" onclick="closeModal('modal-pay')">✕</button>
-    ${fresh?`<div class="notice ok">🎉 Order <b>${o.id}</b> created — save this Order ID.<br><span style="font-size:12px">It reaches HPMP for processing once payment is completed${cu&&cu.status==='approved'&&cu.terms==='credit'?' or confirmed on your credit account':''}.</span></div>`:''}
+  $('payBox').innerHTML=`<button class="mx" onclick="closeModal('modal-pay')"></button>
+    ${fresh?`<div class="notice ok">Order <b>${o.id}</b> created — save this Order ID.<br><span style="font-size:12px">It reaches HPMP for processing once payment is completed${cu&&cu.status==='approved'&&cu.terms==='credit'?' or confirmed on your credit account':''}.</span></div>`:''}
     <div class="mtitle">Pay ${fmt(o.total)} — Order ${o.id}</div>
     <div class="msub">Status: <span class="badge b-${o.status}">${STATUS_LABEL[o.status]}</span></div>
     ${gstLine}
@@ -1408,10 +1452,10 @@ function openPayment(o,fresh){
     <input id="pay-ref" placeholder="e.g., UPI Ref 415223344556">
     <div class="hint">Paid by bank transfer? Enter the UTR / transaction reference from your bank app.</div>
     <div class="err" id="pay-err"></div>
-    <button class="wide blue" onclick="submitPayment('${o.id}')">✅ I have paid — submit reference</button>
+    <button class="wide blue" onclick="submitPayment('${o.id}')">I have paid — submit reference</button>
     ${cu&&cu.status==='approved'&&cu.terms==='credit'?''
       :`<div class="hint" style="text-align:center;margin-top:10px">Payment is required before this order is processed. Deferred payment is available only to customers approved by HPMP for credit terms.</div>`}`
-    :`${o.status==='paid'?`<div class="notice ok">✅ Payment received online (${esc(o.payRef)}). We are processing your order.</div>`:`${manual}<div class="notice info">Payment reference on file: <b>${esc(o.payRef)||'—'}</b>. Our team will verify and confirm your order.</div>`}`}
+    :`${o.status==='paid'?`<div class="notice ok">Payment received online (${esc(o.payRef)}). We are processing your order.</div>`:`${manual}<div class="notice info">Payment reference on file: <b>${esc(o.payRef)||'—'}</b>. Our team will verify and confirm your order.</div>`}`}
   `;
   openModal('modal-pay');
 }
@@ -1428,19 +1472,19 @@ async function payOnline(oid){
       handler:async r=>{
         try{
           await api('/orders/'+oid+'/rzp-verify','POST',r);
-          closeModal('modal-pay');toast('✅ Payment successful! Your order is confirmed.');
+          closeModal('modal-pay');toast('Payment successful! Your order is confirmed.');
           if(currentUser())showView('orders');
         }catch(e){toast(e.message,1)}
       },
-      modal:{ondismiss:()=>{if(btn){btn.disabled=false;btn.textContent='💳 Pay online — UPI / card / netbanking'}}}
+      modal:{ondismiss:()=>{if(btn){btn.disabled=false;btn.textContent='Pay online — UPI / card / netbanking'}}}
     }).open();
-  }catch(e){toast(e.message,1);if(btn){btn.disabled=false;btn.textContent='💳 Pay online — UPI / card / netbanking'}}
+  }catch(e){toast(e.message,1);if(btn){btn.disabled=false;btn.textContent='Pay online — UPI / card / netbanking'}}
 }
 async function orderOnCredit(orderId){
   if(!confirm('Confirm this order on your credit account? Payment will be due as per your credit period.'))return;
   try{
     await api('/orders/'+orderId+'/credit','POST');
-    closeModal('modal-pay');toast('🧾 Order confirmed on credit — we will dispatch shortly.');
+    closeModal('modal-pay');toast('Order confirmed on credit — we will dispatch shortly.');
     showView('orders');
   }catch(e){toast(e.message,1)}
 }
@@ -1855,7 +1899,7 @@ function renderCategory(){
            ${shots.map((p,i)=>`<img src="${p.image}" alt="${esc(p.name)}" class="${i===0?'on':''}">`).join('')}
            ${shots.length>1?`<div class="dots">${shots.map((_,i)=>`<i class="${i===0?'on':''}"></i>`).join('')}</div>`:''}
          </div>`
-      : `<div class="big">${key==='All'?'📦':catEmoji(key)}</div>`;
+      : `<div class="catart">${boxArt(56,key)}</div>`;
     return `<div class="catcard" onclick="goCat('${esc(key)}')">
       ${inner}<b>${esc(title)}</b><span>${items.length} product${items.length>1?'s':''}</span>
       <br><span class="shopnow">${key==='All'?'View all':'Shop now'} →</span></div>`;
@@ -1901,20 +1945,20 @@ async function renderOrdersView(){
     try{
       const orders=await api('/admin/orders');
       $('adminOrdersBody').innerHTML=`
-        <div class="hint" style="margin-bottom:12px">Only paid orders (and credit orders from approved customers) appear here — unpaid carts stay with the customer. Use <b>🖨 Print</b> for a picking/dispatch slip, then move the order Confirmed → Shipped → Delivered.</div>
-        ${orders.length?orders.map(o=>orderCard(o)).join(''):'<div class="empty"><span class="big">📦</span>No orders yet.</div>'}`;
-    }catch(e){$('adminOrdersBody').innerHTML='<div class="empty">⚠️ '+esc(e.message)+'</div>'}
+        <div class="hint" style="margin-bottom:12px">Only paid orders (and credit orders from approved customers) appear here — unpaid carts stay with the customer. Use <b>Print</b> for a picking/dispatch slip, then move the order Confirmed → Shipped → Delivered.</div>
+        ${orders.length?orders.map(o=>orderCard(o)).join(''):'<div class="empty"><span class="big"></span>No orders yet.</div>'}`;
+    }catch(e){$('adminOrdersBody').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
     return;
   }
   const u=currentUser();
-  if(!u){v.innerHTML=head+`<div class="empty"><span class="big">📦</span>Log in to see your orders.<br><br><button class="wide blue" style="max-width:240px" onclick="openAuth('login')">Login</button></div>`;return}
+  if(!u){v.innerHTML=head+`<div class="empty"><span class="big"></span>Log in to see your orders.<br><br><button class="wide blue" style="max-width:240px" onclick="openAuth('login')">Login</button></div>`;return}
   let myOrders=[];try{myOrders=await api('/my/orders');lastOrders=myOrders;updateBell()}catch(e){}
   v.innerHTML=head+(myOrders.length?myOrders.map(o=>myOrderCard(o)).join('')
-    :`<div class="empty"><span class="big">📦</span>No orders yet — your orders will appear here.<br><br><button class="wide blue" style="max-width:240px" onclick="showView('shop')">Start shopping</button></div>`);
+    :`<div class="empty"><span class="big"></span>No orders yet — your orders will appear here.<br><br><button class="wide blue" style="max-width:240px" onclick="showView('shop')">Start shopping</button></div>`);
 }
 
 /* ============ PROFILE ============ */
-function genModal(title,html){$('genBox').innerHTML=`<button class="mx" onclick="closeModal('modal-gen')">✕</button><div class="mtitle">${title}</div>${html}`;openModal('modal-gen')}
+function genModal(title,html){$('genBox').innerHTML=`<button class="mx" onclick="closeModal('modal-gen')"></button><div class="mtitle">${title}</div>${html}`;openModal('modal-gen')}
 /* Customer-side verification. The code is issued at registration and passed on
    by the admin over WhatsApp or email, which proves the number/address is real. */
 function verifyPanel(){
@@ -1952,7 +1996,7 @@ async function renderProfile(){
   const av=isAdmin()?ICON.admin:u?esc(u.name.trim().split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase()):PICON.user;
   const badges=u?`<div style="margin:0 0 10px">
       <span class="badge b-${u.status}">${USTATUS_LABEL[u.status]}</span>
-      ${u.status==='approved'?(u.terms==='credit'?`<span class="badge b-shipped">💳 Credit · ${u.creditDays||30} days</span>`:`<span class="badge b-approved">💰 Advance payment</span>`):''}
+      ${u.status==='approved'?(u.terms==='credit'?`<span class="badge b-shipped">Credit · ${u.creditDays||30} days</span>`:`<span class="badge b-approved">Advance payment</span>`):''}
     </div>`:'';
   const rows=[
     [PICON.wallet,'Wallet','pfWallet()'],
@@ -1980,10 +2024,10 @@ async function pfWallet(){
   let dues=[];try{dues=(await api('/my/orders')).filter(o=>o.payRef&&o.payRef.indexOf('On credit')===0&&!['cancelled','delivered'].includes(o.status))}catch(e){}
   const total=dues.reduce((s,o)=>s+o.total,0);
   genModal('Wallet',`<div class="msub">Your payment account with HPMP.</div>
-    ${u.status!=='approved'?'<div class="notice warn">⏳ Account pending approval — payment terms are set on approval.</div>'
-    :u.terms==='credit'?`<div class="notice ok">💳 <b>Credit account</b> — pay within ${u.creditDays||30} days of ordering.</div>`
-    :'<div class="notice info">💰 <b>Advance payment account</b> — orders are dispatched after payment is received.</div>'}
-    ${dues.length?`<div class="regdetail"><b>Credit orders outstanding:</b><br>${dues.map(o=>o.id+' · '+fmt(o.total)).join('<br>')}<br><b>Total due: ${fmt(total)}</b></div>`:u.terms==='credit'?'<div class="hint">No outstanding credit orders. 🎉</div>':''}`);
+    ${u.status!=='approved'?'<div class="notice warn">Account pending approval — payment terms are set on approval.</div>'
+    :u.terms==='credit'?`<div class="notice ok"><b>Credit account</b> — pay within ${u.creditDays||30} days of ordering.</div>`
+    :'<div class="notice info"><b>Advance payment account</b> — orders are dispatched after payment is received.</div>'}
+    ${dues.length?`<div class="regdetail"><b>Credit orders outstanding:</b><br>${dues.map(o=>o.id+' · '+fmt(o.total)).join('<br>')}<br><b>Total due: ${fmt(total)}</b></div>`:u.terms==='credit'?'<div class="hint">No outstanding credit orders. </div>':''}`);
 }
 function pfPassword(){
   if(!currentUser())return genModal('Change Password',`<div class="msub">Log in first to change your password.</div><button class="wide blue" onclick="closeModal('modal-gen');openAuth('login')">Login</button>`);
@@ -2001,7 +2045,7 @@ async function doChangePass(){
   if(np!==np2){e.textContent='New password and confirm password do not match.';e.style.display='block';return}
   try{
     await api('/me/password','POST',{current:$('cp-old').value,newPassword:np});
-    closeModal('modal-gen');toast('🔒 Password updated');
+    closeModal('modal-gen');toast('Password updated');
   }catch(x){e.textContent=x.message;e.style.display='block'}
 }
 function pfAddress(){
@@ -2023,7 +2067,7 @@ async function doSaveAddr(){
   try{
     const d=await api('/me','PUT',{addr:$('ad-addr').value.trim(),city:$('ad-city').value.trim(),state:$('ad-state').value.trim(),phone:$('ad-phone').value.trim(),pincode:$('ad-pincode').value.trim(),whatsapp:$('ad-whatsapp').value.trim()});
     if(d.user)state.user=d.user;
-    closeModal('modal-gen');toast('📍 Address updated');renderProfile();
+    closeModal('modal-gen');toast('Address updated');renderProfile();
   }catch(x){e.textContent=x.message;e.style.display='block'}
 }
 function pfWish(){
@@ -2031,8 +2075,8 @@ function pfWish(){
   genModal('My WishList',items.length?items.map(p=>`<div class="citem"><div>${prodIcon(p,34)}</div>
     <div style="flex:1"><div class="nm">${esc(p.name)}</div><div class="pr">${fmt(priceFor(p))}</div></div>
     <button class="smallbtn ok-btn" onclick="wishAdd('${p.id}')">Add to cart</button>
-    <button class="rm" onclick="toggleWish('${p.id}');pfWish()">🗑</button></div>`).join('')
-    :'<div class="empty"><span class="big">🤍</span>Tap the heart on any product to save it here.</div>');
+    <button class="rm" onclick="toggleWish('${p.id}');pfWish()"></button></div>`).join('')
+    :'<div class="empty"><span class="big"></span>Tap the heart on any product to save it here.</div>');
 }
 function wishAdd(pid){const ex=cart.find(c=>c.pid===pid);if(ex)ex.qty+=1;else cart.push({pid,qty:1});saveCart();renderNav();toast('Added to cart')}
 function pfPolicy(){
@@ -2044,38 +2088,38 @@ function pfPolicy(){
 function pfContact(){
   const s=state.payInfo||{};
   genModal('Contact Us',`<div class="msub">We respond within 24 hours on business days.</div>
-    <div class="regdetail">📞 / WhatsApp: <b>${esc(s.whatsapp||'—')}</b><br>📧 <b>sales@hpmpmanufacturerspvtltd.com</b></div>
-    <a href="https://wa.me/${esc(String(s.whatsapp||'').replace(/\D/g,''))}?text=Hi%20HPMP%2C%20I%20have%20a%20question" target="_blank"><button class="wide" style="background:var(--green)">💬 Chat on WhatsApp</button></a>`);
+    <div class="regdetail">/ WhatsApp: <b>${esc(s.whatsapp||'—')}</b><br><b>sales@hpmpmanufacturerspvtltd.com</b></div>
+    <a href="https://wa.me/${esc(String(s.whatsapp||'').replace(/\D/g,''))}?text=Hi%20HPMP%2C%20I%20have%20a%20question" target="_blank"><button class="wide" style="background:var(--green)">Chat on WhatsApp</button></a>`);
 }
 function pfAbout(){
   genModal('About Us',`<div class="msub">Blue Wave · Quality Trust</div>
     <div class="regdetail">HPMP Manufacturers Pvt Ltd is a manufacturer and B2B supplier of premium AC wall-mounting brackets and heavy-duty appliance trolleys, made in India at our Hyderabad facility.<br><br>
-    🛡️ 7-tank powder coating for rust protection<br>⚙️ High-grade steel up to 2 mm, 500+ kg load capacity<br>🏭 In-house production with multi-stage quality control<br>🤝 Dealer &amp; distributor network across India</div>`);
+     7-tank powder coating for rust protection<br>High-grade steel up to 2 mm, 500+ kg load capacity<br> In-house production with multi-stage quality control<br> Dealer &amp; distributor network across India</div>`);
 }
 
 /* ============ ACCOUNT (legacy, unused) ============ */
 async function renderAccount(){
   renderHeader();
   const u=currentUser();const v=$('view-account');
-  if(!u&&!isAdmin()){v.innerHTML=`<div class="empty"><span class="big">👤</span>Sign in to view your account.<br><br><button class="wide blue" style="max-width:240px" onclick="openAuth('login')">Sign in</button><button class="wide ghost" style="max-width:240px" onclick="openAuth('register')">Create an account</button></div>`;return}
-  if(isAdmin()){v.innerHTML='<div class="empty"><span class="big">⚙️</span>You are the admin — use the Admin tab.</div>';return}
+  if(!u&&!isAdmin()){v.innerHTML=`<div class="empty"><span class="big"></span>Sign in to view your account.<br><br><button class="wide blue" style="max-width:240px" onclick="openAuth('login')">Sign in</button><button class="wide ghost" style="max-width:240px" onclick="openAuth('register')">Create an account</button></div>`;return}
+  if(isAdmin()){v.innerHTML='<div class="empty"><span class="big"></span>You are the admin — use the Admin tab.</div>';return}
   try{await refreshMe()}catch(e){}
   const uu=currentUser();if(!uu)return showView('home');
   let myOrders=[];try{myOrders=await api('/my/orders');lastOrders=myOrders;updateBell()}catch(e){}
-  const statusMsg={pending:'⏳ Our admin team is verifying your GSTIN and business details. Dealer pricing unlocks automatically on approval.',
-    approved:'✅ You are an approved dealer — wholesale pricing is active storewide.',
-    rejected:'⚠️ Your registration was not approved.'+(uu.note?' Reason: '+esc(uu.note):'')+' Contact sales@hpmpmanufacturerspvtltd.com.'};
+  const statusMsg={pending:'Our admin team is verifying your GSTIN and business details. Dealer pricing unlocks automatically on approval.',
+    approved:'You are an approved dealer — wholesale pricing is active storewide.',
+    rejected:'Your registration was not approved.'+(uu.note?' Reason: '+esc(uu.note):'')+' Contact sales@hpmpmanufacturerspvtltd.com.'};
   v.innerHTML=`<div class="acc-grid">
-    <div class="cardbox"><h3>👤 My business</h3>
+    <div class="cardbox"><h3>My business</h3>
       <span class="badge b-${uu.status}">${USTATUS_LABEL[uu.status]}</span>
-      ${uu.status==='approved'?(uu.terms==='credit'?`<span class="badge b-shipped">💳 Credit customer · pay within ${uu.creditDays||30} days</span>`:`<span class="badge b-approved">💰 Advance payment customer</span>`):''}
-      <div class="regdetail"><b>${esc(uu.company)}</b> (${esc(uu.type)})<br>${esc(uu.name)} · 📞 ${esc(uu.phone)}<br>💬 ${esc(uu.whatsapp||uu.phone)}<br>📧 ${esc(uu.email)}<br>
+      ${uu.status==='approved'?(uu.terms==='credit'?`<span class="badge b-shipped">Credit customer · pay within ${uu.creditDays||30} days</span>`:`<span class="badge b-approved">Advance payment customer</span>`):''}
+      <div class="regdetail"><b>${esc(uu.company)}</b> (${esc(uu.type)})<br>${esc(uu.name)} · ${esc(uu.phone)}<br>${esc(uu.whatsapp||uu.phone)}<br>${esc(uu.email)}<br>
       GSTIN: <span class="gstin-code">${esc(uu.gstin)}</span><br>${esc(uu.addr)},<br>${esc(uu.city)}, ${esc(uu.state)}${uu.pincode?' - '+esc(uu.pincode):''}</div>
       <div class="hint">${statusMsg[uu.status]}</div>
-      <button class="wide blue" style="margin-top:12px" onclick="refreshProducts().then(()=>showView('shop'))">🛍 Continue shopping</button>
+      <button class="wide blue" style="margin-top:12px" onclick="refreshProducts().then(()=>showView('shop'))">Continue shopping</button>
     </div>
-    <div class="cardbox"><h3>📦 My orders (${myOrders.length})</h3>
-      ${myOrders.length?myOrders.map(o=>myOrderCard(o)).join(''):'<div class="empty"><span class="big">📦</span>No orders yet — your orders will appear here.</div>'}
+    <div class="cardbox"><h3>My orders (${myOrders.length})</h3>
+      ${myOrders.length?myOrders.map(o=>myOrderCard(o)).join(''):'<div class="empty"><span class="big"></span>No orders yet — your orders will appear here.</div>'}
     </div></div>`;
 }
 
@@ -2086,14 +2130,14 @@ async function renderAdmin(tab){
   if(adminTab==='orders'){return showView('orders')}
   renderHeader();
   const v=$('view-admin');
-  if(!isAdmin()){v.innerHTML='<div class="empty"><span class="big">🔒</span>Admin access only. <a href="javascript:openAuth(\'login\')">Sign in</a> with admin credentials.</div>';return}
+  if(!isAdmin()){v.innerHTML='<div class="empty"><span class="big"></span>Admin access only. <a href="javascript:openAuth(\'login\')">Sign in</a> with admin credentials.</div>';return}
   let ov={users:0,pending:0,orders:0,paySubmitted:0,revenue:0};
   try{ov=await api('/admin/overview')}catch(e){toast(e.message,1)}
   let credOverdue=0;try{credOverdue=(await api('/admin/credit')).overdue}catch(e){}
-  const tabs=[['regs','🧾 Registrations',ov.pending],['credit','💳 Credit',credOverdue],['pricing','💰 Pricing',0],['offers','🎉 Offers',0],['logistics','🚚 Logistics',0],['settings','⚙️ Settings',0]];
+  const tabs=[['regs','Registrations',ov.pending],['credit','Credit',credOverdue],['pricing','Pricing',0],['offers','Offers',0],['logistics','Logistics',0],['settings','Settings',0]];
   v.innerHTML=`<div class="pf-head" style="justify-content:space-between;padding:6px 2px 12px">
-      <h2 style="font-size:19px">⚙️ Admin panel</h2>
-      <button class="smallbtn gr-btn" onclick="logout()">↪ Logout</button>
+      <h2 style="font-size:19px">Admin panel</h2>
+      <button class="smallbtn gr-btn" onclick="logout()">Logout</button>
     </div>
     <div class="stats">
     <div class="stat"><b>${ov.users}</b><span>Registered businesses</span></div>
@@ -2102,7 +2146,7 @@ async function renderAdmin(tab){
     <div class="stat"><b>${fmt(ov.revenue)}</b><span>Paid/confirmed order value</span></div></div>
     <div class="atabs">${tabs.map(t=>`<button class="atab ${adminTab===t[0]?'on':''}" onclick="renderAdmin('${t[0]}')">${t[1]}${t[2]?`<span class="n">${t[2]}</span>`:''}</button>`).join('')}</div>
     <div id="adminBody">Loading…</div>
-    <button class="wide ghost" style="margin-top:22px" onclick="logout()">↪ Logout of admin</button>`;
+    <button class="wide ghost" style="margin-top:22px" onclick="logout()">Logout of admin</button>`;
   try{
     if(adminTab==='regs')await renderRegs();
     if(adminTab==='pricing')await renderPricing();
@@ -2110,7 +2154,7 @@ async function renderAdmin(tab){
     if(adminTab==='offers')await renderOffers();
     if(adminTab==='logistics')await renderLogistics();
     if(adminTab==='settings')await renderSettings();
-  }catch(e){$('adminBody').innerHTML='<div class="empty">⚠️ '+esc(e.message)+'</div>'}
+  }catch(e){$('adminBody').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
 }
 async function renderRegs(){
   const users=await api('/admin/users');
@@ -2214,7 +2258,7 @@ async function editDealer(uid){
     const u=users.find(x=>x.id===uid);
     if(!u)return toast('Dealer not found',1);
     const types=['Dealer','Distributor','Retailer','Contractor'];
-    genModal('✏️ Edit dealer details',`
+    genModal('Edit dealer details',`
       <div class="msub">Correct anything the dealer entered wrongly at registration. Changes apply to their account immediately.</div>
       <div class="frow"><div><label>Contact person name</label><input id="ed-name" value="${esc(u.name)}"></div>
       <div><label>Business / company name</label><input id="ed-company" value="${esc(u.company)}"></div></div>
@@ -2228,7 +2272,7 @@ async function editDealer(uid){
       <div><label>State</label><input id="ed-state" value="${esc(u.state||'')}"></div></div>
       <div><label>Pincode</label><input id="ed-pin" value="${esc(u.pincode||'')}" maxlength="6"></div>
       <div class="hint">Verify the corrected GSTIN on the <a href="https://services.gst.gov.in/services/searchtp" target="_blank">GST portal</a> before saving.</div>
-      <button class="wide blue" onclick="saveDealerEdit('${uid}')">💾 Save corrections</button>
+      <button class="wide blue" onclick="saveDealerEdit('${uid}')">Save corrections</button>
       <button class="wide ghost" onclick="closeModal('modal-gen')">Cancel</button>`);
   }catch(e){toast(e.message,1)}
 }
@@ -2238,13 +2282,13 @@ async function saveDealerEdit(uid){
     email:g('ed-email'),gstin:g('ed-gstin').toUpperCase(),type:g('ed-type'),
     addr:g('ed-addr'),city:g('ed-city'),state:g('ed-state'),pincode:g('ed-pin')};
   if(!body.name||!body.company)return toast('Name and company are required',1);
-  try{await api('/admin/users/'+uid,'PUT',body);closeModal('modal-gen');toast('✅ Dealer details corrected');renderAdmin('regs')}
+  try{await api('/admin/users/'+uid,'PUT',body);closeModal('modal-gen');toast('Dealer details corrected');renderAdmin('regs')}
   catch(e){toast(e.message,1)}
 }
 async function dealerPrices(uid){
   try{
     const d=await api('/admin/users/'+uid+'/prices');
-    genModal('💰 Pricing for '+esc(d.user.company),`
+    genModal('Pricing for '+esc(d.user.company),`
       <div class="msub">Set special rates for this ${esc(d.user.type.toLowerCase())}. Leave a box empty to use the standard dealer price.</div>
       <div style="overflow-x:auto"><table><thead><tr><th>Product</th><th>MRP</th><th>Standard</th><th>This dealer ₹</th></tr></thead><tbody id="dpRows">
       ${d.products.map(p=>`<tr data-pid="${p.id}">
@@ -2254,26 +2298,26 @@ async function dealerPrices(uid){
         <td><input class="dp pin" type="number" min="0" step="0.01" value="${p.custom!==null?p.custom:''}" placeholder="${p.standard}"></td>
       </tr>`).join('')}
       </tbody></table></div>
-      <button class="wide blue" onclick="saveDealerPrices('${uid}')">💾 Save this dealer's prices</button>
-      <button class="wide ghost" onclick="clearDealerPrices('${uid}')">↺ Reset all to standard</button>`);
+      <button class="wide blue" onclick="saveDealerPrices('${uid}')">Save this dealer's prices</button>
+      <button class="wide ghost" onclick="clearDealerPrices('${uid}')">Reset all to standard</button>`);
   }catch(e){toast(e.message,1)}
 }
 async function saveDealerPrices(uid){
   const prices={};
   document.querySelectorAll('#dpRows tr').forEach(tr=>{prices[tr.dataset.pid]=tr.querySelector('.dp').value.trim()});
-  try{await api('/admin/users/'+uid+'/prices','PUT',{prices});closeModal('modal-gen');toast('💰 Dealer pricing saved — live for that dealer now')}
+  try{await api('/admin/users/'+uid+'/prices','PUT',{prices});closeModal('modal-gen');toast('Dealer pricing saved — live for that dealer now')}
   catch(e){toast(e.message,1)}
 }
 async function clearDealerPrices(uid){
   if(!confirm('Reset this dealer to the standard dealer price list?'))return;
   const prices={};
   document.querySelectorAll('#dpRows tr').forEach(tr=>{prices[tr.dataset.pid]=''});
-  try{await api('/admin/users/'+uid+'/prices','PUT',{prices});closeModal('modal-gen');toast('↺ Reset to standard prices')}
+  try{await api('/admin/users/'+uid+'/prices','PUT',{prices});closeModal('modal-gen');toast('Reset to standard prices')}
   catch(e){toast(e.message,1)}
 }
 async function delUser(id,company){
   if(!confirm('Delete the account of "'+company+'" permanently? Their past orders keep their records.'))return;
-  const pw=prompt('🔐 Enter the ADMIN password to verify this deletion:');
+  const pw=prompt('Enter the ADMIN password to verify this deletion:');
   if(pw===null)return;
   try{await api('/admin/users/'+id+'/delete','POST',{password:pw});toast('Account deleted: '+company);
     if(currentView==='reg')closeRegDetail();else renderAdmin('regs')}
@@ -2316,7 +2360,7 @@ async function renderOrders(){
   const orders=await api('/admin/orders');
   $('adminBody').innerHTML=`<div class="cardbox"><h3>Order management</h3>
     <div class="hint" style="margin-bottom:12px">Only paid orders (and credit orders from approved customers) appear here — unpaid carts stay with the customer. Verify the payment reference, then move the order Confirmed → Shipped → Delivered.</div>
-    ${orders.length?orders.map(o=>orderCard(o)).join(''):'<div class="empty"><span class="big">📦</span>No orders yet.</div>'}
+    ${orders.length?orders.map(o=>orderCard(o)).join(''):'<div class="empty"><span class="big"></span>No orders yet.</div>'}
   </div>`;
 }
 function orderCard(o){
@@ -2332,10 +2376,10 @@ function orderCard(o){
     <div class="osec">
       <div class="olabel">Customer</div>
       <b>${esc(o.contact.company||o.contact.name)}</b>${o.contact.company?' · '+esc(o.contact.name):''}<br>
-      📞 ${esc(o.contact.phone)} <a href="https://wa.me/91${wa}" target="_blank">💬 WhatsApp</a>
+      ${esc(o.contact.phone)} <a href="https://wa.me/91${wa}" target="_blank">WhatsApp</a>
       ${o.contact.gstin?'<br>GSTIN: <span class="gstin-code">'+esc(o.contact.gstin)+'</span>':''}
-      <br>📍 ${esc(o.addr)}
-      ${o.notes?'<br>📝 '+esc(o.notes):''}
+      <br>${esc(o.addr)}
+      ${o.notes?'<br>'+esc(o.notes):''}
     </div>
 
     <div class="osec">
@@ -2362,8 +2406,8 @@ function orderCard(o){
     <div class="osec">
       <div class="olabel">Payment &amp; dispatch</div>
       Payment ref: <b>${esc(o.payRef)||'—'}</b>
-      ${o.creditDue&&!o.creditSettled?'<br>🧾 Credit — due '+new Date(o.creditDue).toLocaleDateString('en-IN'):''}
-      <br>🚚 Preferred transport: <b>${o.transport?esc(o.transport):'No preference'}</b>
+      ${o.creditDue&&!o.creditSettled?'<br>Credit — due '+new Date(o.creditDue).toLocaleDateString('en-IN'):''}
+      <br>Preferred transport: <b>${o.transport?esc(o.transport):'No preference'}</b>
       ${dispatchLine(o)}
     </div>
 
@@ -2373,13 +2417,13 @@ function orderCard(o){
         <select onchange="setOrderStatus('${o.id}',this.value)" style="width:auto;max-width:180px">
           ${Object.keys(STATUS_LABEL).map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${STATUS_LABEL[s]}</option>`).join('')}
         </select>
-        <button class="smallbtn gr-btn" onclick="printOrder('${o.id}')">🖨 Print</button>
+        <button class="smallbtn gr-btn" onclick="printOrder('${o.id}')">Print</button>
       </div>
       <div class="olabel" style="margin-top:6px">Dispatch details</div>
       <div class="orow">
         <select id="dm-${o.id}" onchange="dispatchMode('${o.id}')" style="width:auto;max-width:230px">
-          <option value="local" ${o.dispatchMode==='local'?'selected':''}>🛺 Local — same city (Porter / vehicle)</option>
-          <option value="outstation" ${o.dispatchMode!=='local'?'selected':''}>🚚 Outstation — other district / state (LR)</option>
+          <option value="local" ${o.dispatchMode==='local'?'selected':''}>Local — same city (Porter / vehicle)</option>
+          <option value="outstation" ${o.dispatchMode!=='local'?'selected':''}>Outstation — other district / state (LR)</option>
         </select>
       </div>
       <div id="dloc-${o.id}" style="display:${o.dispatchMode==='local'?'block':'none'}">
@@ -2401,9 +2445,9 @@ function orderCard(o){
         <div class="hint">Transporter LR / builty number for other districts and states — the customer tracks with this number.</div>
       </div>
       <div class="orow">
-        <button class="smallbtn ok-btn" onclick="saveDispatch('${o.id}')">🚚 ${o.dispatchedAt?'Update dispatch':'Save + mark shipped'}</button>
+        <button class="smallbtn ok-btn" onclick="saveDispatch('${o.id}')">${o.dispatchedAt?'Update dispatch':'Save + mark shipped'}</button>
       </div>
-      <div class="orow"><button class="smallbtn no-btn" onclick="deleteOrder('${o.id}')">🗑 Delete order</button></div>
+      <div class="orow"><button class="smallbtn no-btn" onclick="deleteOrder('${o.id}')">Delete order</button></div>
     </div>
   </div>`;
 }
@@ -2455,7 +2499,7 @@ function printSlip(o){
   if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.BlueWavePrint){
     try{
       window.webkit.messageHandlers.BlueWavePrint.postMessage(printDocument($('printArea').innerHTML));
-      toast('🖨 Opening print…');
+      toast('Opening print…');
       return;
     }catch(e){/* fall through */}
   }
@@ -2463,7 +2507,7 @@ function printSlip(o){
   if(window.BlueWavePrint&&window.BlueWavePrint.printHtml){
     try{
       window.BlueWavePrint.printHtml(printDocument($('printArea').innerHTML));
-      toast('🖨 Opening print…');
+      toast('Opening print…');
       return;
     }catch(e){/* fall through to browser printing */}
   }
@@ -2475,7 +2519,7 @@ function printDocument(inner){
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
   @page{size:A4;margin:10mm}
-  body{font-family:'Britannic Bold','Britannic','Arial Narrow','Segoe UI Semibold',system-ui,-apple-system,'Segoe UI',sans-serif;color:#000;font-size:12px;margin:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;color:#000;font-size:12px;margin:0}
   .pr-head{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}
   .pr-brand{font-size:16px;font-weight:bold}
   .pr-title{font-size:15px;font-weight:bold;text-align:right}
@@ -2515,7 +2559,7 @@ function trackTimeline(o){
     return `<div class="osec"><div class="olabel">Tracking</div><div class="notice warn">This order was cancelled. Contact us if that looks wrong.</div></div>`;
   return `<div class="osec"><div class="olabel">Tracking</div>
     <div class="tline">${steps.map(s=>`<div class="tstep ${s[2]?'ok':''}">
-      <span class="tdot">${s[2]?'✓':''}</span>
+      <span class="tdot">${s[2]?'':''}</span>
       <span class="tbody"><b>${esc(s[0])}</b>${s[1]?`<span>${esc(String(s[1]))}</span>`:''}</span>
     </div>`).join('')}</div></div>`;
 }
@@ -2544,23 +2588,23 @@ function myOrderCard(o){
     </div>
     <div class="osec">
       <div class="olabel">Delivery &amp; payment</div>
-      📍 ${esc(o.addr)}
-      <br>🚚 Preferred transport: <b>${o.transport?esc(o.transport):'No preference'}</b>
+      ${esc(o.addr)}
+      <br>Preferred transport: <b>${o.transport?esc(o.transport):'No preference'}</b>
       ${o.dispatchMode==='local'&&o.vehicleNo
-        ? `<br><span class="badge b-shipped">🛺 Local delivery · ${esc(o.vehicleNo)}</span>${o.driverName?'<br>Driver: <b>'+esc(o.driverName)+'</b>':''}${o.driverPhone?` · <a href="tel:${esc(o.driverPhone)}">${esc(o.driverPhone)}</a>`:''}${o.dispatchedAt?'<br><span class="oitems">Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN')+'</span>':''}`
+        ? `<br><span class="badge b-shipped">Local delivery · ${esc(o.vehicleNo)}</span>${o.driverName?'<br>Driver: <b>'+esc(o.driverName)+'</b>':''}${o.driverPhone?` · <a href="tel:${esc(o.driverPhone)}">${esc(o.driverPhone)}</a>`:''}${o.dispatchedAt?'<br><span class="oitems">Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN')+'</span>':''}`
         : o.lrNumber
-        ? `<br><span class="badge b-shipped">🚚 LR ${esc(o.lrNumber)}</span> ${esc(o.dispatchTransport||'')}${o.dispatchedAt?'<br><span class="oitems">Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN')+'</span>':''}<br><span class="oitems">Quote this LR number with the transporter to track your material.</span>`
+        ? `<br><span class="badge b-shipped">LR ${esc(o.lrNumber)}</span> ${esc(o.dispatchTransport||'')}${o.dispatchedAt?'<br><span class="oitems">Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN')+'</span>':''}<br><span class="oitems">Quote this LR number with the transporter to track your material.</span>`
         : ''}
       <br>Payment: <b>${esc(o.payRef)||'Pending'}</b>
-      ${o.creditDue&&!o.creditSettled?`<br><span class="badge b-pending">🧾 Pay by ${new Date(o.creditDue).toLocaleDateString('en-IN')}</span>`:''}
-      ${o.notes?'<br>📝 '+esc(o.notes):''}
+      ${o.creditDue&&!o.creditSettled?`<br><span class="badge b-pending">Pay by ${new Date(o.creditDue).toLocaleDateString('en-IN')}</span>`:''}
+      ${o.notes?'<br>'+esc(o.notes):''}
     </div>
     <div class="osec" style="border:0">
       <div class="orow">
         ${o.status==='awaiting_payment'
-          ? `<button class="smallbtn ok-btn" onclick="openPaymentById('${o.id}')">💳 Pay now</button>`
+          ? `<button class="smallbtn ok-btn" onclick="openPaymentById('${o.id}')">Pay now</button>`
           : `<button class="smallbtn gr-btn" onclick="openPaymentById('${o.id}')">Order details</button>`}
-        <button class="smallbtn gr-btn" onclick="printMyOrder('${o.id}')">🖨 Print</button>
+        <button class="smallbtn gr-btn" onclick="printMyOrder('${o.id}')">Print</button>
       </div>
     </div>
   </div>`;
@@ -2574,9 +2618,9 @@ async function printMyOrder(id){
 /* ---- dispatch helpers (local Porter vehicle / outstation LR) ---- */
 function dispatchLine(o){
   if(o.dispatchMode==='local'&&o.vehicleNo)
-    return `<br><span class="badge b-shipped">🛺 Local · ${esc(o.vehicleNo)}</span> ${esc(o.driverName||'')}${o.driverPhone?' · '+esc(o.driverPhone):''}${o.dispatchedAt?' · '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}`;
+    return `<br><span class="badge b-shipped">Local · ${esc(o.vehicleNo)}</span> ${esc(o.driverName||'')}${o.driverPhone?' · '+esc(o.driverPhone):''}${o.dispatchedAt?' · '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}`;
   if(o.lrNumber)
-    return `<br><span class="badge b-shipped">🚚 LR ${esc(o.lrNumber)}</span> ${esc(o.dispatchTransport||'')}${o.dispatchedAt?' · '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}`;
+    return `<br><span class="badge b-shipped">LR ${esc(o.lrNumber)}</span> ${esc(o.dispatchTransport||'')}${o.dispatchedAt?' · '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}`;
   return '';
 }
 function dispatchMode(id){
@@ -2602,7 +2646,7 @@ async function saveDispatch(id){
   }
   try{
     await api('/admin/orders/'+id+'/dispatch','POST',body);
-    toast(mode==='local'?('🛺 Local dispatch saved — vehicle '+body.vehicleNo):('🚚 Dispatch saved — LR '+body.lrNumber));
+    toast(mode==='local'?('Local dispatch saved — vehicle '+body.vehicleNo):('Dispatch saved — LR '+body.lrNumber));
     refreshOrdersScreen();
   }catch(e){toast(e.message,1)}
 }
@@ -2624,23 +2668,23 @@ async function renderPricing(){
     <div class="hint" style="margin-bottom:10px">Edit any value and click <b>Save all changes</b>. New prices apply instantly for every customer. Untick "Live" to hide a product.</div>
     <div style="overflow-x:auto"><table><thead><tr><th>Photo</th><th>Product</th><th>Category</th><th>MRP ₹</th><th>Dealer ₹</th><th>Margin</th><th>MOQ</th><th>Live</th><th></th></tr></thead><tbody id="priceRows">
     ${products.map(p=>`<tr data-pid="${p.id}">
-      <td style="text-align:center">${p.image?`<img src="${p.image}" style="width:44px;height:44px;object-fit:cover;border-radius:8px">`:`<span style="font-size:26px">${p.emoji}</span>`}<br>
+      <td style="text-align:center">${p.image?`<img src="${p.image}" style="width:44px;height:44px;object-fit:cover;border-radius:8px">`:boxArt(30,p.cat)}<br>
         <input type="file" accept="image/*" style="display:none" id="img-${p.id}" onchange="uploadImg('${p.id}',this)">
-        <button class="copybtn" style="margin:3px 0 0" onclick="$('img-${p.id}').click()">📷 ${p.image?'Change':'Add'}</button>
-        ${p.image?`<button class="copybtn" style="margin:3px 0 0;color:var(--red);border-color:var(--red)" onclick="removeImg('${p.id}')">✕</button>`:''}</td>
-      <td><input class="pr-name" value="${esc(p.name)}" style="min-width:190px"><br><button class="copybtn" style="margin-top:3px" onclick="editMeta('${p.id}')">📝 Description &amp; packing</button></td>
+        <button class="copybtn" style="margin:3px 0 0" onclick="$('img-${p.id}').click()">${p.image?'Change':'Add'}</button>
+        ${p.image?`<button class="copybtn" style="margin:3px 0 0;color:var(--red);border-color:var(--red)" onclick="removeImg('${p.id}')"></button>`:''}</td>
+      <td><input class="pr-name" value="${esc(p.name)}" style="min-width:190px"><br><button class="copybtn" style="margin-top:3px" onclick="editMeta('${p.id}')">Description &amp; packing</button></td>
       <td><input class="pr-cat" value="${esc(p.cat)}" style="min-width:130px"></td>
       <td><input class="pr-mrp pin" type="number" min="0" value="${p.mrp}"></td>
       <td><input class="pr-dealer pin" type="number" min="0" value="${p.dealer}"></td>
       <td><b>${Math.round((1-p.dealer/p.mrp)*100)}%</b> off MRP</td>
       <td><input class="pr-moq pin" type="number" min="1" value="${p.moq}"></td>
       <td style="text-align:center"><input type="checkbox" class="pr-active" style="width:18px;height:18px" ${p.active?'checked':''}></td>
-      <td><button class="smallbtn no-btn" onclick="deleteProduct('${p.id}')" title="Delete">🗑</button></td>
+      <td><button class="smallbtn no-btn" onclick="deleteProduct('${p.id}')" title="Delete"></button></td>
     </tr>`).join('')}
     </tbody></table></div>
-    <button class="wide blue" style="max-width:280px" onclick="savePrices()">💾 Save all changes</button>
+    <button class="wide blue" style="max-width:280px" onclick="savePrices()">Save all changes</button>
   </div>
-  <div class="cardbox"><h3>➕ Add new product</h3>
+  <div class="cardbox"><h3> Add new product</h3>
     <div class="frow">
       <div><label>Product name</label><input id="np-name" placeholder="e.g., XEON AC Bracket (4 Kg)"></div>
       <div><label>Category</label><input id="np-cat" value="AC Brackets"></div>
@@ -2655,17 +2699,17 @@ async function renderPricing(){
 let _adminProds=[];
 function editMeta(pid){
   const p=_adminProds.find(x=>x.id===pid);if(!p)return;
-  genModal('📝 '+esc(p.name),`
+  genModal(''+esc(p.name),`
     <label>Product description (shown to customers)</label>
     <textarea id="em-descr" rows="4">${esc(p.descr||'')}</textarea>
     <label>Master packing details</label>
     <textarea id="em-pack" rows="4">${esc(p.packing||'')}</textarea>
-    <button class="wide blue" onclick="saveMeta('${pid}')">💾 Save details</button>`);
+    <button class="wide blue" onclick="saveMeta('${pid}')">Save details</button>`);
 }
 async function saveMeta(pid){
   try{
     await api('/admin/products/'+pid,'PUT',{descr:$('em-descr').value.trim(),packing:$('em-pack').value.trim()});
-    await refreshProducts();closeModal('modal-gen');toast('💾 Details saved — live in the store');renderAdmin('pricing');
+    await refreshProducts();closeModal('modal-gen');toast('Details saved — live in the store');renderAdmin('pricing');
   }catch(e){toast(e.message,1)}
 }
 function uploadImg(pid,input){
@@ -2678,7 +2722,7 @@ function uploadImg(pid,input){
     c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
     c.getContext('2d').drawImage(img,0,0,c.width,c.height);
     const data=c.toDataURL('image/jpeg',0.82);
-    try{await api('/admin/products/'+pid,'PUT',{image:data});await refreshProducts();toast('📷 Photo updated — live in the store');renderAdmin('pricing')}
+    try{await api('/admin/products/'+pid,'PUT',{image:data});await refreshProducts();toast('Photo updated — live in the store');renderAdmin('pricing')}
     catch(e){toast(e.message,1)}
   };
   img.onerror=()=>toast('Could not read that image',1);
@@ -2701,7 +2745,7 @@ async function savePrices(){
       active:tr.querySelector('.pr-active').checked
     })));
     await refreshProducts();
-    toast('💾 Prices updated — live for all customers now');renderAdmin('pricing');
+    toast('Prices updated — live for all customers now');renderAdmin('pricing');
   }catch(e){toast(e.message,1)}
 }
 async function addProduct(){
@@ -2717,9 +2761,9 @@ async function deleteProduct(id){
 }
 async function renderCredit(){
   const d=await api('/admin/credit');
-  const auto=d.provider?`<div class="notice ok">🤖 Automatic reminders are <b>ON</b> via ${d.provider==='whatsapp'?'WhatsApp Business API':'SMS (MSG91)'} — messages go out on their own before and after each due date.</div>`
-    :`<div class="notice info">💬 Automatic sending isn't connected yet, so use the green <b>WhatsApp</b> button to send a ready-written reminder in one tap. To make it fully automatic, add WhatsApp or SMS keys in <b>Settings → Payment reminders</b>.</div>`;
-  $('adminBody').innerHTML=`<div class="cardbox"><h3>💳 Credit customers — payments due</h3>
+  const auto=d.provider?`<div class="notice ok"> Automatic reminders are <b>ON</b> via ${d.provider==='whatsapp'?'WhatsApp Business API':'SMS (MSG91)'} — messages go out on their own before and after each due date.</div>`
+    :`<div class="notice info">Automatic sending isn't connected yet, so use the green <b>WhatsApp</b> button to send a ready-written reminder in one tap. To make it fully automatic, add WhatsApp or SMS keys in <b>Settings → Payment reminders</b>.</div>`;
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>Credit customers — payments due</h3>
     ${auto}
     <div class="stats" style="margin-bottom:12px">
       <div class="stat"><b>${d.orders.length}</b><span>Open credit orders</span></div>
@@ -2734,28 +2778,28 @@ async function renderCredit(){
         :`<span class="badge b-approved">In ${o.dueDays}d</span>`;
       return `<tr>
         <td><b>${o.id}</b></td>
-        <td>${esc(o.company)}<br><span class="oitems">📞 ${esc(o.phone)}</span></td>
+        <td>${esc(o.company)}<br><span class="oitems">${esc(o.phone)}</span></td>
         <td><b>${fmt(o.total)}</b></td>
         <td>${new Date(o.dueAt).toLocaleDateString('en-IN')}<br><span class="oitems">${o.creditDays}-day terms</span></td>
         <td>${badge}</td>
         <td class="oitems">${o.lastReminder?esc(o.lastReminder.kind)+'<br>'+new Date(o.lastReminder.at).toLocaleDateString('en-IN')+' · '+esc(o.lastReminder.status):'—'}</td>
         <td>
-          <a href="${o.waLink}" target="_blank"><button class="smallbtn ok-btn">💬 WhatsApp</button></a>
-          <button class="smallbtn gr-btn" onclick="sendRemind('${o.id}')">📤 Send now</button>
-          <button class="smallbtn gr-btn" onclick="settleCredit('${o.id}')">✅ Mark paid</button>
+          <a href="${o.waLink}" target="_blank"><button class="smallbtn ok-btn">WhatsApp</button></a>
+          <button class="smallbtn gr-btn" onclick="sendRemind('${o.id}')"> Send now</button>
+          <button class="smallbtn gr-btn" onclick="settleCredit('${o.id}')">Mark paid</button>
         </td></tr>`}).join('')}
     </tbody></table></div>`
-    :'<div class="empty"><span class="big">💳</span>No outstanding credit orders.</div>'}
-    <button class="wide blue" style="max-width:280px;margin-top:14px" onclick="runReminders()">🤖 Run reminder check now</button>
+    :'<div class="empty"><span class="big"></span>No outstanding credit orders.</div>'}
+    <button class="wide blue" style="max-width:280px;margin-top:14px" onclick="runReminders()"> Run reminder check now</button>
   </div>`;
 }
 async function sendRemind(id){
-  try{await api('/admin/credit/'+id+'/remind','POST');toast('📤 Reminder sent');renderAdmin('credit')}
+  try{await api('/admin/credit/'+id+'/remind','POST');toast(' Reminder sent');renderAdmin('credit')}
   catch(e){toast(e.message,1)}
 }
 async function settleCredit(id){
   if(!confirm('Mark this credit order as paid? It stops all further reminders.'))return;
-  try{await api('/admin/credit/'+id+'/settle','POST');toast('✅ Marked as paid');renderAdmin('credit')}
+  try{await api('/admin/credit/'+id+'/settle','POST');toast('Marked as paid');renderAdmin('credit')}
   catch(e){toast(e.message,1)}
 }
 async function runReminders(){
@@ -2767,7 +2811,7 @@ async function renderOffers(){
   const today=new Date().toISOString().slice(0,10);
   const live=list.filter(o=>o.active&&(!o.starts||o.starts<=today)&&(!o.ends||o.ends>=today))
                  .sort((a,b)=>b.percent-a.percent)[0];
-  $('adminBody').innerHTML=`<div class="cardbox"><h3>🎉 Festive offers</h3>
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>Festive offers</h3>
     <div class="hint" style="margin-bottom:10px">A percentage off <b>dealer prices</b> for a chosen period. Guests keep seeing plain MRP. When two offers overlap the biggest one applies, and every approved dealer gets a notification the moment you create it.</div>
     ${live?`<div class="notice ok">Running now: <b>${esc(live.name)}</b> — ${live.percent}% off dealer prices${live.ends?' until '+esc(live.ends):''}</div>`
           :'<div class="notice info">No offer is running today. Dealers see their normal rates.</div>'}
@@ -2779,7 +2823,7 @@ async function renderOffers(){
       <div><label>Starts (blank = today)</label><input id="of-from" type="date"></div>
       <div><label>Ends (blank = no end)</label><input id="of-to" type="date"></div>
     </div>
-    <button class="wide blue" style="max-width:260px" onclick="addOffer()">＋ Create offer</button>
+    <button class="wide blue" style="max-width:260px" onclick="addOffer()">Create offer</button>
   </div>
   <div class="cardbox"><h3>All offers</h3>
     ${list.length?list.map(o=>{
@@ -2789,12 +2833,12 @@ async function renderOffers(){
           <div><b>${esc(o.name)}</b> · <b>${o.percent}%</b> off dealer prices
             ${running?'<span class="badge b-approved">Running</span>':o.active?'<span class="badge b-cancelled">Scheduled / ended</span>':'<span class="badge b-cancelled">Paused</span>'}</div>
           <div>
-            <button class="smallbtn gr-btn" onclick="toggleOffer('${o.id}',${o.active?0:1})">${o.active?'⏸ Pause':'▶ Resume'}</button>
-            <button class="smallbtn no-btn" onclick="delOffer('${o.id}','${esc(o.name)}')">🗑 Delete</button>
+            <button class="smallbtn gr-btn" onclick="toggleOffer('${o.id}',${o.active?0:1})">${o.active?'Pause':'Resume'}</button>
+            <button class="smallbtn no-btn" onclick="delOffer('${o.id}','${esc(o.name)}')">Delete</button>
           </div>
         </div>
-        📅 ${o.starts?esc(o.starts):'from today'} → ${o.ends?esc(o.ends):'no end date'}
-      </div>`}).join(''):'<div class="empty"><span class="big">🎉</span>No offers created yet.</div>'}
+        ${o.starts?esc(o.starts):'from today'} → ${o.ends?esc(o.ends):'no end date'}
+      </div>`}).join(''):'<div class="empty"><span class="big"></span>No offers created yet.</div>'}
   </div>`;
 }
 async function addOffer(){
@@ -2802,7 +2846,7 @@ async function addOffer(){
   if(!name)return toast('Give the offer a name',1);
   if(!percent)return toast('Enter the discount percentage',1);
   try{await api('/admin/offers','POST',{name,percent,starts:$('of-from').value,ends:$('of-to').value});
-    toast('🎉 Offer created — dealers notified');renderAdmin('offers')}
+    toast('Offer created — dealers notified');renderAdmin('offers')}
   catch(e){toast(e.message,1)}
 }
 async function toggleOffer(id,active){
@@ -2814,15 +2858,15 @@ async function delOffer(id,name){
 }
 async function renderLogistics(){
   const ts=await api('/admin/transports');
-  $('adminBody').innerHTML=`<div class="cardbox"><h3>🚚 Logistics — transport list</h3>
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>Logistics — transport list</h3>
     <div class="hint" style="margin-bottom:12px">Add the transport services you dispatch with. Customers pick their preferred transport from this list at checkout, and their choice shows on every order.</div>
     ${ts.length?ts.map(t=>`<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px 14px;margin-bottom:6px">
-      <b style="color:var(--navy)">🚚 ${esc(t.name)}</b>
-      <button class="smallbtn no-btn" onclick="delTransport('${t.id}')">🗑 Remove</button></div>`).join('')
-    :'<div class="empty"><span class="big">🚚</span>No transports yet — add your first one below.</div>'}
+      <b style="color:var(--navy)">${esc(t.name)}</b>
+      <button class="smallbtn no-btn" onclick="delTransport('${t.id}')">Remove</button></div>`).join('')
+    :'<div class="empty"><span class="big"></span>No transports yet — add your first one below.</div>'}
     <div class="frow" style="margin-top:14px">
       <div><label>Transport name</label><input id="tr-name" placeholder="e.g., VRL Logistics, Navata, TCI Express"></div>
-      <div><label>&nbsp;</label><button class="wide blue" style="margin-top:0" onclick="addTransport()">➕ Add transport</button></div>
+      <div><label>&nbsp;</label><button class="wide blue" style="margin-top:0" onclick="addTransport()"> Add transport</button></div>
     </div>
   </div>`;
   const inp=$('tr-name');if(inp)inp.addEventListener('keydown',e=>{if(e.key==='Enter')addTransport()});
@@ -2830,7 +2874,7 @@ async function renderLogistics(){
 async function addTransport(){
   const n=$('tr-name').value.trim();
   if(!n)return toast('Enter a transport name',1);
-  try{await api('/admin/transports','POST',{name:n});await refreshTransports();toast('🚚 Transport added: '+n);renderAdmin('logistics')}
+  try{await api('/admin/transports','POST',{name:n});await refreshTransports();toast('Transport added: '+n);renderAdmin('logistics')}
   catch(e){toast(e.message,1)}
 }
 async function delTransport(id){
@@ -2841,7 +2885,7 @@ async function delTransport(id){
 async function renderSettings(){
   const s=await api('/admin/settings');
   window.__settings=s;
-  $('adminBody').innerHTML=`<div class="cardbox"><h3>💳 Payment details (shown to customers at checkout)</h3>
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>Payment details (shown to customers at checkout)</h3>
     <div class="frow">
       <div><label>Payee / account name</label><input id="st-payee" value="${esc(s.payeeName)}"></div>
       <div><label>WhatsApp number</label><input id="st-wa2" value="${esc(s.whatsapp)}" disabled style="display:none"></div>
@@ -2858,9 +2902,9 @@ async function renderSettings(){
       <div><label>GST % included in your prices</label><input id="st-gst" type="number" min="0" max="100" value="${s.gstPercent}"><div class="hint">MRP and dealer prices are treated as GST-inclusive — the app shows the GST portion inside each total automatically.</div></div>
     </div>
   </div>
-  <div class="cardbox"><h3>💳 Razorpay gateway (online payments — UPI, cards, netbanking)</h3>
+  <div class="cardbox"><h3>Razorpay gateway (online payments — UPI, cards, netbanking)</h3>
     <div class="notice ${s.rzpSecretSet&&s.rzpKeyId?'ok':'info'}" style="margin-bottom:8px">
-      ${s.rzpSecretSet&&s.rzpKeyId?'✅ Razorpay is <b>enabled</b> — customers see a "Pay online" button with instant confirmation.':'⭕ Not enabled yet. Get free API keys at <b>dashboard.razorpay.com → Account &amp; Settings → API Keys</b>, paste them below, and online payments switch on automatically.'}
+      ${s.rzpSecretSet&&s.rzpKeyId?'Razorpay is <b>enabled</b> — customers see a "Pay online" button with instant confirmation.':'Not enabled yet. Get free API keys at <b>dashboard.razorpay.com → Account &amp; Settings → API Keys</b>, paste them below, and online payments switch on automatically.'}
     </div>
     <div class="frow">
       <div><label>Key ID</label><input id="st-rzpid" value="${esc(s.rzpKeyId)}" placeholder="rzp_live_XXXXXXXXXXXX"></div>
@@ -2936,33 +2980,33 @@ async function renderSettings(){
     <textarea id="st-remtpl" rows="4">${esc(s.remTemplate)}</textarea>
     <div class="hint">Placeholders: <b>{name}</b> {order} {amount} {date} {dueDate} {due}</div>
   </div>
-  <div class="cardbox"><h3>🧾 GSTIN auto-verification (optional)</h3>
+  <div class="cardbox"><h3>GSTIN auto-verification (optional)</h3>
     <div class="notice ${s.gstApiKeySet?'ok':'info'}" style="margin-bottom:8px">
-      ${s.gstApiKeySet?'✅ Live GST-records lookup is <b>enabled</b> — registration forms auto-fill the legal name and address from GST records.':'⭕ Not configured. The app already validates GSTIN format &amp; check digit and auto-fills the state. To also auto-fill <b>legal name and address from GST records</b>, get a GST verification API key (e.g. from <b>appyflow.in</b>) and paste it below.'}
+      ${s.gstApiKeySet?'Live GST-records lookup is <b>enabled</b> — registration forms auto-fill the legal name and address from GST records.':'Not configured. The app already validates GSTIN format &amp; check digit and auto-fills the state. To also auto-fill <b>legal name and address from GST records</b>, get a GST verification API key (e.g. from <b>appyflow.in</b>) and paste it below.'}
     </div>
     <label>GST verification API key ${s.gstApiKeySet?'(saved — leave blank to keep)':''}</label>
     <input id="st-gstkey" type="password" placeholder="${s.gstApiKeySet?'••••••••••••':'Paste key secret'}">
   </div>
-  <div class="cardbox"><h3>🔐 Admin login</h3>
+  <div class="cardbox"><h3>Admin login</h3>
     <div class="frow">
       <div><label>Admin email</label><input id="st-aemail" value="${esc(s.adminEmail)}"></div>
       <div><label>New admin password (leave blank to keep current)</label><input id="st-apass" type="password" placeholder="••••••••"></div>
     </div>
     <div class="hint">Share only with your backend/approval team.</div>
   </div>
-  <button class="wide blue" style="max-width:260px" onclick="saveSettings()">💾 Save settings</button>
+  <button class="wide blue" style="max-width:260px" onclick="saveSettings()">Save settings</button>
   <div class="cardbox" style="margin-top:16px"><h3>Backup &amp; restore</h3>
     <div class="hint" style="margin-bottom:10px">Saves every dealer, order, price and setting into one file. Keep a copy each week — if the hosting ever resets, restore puts everything back exactly as it was.${nativeApp()?' In the app the file goes to your phone\'s Downloads folder.':''}</div>
     <button class="smallbtn gr-btn" onclick="downloadBackup()">⬇ Download backup</button>
     <button class="smallbtn gr-btn" onclick="$('restoreFile').click()">⬆ Restore from backup</button>
     <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" onchange="restoreBackup(this)">
   </div>
-  <div class="cardbox" style="margin-top:16px;border:1px solid #f0c0c0"><h3 style="color:var(--red)">⚠️ Danger zone</h3>
+  <div class="cardbox" style="margin-top:16px;border:1px solid #f0c0c0"><h3 style="color:var(--red)">Danger zone</h3>
     <div class="hint" style="margin-bottom:10px">Each action asks for the admin password before deleting. Products, prices, transports and settings are always kept. Deletions cannot be undone.</div>
-    <button class="smallbtn no-btn" onclick="resetData('accounts')">🗑 Delete ALL accounts</button>
-    <button class="smallbtn no-btn" onclick="resetData('orders')">🗑 Delete ALL orders</button>
+    <button class="smallbtn no-btn" onclick="resetData('accounts')">Delete ALL accounts</button>
+    <button class="smallbtn no-btn" onclick="resetData('orders')">Delete ALL orders</button>
   </div>
-  ${nativeApp()?`<div class="cardbox" style="margin-top:16px"><h3>📱 App maintenance</h3>
+  ${nativeApp()?`<div class="cardbox" style="margin-top:16px"><h3>App maintenance</h3>
     <div class="hint" style="margin-bottom:10px">Backend team only. Dealers never see these — they are inside the admin login. The server address decides which database this phone talks to.</div>
     <div style="font-size:13px;margin-bottom:8px">Connected to: <b id="nativeSrv">${esc(location.origin.startsWith('file')?'Offline copy on this phone':location.origin)}</b></div>
     <button class="smallbtn gr-btn" onclick="nativeCmd('server')">Server address</button>
@@ -3006,18 +3050,18 @@ async function downloadBackup(){
        written by the app itself — Downloads folder on Android, share sheet on iPhone. */
     if(window.BlueWaveApp&&window.BlueWaveApp.saveBackup){
       window.BlueWaveApp.saveBackup(name,text);
-      return toast('💾 Backup saved to Downloads — '+summary);
+      return toast('Backup saved to Downloads — '+summary);
     }
     if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.BlueWaveApp){
       window.webkit.messageHandlers.BlueWaveApp.postMessage({action:'save',name:name,json:text});
-      return toast('💾 Backup ready — choose where to keep it');
+      return toast('Backup ready — choose where to keep it');
     }
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([text],{type:'application/json'}));
     a.download=name;
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-    toast('💾 Backup saved — '+summary);
+    toast('Backup saved — '+summary);
   }catch(e){toast(e.message,1)}
 }
 async function restoreBackup(input){
@@ -3028,18 +3072,18 @@ async function restoreBackup(input){
   if(!backup||backup.app!=='bluewave')return toast('That is not a Blue Wave backup file',1);
   const n=(backup.data&&backup.data.users||[]).length, o=(backup.data&&backup.data.orders||[]).length;
   if(!confirm('Restore '+n+' accounts and '+o+' orders from this backup?\n\nEverything currently in the app is replaced.'))return;
-  const pw=prompt('🔐 Enter the ADMIN password to confirm the restore:');
+  const pw=prompt('Enter the ADMIN password to confirm the restore:');
   if(pw===null)return;
   try{await api('/admin/restore','POST',{password:pw,backup});
-    toast('✅ Restored from backup');renderAdmin('regs')}
+    toast('Restored from backup');renderAdmin('regs')}
   catch(e){toast(e.message,1)}
 }
 async function resetData(scope){
   const what=scope==='accounts'?'ALL registered business accounts':'ALL orders';
   if(!confirm('This permanently deletes '+what+'. Continue?'))return;
-  const pw=prompt('🔐 Enter the ADMIN password to verify this deletion:');
+  const pw=prompt('Enter the ADMIN password to verify this deletion:');
   if(pw===null)return;
-  try{await api('/admin/reset','POST',{scope,password:pw});toast('🗑 Deleted '+what.toLowerCase());renderAdmin(scope==='accounts'?'regs':'orders')}
+  try{await api('/admin/reset','POST',{scope,password:pw});toast('Deleted '+what.toLowerCase());renderAdmin(scope==='accounts'?'regs':'orders')}
   catch(e){toast(e.message,1)}
 }
 function smsKeysUI(){
@@ -3188,12 +3232,12 @@ function addPwToggles(root){
     inp.parentNode.insertBefore(wrap,inp);
     wrap.appendChild(inp);
     const eye=document.createElement('button');
-    eye.type='button';eye.className='pweye';eye.textContent='👁';
+    eye.type='button';eye.className='pweye';eye.textContent='';
     eye.title='Show password';eye.setAttribute('aria-label','Show password');
     eye.onclick=()=>{
       const show=inp.type==='password';
       inp.type=show?'text':'password';
-      eye.textContent=show?'🙈':'👁';
+      eye.textContent=show?'':'';
       eye.title=show?'Hide password':'Show password';
       inp.focus();
     };

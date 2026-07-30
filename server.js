@@ -192,14 +192,14 @@ const setSetting = (k, v) => db.prepare('INSERT INTO settings(key,value) VALUES(
 /* ---------- seed ---------- */
 if (!getSetting('seeded')) {
   const seed = [
-    ['XEON AC Bracket (2.7 Kg)', 'AC Brackets', '❄️', 1299, 320],
-    ['XEON AC Bracket (3 Kg)', 'AC Brackets', '❄️', 1299, 335],
-    ['XEON AC Bracket (3.5 Kg)', 'AC Brackets', '❄️', 1299, 365],
-    ['TITANIC AC Bracket (5 Kg)', 'AC Brackets', '❄️', 1299, 550],
-    ['XUV 700 Adjustable Trolley', 'Adjustable Trolleys', '🧺', 2999, 690],
-    ['XUV 300 Adjustable Trolley', 'Adjustable Trolleys', '🧺', 2999, 545],
-    ['Angle Trolly', 'Fixed Trolleys', '🧺', 1999, 530],
-    ['Front Load Trolly', 'Fixed Trolleys', '🧺', 1999, 625],
+    ['XEON AC Bracket (2.7 Kg)', 'AC Brackets', '', 1299, 320],
+    ['XEON AC Bracket (3 Kg)', 'AC Brackets', '', 1299, 335],
+    ['XEON AC Bracket (3.5 Kg)', 'AC Brackets', '', 1299, 365],
+    ['TITANIC AC Bracket (5 Kg)', 'AC Brackets', '', 1299, 550],
+    ['XUV 700 Adjustable Trolley', 'Adjustable Trolleys', '', 2999, 690],
+    ['XUV 300 Adjustable Trolley', 'Adjustable Trolleys', '', 2999, 545],
+    ['Angle Trolly', 'Fixed Trolleys', '', 1999, 530],
+    ['Front Load Trolly', 'Fixed Trolleys', '', 1999, 625],
   ];
   const ins = db.prepare('INSERT INTO products(id,name,cat,emoji,mrp,dealer,moq,active,sort) VALUES(?,?,?,?,?,?,50,1,?)');
   seed.forEach((s, i) => ins.run(uid('p'), s[0], s[1], s[2], s[3], s[4], i));
@@ -768,7 +768,7 @@ app.post('/api/orders/:id/payment', (req, res) => {
   if (o.status !== 'awaiting_payment') return res.status(400).json({ error: 'Payment already recorded for this order.' });
   db.prepare("UPDATE orders SET pay_ref=?, status='payment_submitted' WHERE id=?").run(ref, o.id);
   const who = (() => { try { return JSON.parse(o.contact_json || '{}'); } catch (e) { return {}; } })();
-  notifyAdmin('order', '🧾 New order ' + o.id,
+  notifyAdmin('order', 'New order ' + o.id,
     (who.company || who.name || 'Customer') + ' — ' + fmtMoney(o.total) + ', payment reference ' + ref + '. Confirm and dispatch.', o.id);
   if (o.user_id) notify(o.user_id, 'order', 'Order ' + o.id + ' received',
     'We have your payment details and are checking them. You will get an update when the order is confirmed.', o.id);
@@ -995,7 +995,7 @@ app.post('/api/admin/offers', requireAdmin, (req, res) => {
     .run(id, name, percent, starts, ends, now());
   /* tell every approved dealer about it */
   db.prepare("SELECT id FROM users WHERE status='approved'").all().forEach(u =>
-    notify(u.id, 'offer', '🎉 ' + name,
+    notify(u.id, 'offer', '' + name,
       percent + '% off your dealer prices' + (ends ? ' until ' + ends : '') + '. Open the shop to see the new rates.'));
   res.json({ ok: true, id });
 });
@@ -1084,7 +1084,7 @@ app.post('/api/admin/users/:id/status', requireAdmin, (req, res) => {
   db.prepare('UPDATE users SET status=?, note=?, terms=?, credit_days=?, discount=? WHERE id=?')
     .run(st, String(req.body?.note || ''), terms, creditDays, disc, u.id);
   if (st === 'approved')
-    notify(u.id, 'approval', '✅ Account approved',
+    notify(u.id, 'approval', 'Account approved',
       'Your ' + (u.type || 'dealer') + ' account is approved on ' +
       (terms === 'credit' ? creditDays + '-day credit' : 'advance payment') + ' terms' +
       (disc ? ', with an extra ' + disc + '% off your dealer prices' : '') +
@@ -1583,10 +1583,10 @@ app.post('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
   if (!o) return res.status(404).json({ error: 'Order not found.' });
   db.prepare('UPDATE orders SET status=? WHERE id=?').run(st, o.id);
   const SAY = {
-    paid: ['💰 Payment confirmed', 'We have confirmed your payment. Your order is being prepared.'],
-    confirmed: ['✅ Order confirmed', 'Your order is confirmed and is being packed.'],
-    shipped: ['🚚 Order dispatched', 'Your order has left our facility. Open the order to see the dispatch details.'],
-    delivered: ['📦 Order delivered', 'Your order is marked delivered. Thank you for your business!'],
+    paid: ['Payment confirmed', 'We have confirmed your payment. Your order is being prepared.'],
+    confirmed: ['Order confirmed', 'Your order is confirmed and is being packed.'],
+    shipped: ['Order dispatched', 'Your order has left our facility. Open the order to see the dispatch details.'],
+    delivered: ['Order delivered', 'Your order is marked delivered. Thank you for your business!'],
     cancelled: ['Order cancelled', 'Your order has been cancelled. Please contact us if this is unexpected.']
   };
   if (o.user_id && SAY[st]) notify(o.user_id, 'order', SAY[st][0] + ' — ' + o.id, SAY[st][1], o.id);
@@ -1606,7 +1606,7 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
   const sort = (db.prepare('SELECT COALESCE(MAX(sort),0) m FROM products').get().m) + 1;
   const id = uid('p');
   db.prepare('INSERT INTO products(id,name,cat,emoji,mrp,dealer,moq,active,sort) VALUES(?,?,?,?,?,?,?,1,?)')
-    .run(id, name, cat, cat.toLowerCase().includes('bracket') ? '❄️' : '🧺', mrp, dealer, Math.max(1, parseInt(b.moq) || 50), sort);
+    .run(id, name, cat, cat.toLowerCase().includes('bracket') ? '' : '', mrp, dealer, Math.max(1, parseInt(b.moq) || 50), sort);
   res.json({ ok: true, id });
 });
 
@@ -1660,7 +1660,7 @@ app.post('/api/admin/orders/:id/dispatch', requireAdmin, (req, res) => {
       .run(lr, clip(b.transport, 80), now(), o.id);
   }
   const after = db.prepare('SELECT * FROM orders WHERE id=?').get(o.id);
-  if (o.user_id) notify(o.user_id, 'order', '🚚 Order ' + o.id + ' dispatched',
+  if (o.user_id) notify(o.user_id, 'order', 'Order ' + o.id + ' dispatched',
     mode === 'local'
       ? 'Out for local delivery — vehicle ' + (after.vehicle_no || '') +
         (after.driver_name ? ', driver ' + after.driver_name : '') +
