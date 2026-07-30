@@ -69,6 +69,8 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .npop .nt span{color:var(--mut);font-size:12.5px;line-height:1.45}
 .npop .nx{background:none;border:none;color:var(--mut);font-size:14px;padding:0 2px;line-height:1}
 .citem.unread{background:#f2fbff;border-radius:10px}
+.bellbtn.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* ===== registrations: a name list, then a full page per business ===== */
 .reglist{display:flex;flex-direction:column;gap:8px}
@@ -660,6 +662,7 @@ const PICON={
   </svg>`,
   pencil:svgIcon('<path d="M16.4 4.4l3.2 3.2"/><path d="M4.6 19.4l1-3.8L16.2 5a1.6 1.6 0 0 1 2.3 0l.5.5a1.6 1.6 0 0 1 0 2.3L8.4 18.4z"/>'),
   bell:svgIcon('<path d="M18 15.6V11a6 6 0 1 0-12 0v4.6L4.4 18h15.2z"/><path d="M10.2 20.6a2 2 0 0 0 3.6 0"/>'),
+  refresh:svgIcon('<path d="M20 11.5A8 8 0 0 0 6.3 6.3L4 8.5"/><path d="M4 4.5v4h4"/><path d="M4 12.5a8 8 0 0 0 13.7 5.2L20 15.5"/><path d="M20 19.5v-4h-4"/>'),
   logout:svgIcon('<path d="M14.4 8.4V6.2a2 2 0 0 0-2-2H6.2a2 2 0 0 0-2 2v11.6a2 2 0 0 0 2 2h6.2a2 2 0 0 0 2-2v-2.2"/><path d="M9.6 12h10.2"/><path d="M17.2 9.2 20 12l-2.8 2.8"/>'),
   key:svgIcon('<circle cx="8.4" cy="12" r="3.6"/><path d="M12 12h8.4"/><path d="M17.4 12v3"/><path d="M20 12v2.4"/>')
 };
@@ -700,9 +703,40 @@ function renderHeader(){
     b.onclick=currentView==='auth'?closeAuth:currentView==='checkout'?closeCheckout:currentView==='shop'?()=>showView('category')
       :currentView==='reg'?closeRegDetail:closeProduct;}
   const h=$('hdrAuth');
-  h.innerHTML=`<button class="bellbtn" onclick="openNotifications()" title="Notifications">${PICON.bell}<span class="belldot" id="bellDot" style="display:none"></span></button>`;
+  h.innerHTML=`<button class="bellbtn" id="refBtn" onclick="softRefresh()" title="Refresh">${PICON.refresh}</button>
+    <button class="bellbtn" onclick="openNotifications()" title="Notifications">${PICON.bell}<span class="belldot" id="bellDot" style="display:none"></span></button>`;
   updateBell();
 }
+/* Refresh inside the app: pulls fresh prices, orders and notifications and
+   redraws the screen you are on. It does not reload the page, so the opening
+   animation never replays and you stay exactly where you were. */
+let refreshing=false;
+async function softRefresh(){
+  if(refreshing)return;
+  refreshing=true;
+  const b=$('refBtn');if(b)b.classList.add('spin');
+  try{
+    await Promise.all([
+      refreshProducts(),
+      refreshMe(),
+      refreshTransports(),
+      api('/pay-info').then(d=>state.payInfo=d).catch(()=>{})
+    ]);
+    await refreshNotifs(false);
+    const REDRAW={home:renderHome,shop:renderShop,category:renderCategory,orders:renderOrdersView,
+      profile:renderProfile,reg:renderRegDetail};
+    if(currentView==='admin')renderAdmin(adminTab);
+    else if(REDRAW[currentView])await REDRAW[currentView]();
+    renderHeader();renderNav();
+    toast('Up to date');
+  }catch(e){
+    toast('Could not refresh — check your connection',1);
+  }finally{
+    refreshing=false;
+    const b2=$('refBtn');if(b2)b2.classList.remove('spin');
+  }
+}
+
 /* ============ NOTIFICATIONS ============
    Orders, registrations, approvals and offers arrive from the server. New ones
    pop up on screen while the app is open and stay in the bell list. */
@@ -2257,8 +2291,9 @@ async function renderSettings(){
   ${nativeApp()?`<div class="cardbox" style="margin-top:16px"><h3>📱 App maintenance</h3>
     <div class="hint" style="margin-bottom:10px">Backend team only. Dealers never see these — they are inside the admin login. The server address decides which database this phone talks to.</div>
     <div style="font-size:13px;margin-bottom:8px">Connected to: <b id="nativeSrv">${esc(location.origin.startsWith('file')?'Offline copy on this phone':location.origin)}</b></div>
-    <button class="smallbtn gr-btn" onclick="nativeCmd('server')">🌐 Server address</button>
-    <button class="smallbtn gr-btn" onclick="nativeCmd('offline')">📴 Load offline copy</button>
+    <button class="smallbtn gr-btn" onclick="softRefresh()">Refresh data</button>
+    <button class="smallbtn gr-btn" onclick="nativeCmd('server')">Server address</button>
+    <button class="smallbtn gr-btn" onclick="nativeCmd('offline')">Load offline copy</button>
   </div>`:''}`;
   const sel=$('st-remprov');
   if(sel){remKeysUI(s);sel.addEventListener('change',()=>remKeysUI(s))}
