@@ -621,7 +621,7 @@ app.get('/api/admin/sms-log', requireAdmin, (req, res) => {
 app.post('/api/admin/sms-test', requireAdmin, async (req, res) => {
   const to = String(req.body?.to || '').trim();
   if (!to.replace(/\D/g, '')) return res.status(400).json({ error: 'Enter a mobile number to test with.' });
-  const r = await sendSms(to, 'Blue Wave test message: your SMS gateway is working. 123456');
+  const r = await sendSms(to, 'Blue Wave test message: your SMS gateway is working. 123456', '123456');
   db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
     .run('test', 'sms_test', ss('smsProvider') || 'none', to, 'gateway test',
       (r.ok ? 'sent' : r.status) + (r.detail ? ' — ' + r.detail : ''), now());
@@ -1148,43 +1148,60 @@ const intlNumber = phone => {
   return n.length === 10 ? '91' + n : n;
 };
 
-async function smsMsg91(to, text) {
+/* MSG91 has three endpoints and the right one depends on what you have set up:
+ *   • OTP API      — best for one-time codes, needs a DLT-approved OTP template
+ *   • Flow API     — any DLT template, used for reminders
+ *   • Send SMS v2  — plain route, for accounts/numbers that need no template
+ * We pick automatically from the settings, so nothing extra to choose. */
+async function smsMsg91(to, text, otp) {
   const key = getSetting('smsKey');
   if (!key) return { ok: false, status: 'MSG91 auth key not saved', detail: 'Paste the auth key in Settings and save.' };
   const tplId = String(getSetting('smsTemplateId') || '').trim();
+  const sender = ss('smsSender');
+  const mobile = intlNumber(to);
+  const reply = async (r, label) => {
+    const raw = await r.text();
+    let d = {}; try { d = JSON.parse(raw); } catch (e) { /* not json */ }
+    const good = r.ok && String(d.type || '').toLowerCase() !== 'error';
+    return good ? { ok: true, status: 'sent', detail: label + ': ' + raw.slice(0, 200) }
+      : { ok: false, status: 'MSG91 (' + label + ') replied ' + r.status, detail: raw.slice(0, 300) };
+  };
   try {
-    /* DLT template route — what Indian operators require */
+    /* 1. a one-time code with an approved OTP template */
+    if (otp && tplId) {
+      const url = 'https://control.msg91.com/api/v5/otp?template_id=' + encodeURIComponent(tplId) +
+        '&mobile=' + encodeURIComponent(mobile) + '&otp=' + encodeURIComponent(otp) +
+        '&otp_expiry=10' + (sender ? '&sender=' + encodeURIComponent(sender) : '');
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { authkey: key, 'Content-Type': 'application/json', accept: 'application/json' },
+        body: '{}', signal: AbortSignal.timeout(12000)
+      });
+      const out = await reply(r, 'OTP API');
+      if (out.ok) return out;
+      /* an OTP template rejected here is usually a normal template — try the flow API */
+    }
+    /* 2. any other DLT template */
     if (tplId) {
       const r = await fetch('https://control.msg91.com/api/v5/flow/', {
         method: 'POST',
         headers: { authkey: key, 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
-          template_id: tplId, short_url: '0',
-          recipients: [{ mobiles: intlNumber(to), OTP: (String(text).match(/\b(\d{6})\b/) || [, ''])[1], MESSAGE: text }]
+          template_id: tplId, short_url: '0', sender,
+          recipients: [{ mobiles: mobile, OTP: otp || '', MESSAGE: text, NAME: '' }]
         }),
         signal: AbortSignal.timeout(12000)
       });
-      const raw = await r.text();
-      let d = {}; try { d = JSON.parse(raw); } catch (e) { /* not json */ }
-      const okFlow = r.ok && String(d.type || '').toLowerCase() !== 'error';
-      return okFlow ? { ok: true, status: 'sent', detail: raw.slice(0, 300) }
-        : { ok: false, status: 'MSG91 replied ' + r.status, detail: raw.slice(0, 300) };
+      return reply(r, 'Flow API');
     }
-    /* plain SMS route (works for international numbers and test accounts) */
+    /* 3. no template configured — plain SMS */
     const r = await fetch('https://api.msg91.com/api/v2/sendsms', {
       method: 'POST',
       headers: { authkey: key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sender: ss('smsSender'), route: ss('smsRoute'), country: '91',
-        sms: [{ message: text, to: [intlNumber(to)] }]
-      }),
+      body: JSON.stringify({ sender, route: ss('smsRoute'), country: '91', sms: [{ message: text, to: [mobile] }] }),
       signal: AbortSignal.timeout(12000)
     });
-    const raw = await r.text();
-    let d = {}; try { d = JSON.parse(raw); } catch (e) { /* not json */ }
-    return (r.ok && String(d.type || '').toLowerCase() !== 'error')
-      ? { ok: true, status: 'sent', detail: raw.slice(0, 300) }
-      : { ok: false, status: 'MSG91 replied ' + r.status, detail: raw.slice(0, 300) };
+    return reply(r, 'Send SMS');
   } catch (e) { return { ok: false, status: 'Could not reach MSG91', detail: e.message }; }
 }
 
@@ -1342,11 +1359,11 @@ async function sendMail(to, subject, text) {
 }
 
 /** Sends a one-time code. Returns {ok,status}; never throws. */
-async function sendSms(to, text) {
+async function sendSms(to, text, otp) {
   const p = ss('smsProvider');
   if (!p) return { ok: false, status: 'No SMS provider chosen', detail: 'Pick one in Settings and save your keys.' };
   if (!String(to || '').replace(/\D/g, '')) return { ok: false, status: 'No mobile number to send to' };
-  if (p === 'msg91') return smsMsg91(to, text);
+  if (p === 'msg91') return smsMsg91(to, text, otp);
   if (p === 'fast2sms') return smsFast2Sms(to, text);
   if (p === 'twilio') return smsTwilio(to, text);
   if (p === 'whatsapp') return smsWhatsApp(to, text);
@@ -1356,8 +1373,8 @@ async function sendSms(to, text) {
 /* Anything a customer should receive — one-time codes and payment reminders —
  * goes through here: SMS gateway first, email second, and the admin is told if
  * neither worked. One path, one place to fix. */
-async function deliver({ phone, email, name, subject, text, mailText }) {
-  let r = await sendSms(phone, text);
+async function deliver({ phone, email, name, subject, text, mailText, otp }) {
+  let r = await sendSms(phone, text, otp);
   if (r.ok) return { ...r, via: ss('smsProvider') === 'whatsapp' ? 'whatsapp' : 'sms' };
   if (mailReady() && email) {
     const m = await sendMail(email, subject || 'Blue Wave', mailText || text);
@@ -1375,7 +1392,7 @@ async function sendCode(user, purpose, code, extraNote) {
   const text = 'Blue Wave ' + purpose + ' code: ' + code +
     '. Valid for 10 minutes. Do not share it with anyone. HPMP Manufacturers Pvt Ltd.';
   const r = await deliver({
-    phone: to, email: user.email, name: user.name,
+    phone: to, email: user.email, name: user.name, otp: code,
     subject: 'Blue Wave ' + purpose + ' code: ' + code,
     text,
     mailText: 'Hello ' + (user.name || '') + ',\n\n' +
