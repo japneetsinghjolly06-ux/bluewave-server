@@ -70,6 +70,47 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .npop .nx{background:none;border:none;color:var(--mut);font-size:14px;padding:0 2px;line-height:1}
 .citem.unread{background:#f2fbff;border-radius:10px}
 
+/* ===== sign-in screen ===== */
+#authPage.centered{min-height:calc(100vh - 210px);display:flex;flex-direction:column;justify-content:center}
+#authPage.centered #pane-login{width:100%}
+@media (max-height:620px){#authPage.centered{min-height:0;display:block;padding-top:12px}}
+.phonebox{display:flex;align-items:center;gap:9px;background:#f2f4f6;border-bottom:2px solid var(--ink);
+  border-radius:8px 8px 0 0;padding:14px 12px;margin-top:6px}
+.phonebox .pb-ic{display:flex;color:var(--ink);opacity:.75}
+.phonebox .pb-ic svg{width:19px;height:19px;stroke:currentColor}
+.pb-flag{width:26px;height:18px;border-radius:3px;flex-shrink:0;
+  background:linear-gradient(#ff9933 33.3%,#fff 33.3% 66.6%,#138808 66.6%);border:1px solid #dfe5ea;position:relative}
+.pb-flag::after{content:'';position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;
+  border:1.2px solid #0a3d91;border-radius:50%}
+.pb-flag{font-size:19px;line-height:1;width:auto;height:auto;background:none;border:none;flex-shrink:0}
+.pb-flag::after{display:none}
+/* country picker: compact button, with a proper list of flags when opened */
+.pb-sel{position:relative;display:flex;align-items:center;gap:7px;flex-shrink:0;background:none;border:none;
+  padding:0;margin:0;font-family:inherit;cursor:pointer}
+.pb-flag{display:flex;line-height:0}
+.flagimg{border-radius:2px;display:block}
+.pb-cc{font-size:15px;font-weight:700;color:var(--ink)}
+.pb-caret{font-size:11px;color:var(--mut);line-height:1}
+.ccpanel{position:relative;margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 10px 30px rgba(11,42,74,.16);overflow:hidden;z-index:60}
+.ccpanel input{margin:8px;width:calc(100% - 16px);font-size:14px}
+.ccrows{max-height:230px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.ccrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:none;
+  border-top:1px solid #f0f5fa;padding:10px 12px;font-family:inherit;font-size:14px;color:var(--ink);cursor:pointer}
+.ccrow:hover,.ccrow:active{background:#f4fafe}
+.ccrow.on{background:#eaf7fd;font-weight:600}
+.ccflag{display:flex;line-height:0;flex-shrink:0}
+.ccname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ccdial{color:var(--mut);font-size:13.5px;flex-shrink:0}
+.phonebox input{flex:1;border:none;background:transparent;padding:0;margin:0;font-size:15px;color:var(--ink)}
+.phonebox input:focus{outline:none;box-shadow:none}
+.switchlink{color:var(--navy);font-weight:600;font-size:13.5px;text-decoration:none}
+.agree{display:flex;gap:11px;align-items:flex-start;margin:20px 0 6px;font-size:13px;color:var(--ink);line-height:1.5}
+.agree input{width:20px;height:20px;margin:1px 0 0;flex-shrink:0;accent-color:var(--navy)}
+.agree a{color:var(--navy);font-weight:600}
+.bizreg{display:inline-flex;align-items:center;gap:8px;color:var(--navy);font-weight:700;font-size:14.5px;text-decoration:none}
+.bizreg svg{width:19px;height:19px;stroke:var(--navy)}
+
 /* notifications page */
 .nlist{display:flex;flex-direction:column;gap:8px}
 .nrow{display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 13px}
@@ -493,49 +534,75 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
 </aside>
 
 <div id="authPage" style="display:none">
-  <div class="tabs">
-    <button class="tab on" id="tab-login" onclick="authTab('login')">Sign in</button>
-    <button class="tab" id="tab-register" onclick="authTab('register')">Create account</button>
-  </div>
   <div id="pane-login">
-    <div class="mtitle">Sign in to your account</div>
-    <div class="msub">Use the email address or the mobile number you registered with.</div>
-    <label>Email or mobile number <span class="req">*</span></label>
-    <input id="li-email" type="text" autocapitalize="none" autocomplete="username" placeholder="you@business.com or 98765 43210">
-    <label>Password <span class="req">*</span></label><input id="li-pass" type="password" autocomplete="current-password" placeholder="••••••••">
+    <div class="mtitle" style="text-align:center">Sign In</div>
+
+    <div id="li-mobile-pane">
+      <div class="phonebox">
+        <span class="pb-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3h3l1.5 4.5-2 1.4a12.5 12.5 0 0 0 6.1 6.1l1.4-2L21 14.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.2 2 2 0 0 1 6.5 3z"/></svg></span>
+        <button type="button" class="pb-sel" id="ccBtn" onclick="ccOpen(event)" aria-label="Choose country code">
+          <span class="pb-flag" id="li-flag" aria-hidden="true"></span>
+          <span class="pb-cc" id="li-cc-txt">+91</span>
+          <span class="pb-caret" aria-hidden="true">▾</span>
+        </button>
+        <input id="li-mob" type="tel" inputmode="numeric" maxlength="14" autocomplete="tel" placeholder="Mobile Number">
+      </div>
+      <div id="ccPanel" class="ccpanel" style="display:none">
+        <input id="ccSearch" type="text" placeholder="Search country" oninput="ccList(this.value)" autocomplete="off">
+        <div id="ccRows" class="ccrows"></div>
+      </div>
+      <div style="text-align:right;margin-top:8px">
+        <a href="javascript:loginMode('email')" class="switchlink">Login with Email</a>
+      </div>
+      <div id="li-otp-wrap" style="display:none;margin-top:12px">
+        <label>Enter the 6-digit code</label>
+        <input id="li-otp" inputmode="numeric" maxlength="6" placeholder="123456">
+        <div class="hint" id="li-otp-note"></div>
+        <a href="javascript:sendOtp(1)" class="switchlink" style="font-size:12.5px">Send the code again</a>
+      </div>
+    </div>
+
+    <div id="li-email-pane" style="display:none">
+      <label>Email <span class="req">*</span></label>
+      <input id="li-email" type="email" autocapitalize="none" autocomplete="username" placeholder="you@business.com">
+      <label>Password <span class="req">*</span></label>
+      <input id="li-pass" type="password" autocomplete="current-password" placeholder="••••••••">
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:8px">
+        <a href="javascript:openForgot()" class="switchlink" style="color:var(--mut)">Forgot password?</a>
+        <a href="javascript:loginMode('mobile')" class="switchlink">Login with Mobile OTP</a>
+      </div>
+      <div id="fg-box" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fafcfe">
+        <div class="dtbt" style="border:none;padding:0;margin-bottom:6px">Reset your password</div>
+        <div id="fg-step1">
+          <label>Registered email or mobile number</label>
+          <input id="fg-id" type="text" autocapitalize="none" placeholder="you@business.com or 98765 43210">
+          <button class="wide ghost" onclick="askReset()">Send reset code</button>
+        </div>
+        <div id="fg-step2" style="display:none">
+          <div class="hint" id="fg-note"></div>
+          <label>6-digit code</label><input id="fg-code" inputmode="numeric" maxlength="6" placeholder="123456">
+          <label>New password</label><input id="fg-p1" type="password" placeholder="At least 6 characters">
+          <label>Confirm new password</label><input id="fg-p2" type="password" placeholder="Repeat it">
+          <button class="wide blue" onclick="doReset()">Set new password</button>
+          <button class="wide ghost" onclick="askReset(1)">Send the code again</button>
+        </div>
+        <div class="err" id="fg-err"></div>
+      </div>
+    </div>
+
+    <label class="agree"><input type="checkbox" id="li-agree">
+      <span>By continuing you agree to our <a href="javascript:pfPolicy()">Terms &amp; Conditions</a> And <a href="javascript:pfPolicy()">Privacy Policy</a></span>
+    </label>
+
     <div class="err" id="li-err"></div>
-    <button class="wide blue" onclick="doLogin()">Continue</button>
-    <div style="text-align:center;margin-top:8px">
-      <a href="javascript:authTab('forgot')" style="font-size:13px;color:var(--blue);font-weight:600">Forgot your password?</a>
+    <button class="wide blue" id="li-btn" onclick="loginGo()">Login</button>
+
+    <div style="text-align:center;font-size:13.5px;color:var(--ink);margin-top:14px">
+      Not yet registered? <a href="javascript:authTab('register')" style="font-weight:700">Sign up…</a>
     </div>
-    <div class="ordiv">OR</div>
-    <div style="text-align:center;font-size:13px;color:var(--mut)">New to Blue Wave?<br>
-      <a href="javascript:authTab('register')" style="font-weight:700">Create an account</a></div>
-  </div>
-  <div id="pane-forgot" style="display:none">
-    <div class="mtitle">Reset your password</div>
-    <div class="msub">We send a 6-digit code to the mobile number on your account.</div>
-    <div id="fg-step1">
-      <label>Registered email or mobile number <span class="req">*</span></label>
-      <input id="fg-id" type="text" autocapitalize="none" placeholder="you@business.com or 98765 43210">
-      <div class="err" id="fg-err1"></div>
-      <button class="wide blue" onclick="askReset()">Send reset code</button>
+    <div style="text-align:center;margin-top:14px">
+      <a href="javascript:authTab('register')" class="bizreg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V6.5A1.5 1.5 0 0 1 5.5 5H12v16"/><path d="M12 10h6.5A1.5 1.5 0 0 1 20 11.5V21"/><path d="M2.5 21h19"/><path d="M7 9h2M7 13h2M7 17h2M15.5 14h2M15.5 17.5h2"/></svg>Business Register</a>
     </div>
-    <div id="fg-step2" style="display:none">
-      <div class="notice info" id="fg-note"></div>
-      <label>6-digit code <span class="req">*</span></label>
-      <input id="fg-code" inputmode="numeric" maxlength="6" placeholder="123456">
-      <label>New password <span class="req">*</span></label>
-      <input id="fg-p1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
-      <label>Confirm new password <span class="req">*</span></label>
-      <input id="fg-p2" type="password" autocomplete="new-password" placeholder="Repeat the new password">
-      <div class="err" id="fg-err2"></div>
-      <button class="wide blue" onclick="doReset()">Set new password</button>
-      <button class="wide ghost" onclick="askReset(1)">Send the code again</button>
-    </div>
-    <div class="ordiv">OR</div>
-    <div style="text-align:center;font-size:13px;color:var(--mut)">
-      <a href="javascript:authTab('login')" style="font-weight:700">Back to sign in</a></div>
   </div>
   <div id="pane-register" style="display:none">
     <div class="mtitle">Create your account</div>
@@ -563,6 +630,9 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
     <div class="err" id="rg-err"></div>
     <button class="wide" onclick="doRegister()">Create account</button>
     <div class="hint" style="text-align:center;margin-top:8px">By continuing, you agree to our terms and privacy policy.</div>
+    <div style="text-align:center;font-size:13.5px;margin-top:14px">
+      Already registered? <a href="javascript:authTab('login')" style="font-weight:700">Sign in</a>
+    </div>
   </div>
 </div>
 
@@ -712,6 +782,8 @@ const PICON={
   </svg>`,
   pencil:svgIcon('<path d="M16.4 4.4l3.2 3.2"/><path d="M4.6 19.4l1-3.8L16.2 5a1.6 1.6 0 0 1 2.3 0l.5.5a1.6 1.6 0 0 1 0 2.3L8.4 18.4z"/>'),
   bell:svgIcon('<path d="M18 15.6V11a6 6 0 1 0-12 0v4.6L4.4 18h15.2z"/><path d="M10.2 20.6a2 2 0 0 0 3.6 0"/>'),
+  phone:svgIcon('<path d="M6.5 3h3l1.5 4.5-2 1.4a12.5 12.5 0 0 0 6.1 6.1l1.4-2L21 14.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.2 2 2 0 0 1 6.5 3z"/>'),
+  building:svgIcon('<path d="M4 21V6.5A1.5 1.5 0 0 1 5.5 5H12v16"/><path d="M12 10h6.5A1.5 1.5 0 0 1 20 11.5V21"/><path d="M2.5 21h19"/><path d="M7 9h2M7 13h2M7 17h2M15.5 14h2M15.5 17.5h2"/>'),
   refresh:svgIcon('<path d="M20 11.5A8 8 0 0 0 6.3 6.3L4 8.5"/><path d="M4 4.5v4h4"/><path d="M4 12.5a8 8 0 0 0 13.7 5.2L20 15.5"/><path d="M20 19.5v-4h-4"/>'),
   logout:svgIcon('<path d="M14.4 8.4V6.2a2 2 0 0 0-2-2H6.2a2 2 0 0 0-2 2v11.6a2 2 0 0 0 2 2h6.2a2 2 0 0 0 2-2v-2.2"/><path d="M9.6 12h10.2"/><path d="M17.2 9.2 20 12l-2.8 2.8"/>'),
   key:svgIcon('<circle cx="8.4" cy="12" r="3.6"/><path d="M12 12h8.4"/><path d="M17.4 12v3"/><path d="M20 12v2.4"/>')
@@ -1392,34 +1464,251 @@ function openAuth(tab){
 let authBackTo='home';
 function closeAuth(){showView(authBackTo||'home');renderHeader()}
 function authTab(t){
-  $('tab-login').classList.toggle('on',t!=='register');$('tab-register').classList.toggle('on',t==='register');
-  $('pane-login').style.display=t==='login'?'block':'none';
+  const page=$('authPage');
+  if(page)page.classList.toggle('centered',t!=='register');
+  $('pane-login').style.display=t==='register'?'none':'block';
   $('pane-register').style.display=t==='register'?'block':'none';
-  const f=$('pane-forgot');
-  if(f){
-    f.style.display=t==='forgot'?'block':'none';
-    if(t==='forgot'){
-      $('fg-step1').style.display='block';$('fg-step2').style.display='none';
-      $('fg-err1').style.display='none';$('fg-err2').style.display='none';
-      const li=$('li-email');if(li&&li.value.trim())$('fg-id').value=li.value.trim();
+  if(t!=='register'){fillCountries();loginMode(loginWay)}
+}
+/* Dial codes for signing in from anywhere. India first, then the countries
+   our dealers travel to and buy from most. The flag is the country's own
+   Unicode flag character, so it needs no images. */
+const COUNTRIES=[
+  ['IN','India','91',10],['AE','United Arab Emirates','971',9],['SA','Saudi Arabia','966',9],
+  ['OM','Oman','968',8],['QA','Qatar','974',8],['KW','Kuwait','965',8],['BH','Bahrain','973',8],
+  ['SG','Singapore','65',8],['MY','Malaysia','60',9],['LK','Sri Lanka','94',9],['NP','Nepal','977',10],
+  ['BD','Bangladesh','880',10],['PK','Pakistan','92',10],['TH','Thailand','66',9],['ID','Indonesia','62',11],
+  ['CN','China','86',11],['HK','Hong Kong','852',8],['JP','Japan','81',10],['KR','South Korea','82',10],
+  ['AU','Australia','61',9],['NZ','New Zealand','64',9],['GB','United Kingdom','44',10],
+  ['IE','Ireland','353',9],['DE','Germany','49',11],['FR','France','33',9],['IT','Italy','39',10],
+  ['ES','Spain','34',9],['NL','Netherlands','31',9],['CH','Switzerland','41',9],['SE','Sweden','46',9],
+  ['PL','Poland','48',9],['TR','Turkey','90',10],['RU','Russia','7',10],['ZA','South Africa','27',9],
+  ['NG','Nigeria','234',10],['KE','Kenya','254',9],['EG','Egypt','20',10],['US','United States','1',10],
+  ['CA','Canada','1',10],['MX','Mexico','52',10],['BR','Brazil','55',11]
+];
+const flagOf=iso=>String.fromCodePoint(...[...iso.toUpperCase()].map(c=>0x1F1E6+c.charCodeAt(0)-65));
+/* Flags drawn as tiny inline SVGs, so they look the same on every phone and
+   desktop — Windows renders the flag emoji as plain letters, which is why the
+   picker draws them instead. Each is described by its bands plus any emblem. */
+const FLAG={
+  IN:{h:['#f93','#fff','#128807'],mark:'<circle cx="30" cy="20" r="5.4" fill="none" stroke="#008" stroke-width="1.1"/><circle cx="30" cy="20" r="1" fill="#008"/>'},
+  AE:{h:['#00732f','#fff','#000'],bar:'#ff0000'},
+  SA:{solid:'#165d31',mark:'<rect x="12" y="17" width="36" height="2" fill="#fff"/><path d="M14 24h32" stroke="#fff" stroke-width="2.4"/>'},
+  OM:{h:['#fff','#db161b','#008000'],bar:'#db161b'},
+  QA:{v:['#fff','#8d1b3d'],split:0.3},
+  KW:{h:['#007a3d','#fff','#ce1126'],mark:'<path d="M0 0 18 10v20L0 40z" fill="#000"/>'},
+  BH:{v:['#fff','#ce1126'],split:0.28},
+  SG:{h:['#ef3340','#fff'],mark:'<circle cx="14" cy="10" r="6" fill="#fff"/><circle cx="17" cy="10" r="5" fill="#ef3340"/>'},
+  MY:{stripes:['#cc0001','#fff'],n:14,canton:'#010066',mark:'<circle cx="13" cy="10" r="5" fill="#ffcc00" opacity=".95"/><circle cx="15.5" cy="10" r="4" fill="#010066"/>'},
+  LK:{solid:'#ffbe29',mark:'<rect x="4" y="6" width="14" height="28" fill="#00534e"/><rect x="18" y="6" width="10" height="28" fill="#eb7400"/><rect x="29" y="6" width="27" height="28" fill="#8d153a"/>'},
+  NP:{solid:'#fff',mark:'<path d="M16 3 44 17H16zM16 15 46 33H16z" fill="#dc143c" stroke="#003893" stroke-width="1.8" stroke-linejoin="round"/><path d="M16 3v34" stroke="#003893" stroke-width="1.8"/>'},
+  BD:{solid:'#006a4e',mark:'<circle cx="27" cy="20" r="9" fill="#f42a41"/>'},
+  PK:{v:['#fff','#01411c'],split:0.28,mark:'<circle cx="38" cy="20" r="7" fill="#fff"/><circle cx="41" cy="19" r="6" fill="#01411c"/>'},
+  TH:{stripes:['#a51931','#f4f5f8','#2d2a4a','#f4f5f8','#a51931'],n:5},
+  ID:{h:['#ce1126','#fff']},
+  CN:{solid:'#de2910',mark:'<path d="M10 8l1.6 4.6 4.4-2.8-2.8 4.4 4.6 1.6-4.6 1.6 2.8 4.4-4.4-2.8L10 28l-1.6-4.6-4.4 2.8 2.8-4.4L2.2 20l4.6-1.6-2.8-4.4 4.4 2.8z" fill="#ffde00" transform="scale(.72) translate(6 6)"/><circle cx="24" cy="8" r="1.5" fill="#ffde00"/><circle cx="28" cy="12" r="1.5" fill="#ffde00"/><circle cx="28" cy="18" r="1.5" fill="#ffde00"/><circle cx="24" cy="22" r="1.5" fill="#ffde00"/>'},
+  HK:{solid:'#de2910',mark:'<circle cx="30" cy="20" r="7" fill="#fff"/><circle cx="30" cy="20" r="3" fill="#de2910"/>'},
+  JP:{solid:'#fff',mark:'<circle cx="30" cy="20" r="9" fill="#bc002d"/>'},
+  KR:{solid:'#fff',mark:'<path d="M30 11a9 9 0 0 1 0 18 4.5 4.5 0 0 0 0-9 4.5 4.5 0 0 1 0-9z" fill="#cd2e3a"/><path d="M30 29a9 9 0 0 1 0-18 4.5 4.5 0 0 0 0 9 4.5 4.5 0 0 1 0 9z" fill="#0047a0"/>'},
+  AU:{solid:'#00247d',canton:'#00247d',mark:'<path d="M0 0h26v18H0z" fill="#00247d"/><path d="M0 0l26 18M26 0L0 18" stroke="#fff" stroke-width="3"/><path d="M13 0v18M0 9h26" stroke="#fff" stroke-width="5"/><path d="M13 0v18M0 9h26" stroke="#cf142b" stroke-width="2.5"/><circle cx="40" cy="26" r="2.2" fill="#fff"/><circle cx="46" cy="14" r="1.6" fill="#fff"/><circle cx="52" cy="22" r="1.6" fill="#fff"/><circle cx="13" cy="31" r="2.4" fill="#fff"/>'},
+  NZ:{solid:'#00247d',mark:'<path d="M0 0h26v18H0z" fill="#00247d"/><path d="M0 0l26 18M26 0L0 18" stroke="#fff" stroke-width="3"/><path d="M13 0v18M0 9h26" stroke="#fff" stroke-width="5"/><path d="M13 0v18M0 9h26" stroke="#cf142b" stroke-width="2.5"/><circle cx="44" cy="12" r="1.8" fill="#cf142b"/><circle cx="50" cy="20" r="1.8" fill="#cf142b"/><circle cx="44" cy="28" r="1.8" fill="#cf142b"/><circle cx="38" cy="20" r="1.8" fill="#cf142b"/>'},
+  GB:{solid:'#00247d',mark:'<path d="M0 0l60 40M60 0L0 40" stroke="#fff" stroke-width="7"/><path d="M0 0l60 40M60 0L0 40" stroke="#cf142b" stroke-width="4"/><path d="M30 0v40M0 20h60" stroke="#fff" stroke-width="11"/><path d="M30 0v40M0 20h60" stroke="#cf142b" stroke-width="6"/>'},
+  IE:{v:['#169b62','#fff','#ff883e']},
+  DE:{h:['#000','#dd0000','#ffce00']},
+  FR:{v:['#002395','#fff','#ed2939']},
+  IT:{v:['#009246','#fff','#ce2b37']},
+  ES:{h:['#aa151b','#f1bf00','#aa151b'],weights:[1,2,1]},
+  NL:{h:['#ae1c28','#fff','#21468b']},
+  CH:{solid:'#d52b1e',mark:'<path d="M27 11h6v6h6v6h-6v6h-6v-6h-6v-6h6z" fill="#fff"/>'},
+  SE:{solid:'#006aa7',mark:'<path d="M20 0v40M0 17h60" stroke="#fecc00" stroke-width="7"/>'},
+  PL:{h:['#fff','#dc143c']},
+  TR:{solid:'#e30a17',mark:'<circle cx="24" cy="20" r="8" fill="#fff"/><circle cx="27.5" cy="20" r="6.4" fill="#e30a17"/><path d="M36 20l5.6-1.8-3.5 4.8v-6l3.5 4.8z" fill="#fff"/>'},
+  RU:{h:['#fff','#0039a6','#d52b1e']},
+  ZA:{solid:'#002395',mark:'<path d="M0 0h60v13H0z" fill="#de3831"/><path d="M0 27h60v13H0z" fill="#002395"/><path d="M0 13h60v14H0z" fill="#fff"/><path d="M0 16h60v8H0z" fill="#007a4d"/><path d="M0 0l22 20L0 40z" fill="#000"/><path d="M0 0l26 20L0 40" fill="none" stroke="#ffb612" stroke-width="4"/>'},
+  NG:{v:['#008751','#fff','#008751']},
+  KE:{h:['#000','#fff','#006600'],mark:'<rect x="0" y="17" width="60" height="6" fill="#bb0000"/><path d="M30 12l4 8-4 8-4-8z" fill="#fff" stroke="#000" stroke-width="1"/>'},
+  EG:{h:['#ce1126','#fff','#000'],mark:'<path d="M27 17h6v6h-6z" fill="#c09300"/>'},
+  US:{stripes:['#b22234','#fff'],n:13,canton:'#3c3b6e',mark:'<circle cx="6" cy="5" r="1" fill="#fff"/><circle cx="12" cy="5" r="1" fill="#fff"/><circle cx="18" cy="5" r="1" fill="#fff"/><circle cx="9" cy="9" r="1" fill="#fff"/><circle cx="15" cy="9" r="1" fill="#fff"/><circle cx="6" cy="13" r="1" fill="#fff"/><circle cx="12" cy="13" r="1" fill="#fff"/><circle cx="18" cy="13" r="1" fill="#fff"/>'},
+  CA:{v:['#d52b1e','#fff','#d52b1e'],weights:[1,2,1],mark:'<path d="M30 12l1.6 4 3-1-1 3.6 3.4.8-3 2.4 1 3.4-4-1.4-1 4.2-1-4.2-4 1.4 1-3.4-3-2.4 3.4-.8-1-3.6 3 1z" fill="#d52b1e"/>'},
+  MX:{v:['#006847','#fff','#ce1126'],mark:'<circle cx="30" cy="20" r="3.4" fill="none" stroke="#8b5a2b" stroke-width="1.4"/>'},
+  BR:{solid:'#009c3b',mark:'<path d="M30 5l25 15-25 15L5 20z" fill="#ffdf00"/><circle cx="30" cy="20" r="7.5" fill="#002776"/><path d="M23 18.5c4.6-1.6 9.4-1.6 14 0" stroke="#fff" stroke-width="1.6" fill="none"/>'}
+};
+function flagSvg(iso,size){
+  const f=FLAG[iso];
+  const w=size||22,hh=Math.round((size||22)*0.67);
+  let inner='';
+  if(!f)inner='<rect width="60" height="40" fill="#e8eef3"/>';
+  else if(f.stripes){
+    const n=f.n||13,band=40/n;
+    for(let i=0;i<n;i++)inner+=`<rect y="${(i*band).toFixed(2)}" width="60" height="${band.toFixed(2)}" fill="${f.stripes[i%f.stripes.length]}"/>`;
+    if(f.canton)inner+=`<rect width="26" height="${(band*7).toFixed(2)}" fill="${f.canton}"/>`;
+  }else if(f.h){
+    const wts=f.weights||f.h.map(()=>1),tot=wts.reduce((a,b)=>a+b,0);let y=0;
+    f.h.forEach((c,i)=>{const hgt=40*wts[i]/tot;inner+=`<rect y="${y.toFixed(2)}" width="60" height="${hgt.toFixed(2)}" fill="${c}"/>`;y+=hgt});
+  }else if(f.v){
+    if(f.split){
+      inner+=`<rect width="${(60*f.split).toFixed(1)}" height="40" fill="${f.v[0]}"/>`;
+      inner+=`<rect x="${(60*f.split).toFixed(1)}" width="${(60*(1-f.split)).toFixed(1)}" height="40" fill="${f.v[1]}"/>`;
+    }else{
+      const wts=f.weights||f.v.map(()=>1),tot=wts.reduce((a,b)=>a+b,0);let x=0;
+      f.v.forEach((c,i)=>{const wd=60*wts[i]/tot;inner+=`<rect x="${x.toFixed(2)}" width="${wd.toFixed(2)}" height="40" fill="${c}"/>`;x+=wd});
     }
+  }else if(f.solid)inner+=`<rect width="60" height="40" fill="${f.solid}"/>`;
+  if(f&&f.bar)inner+=`<rect width="16" height="40" fill="${f.bar}"/>`;
+  if(f&&f.mark)inner+=f.mark;
+  return `<svg class="flagimg" viewBox="0 0 60 40" width="${w}" height="${hh}" aria-hidden="true" preserveAspectRatio="none">${inner}<rect width="60" height="40" fill="none" stroke="rgba(0,0,0,.18)" stroke-width="1.5"/></svg>`;
+}
+
+let ccIso='IN',ccDial='91';
+function fillCountries(){
+  try{ccIso=localStorage.getItem('bw_cc_iso')||'IN';ccDial=localStorage.getItem('bw_cc')||'91'}catch(e){}
+  if(!COUNTRIES.some(c=>c[0]===ccIso)){ccIso='IN';ccDial='91'}
+  paintCc();
+  ccList('');
+}
+function paintCc(){
+  const f=$('li-flag');if(f)f.innerHTML=flagSvg(ccIso,24);
+  const t=$('li-cc-txt');if(t)t.textContent='+'+ccDial;
+  const m=$('li-mob');if(m)m.maxLength=14;
+}
+function ccList(q){
+  const rows=$('ccRows');if(!rows)return;
+  const s=String(q||'').trim().toLowerCase();
+  const list=[...COUNTRIES].sort((a,b)=>a[1].localeCompare(b[1]))
+    .filter(c=>!s||c[1].toLowerCase().includes(s)||('+'+c[2]).includes(s)||c[0].toLowerCase()===s);
+  rows.innerHTML=list.length?list.map(c=>`
+    <button type="button" class="ccrow ${c[0]===ccIso?'on':''}" onclick="ccPick('${c[0]}','${c[2]}',${c[3]})">
+      <span class="ccflag">${flagSvg(c[0],24)}</span>
+      <span class="ccname">${esc(c[1])}</span>
+      <span class="ccdial">+${c[2]}</span>
+    </button>`).join(''):'<div class="hint" style="padding:10px 12px">No country matches that.</div>';
+}
+function ccOpen(e){
+  if(e)e.preventDefault();
+  const p=$('ccPanel');if(!p)return;
+  const open=p.style.display!=='none';
+  p.style.display=open?'none':'block';
+  if(!open){
+    const s=$('ccSearch');if(s){s.value='';ccList('')}
+    setTimeout(()=>{const r=$('ccRows').querySelector('.ccrow.on');if(r)r.scrollIntoView({block:'center'})},10);
+  }
+}
+function ccClose(){const p=$('ccPanel');if(p)p.style.display='none'}
+function ccPick(iso,dial,len){
+  ccIso=iso;ccDial=dial;ccLen=len||10;
+  try{localStorage.setItem('bw_cc',dial);localStorage.setItem('bw_cc_iso',iso)}catch(e){}
+  paintCc();ccClose();
+  /* a new country means the old code no longer applies */
+  otpSentTo='';
+  const w=$('li-otp-wrap');if(w)w.style.display='none';
+  const b=$('li-btn');if(b&&loginWay==='mobile')b.textContent='Get OTP';
+  const m=$('li-mob');if(m)m.focus();
+}
+function ccChanged(){paintCc()}
+let ccLen=10;
+function dialCode(){return ccDial||'91'}
+function fullMobile(){
+  const raw=($('li-mob').value||'').replace(/\D/g,'');
+  return dialCode()+raw.replace(new RegExp('^'+dialCode()),'');
+}
+function localLen(){
+  const c=COUNTRIES.find(x=>x[0]===ccIso);
+  return c?c[3]:10;
+}
+
+let loginWay='mobile',otpSentTo='';
+function loginMode(way){
+  loginWay=way;
+  ccClose();
+  const m=$('li-mobile-pane'),e=$('li-email-pane'),b=$('li-btn');
+  if(!m||!e)return;
+  m.style.display=way==='mobile'?'block':'none';
+  e.style.display=way==='email'?'block':'none';
+  const err=$('li-err');if(err)err.style.display='none';
+  if(b)b.textContent=(way==='mobile'&&!otpSentTo)?'Get OTP':'Login';
+}
+function agreed(){
+  const c=$('li-agree');
+  if(c&&!c.checked){
+    const err=$('li-err');
+    err.textContent='Please accept the Terms & Conditions and Privacy Policy to continue.';
+    err.style.display='block';
+    return false;
+  }
+  return true;
+}
+/* one button: asks for the code, then signs in with it */
+async function loginGo(){
+  if(!agreed())return;
+  if(loginWay==='email')return doLogin();
+  if(!otpSentTo)return sendOtp();
+  return doOtpLogin();
+}
+async function sendOtp(again){
+  const err=$('li-err');err.style.display='none';
+  const local=($('li-mob').value||'').replace(/\D/g,'');
+  const want=localLen();
+  if(local.length<Math.min(6,want)||local.length>14){
+    err.textContent='Enter your '+want+'-digit mobile number.';err.style.display='block';return;
+  }
+  const mob=fullMobile();
+  try{
+    const d=await api('/otp/request','POST',{mobile:mob});
+    otpSentTo=mob;
+    $('li-otp-wrap').style.display='block';
+    $('li-btn').textContent='Login';
+    $('li-otp-note').textContent=d.sent
+      ? (d.via==='email'?'Code emailed to '+(d.to||'your registered email')+'. It is valid for 10 minutes.'
+         :'Code sent to '+(d.to||('+'+mob))+'. It is valid for 10 minutes.')
+      : 'Our team will send your code shortly. Enter it here once it arrives.';
+    if(!again)setTimeout(()=>{const o=$('li-otp');if(o)o.focus()},150);
+    toast(d.sent?'Code sent':'Request sent to our team');
+  }catch(e){err.textContent=e.message;err.style.display='block'}
+}
+async function doOtpLogin(){
+  const err=$('li-err');err.style.display='none';
+  const code=$('li-otp').value.trim();
+  if(!/^\d{6}$/.test(code)){err.textContent='Enter the 6-digit code.';err.style.display='block';return}
+  try{
+    const d=await api('/otp/login','POST',{mobile:otpSentTo,code});
+    otpSentTo='';
+    afterLogin(d);
+  }catch(e){err.textContent=e.message;err.style.display='block'}
+}
+function afterLogin(d){
+  token=d.token;localStorage.setItem('bw_token',token);
+  state.role=d.role;state.user=d.user||null;
+  refreshProducts().then(()=>{renderHeader();
+    refreshNotifs(true);syncPush();nativeAuth();
+    if(d.role==='admin'){showView('admin');toast('Welcome, Admin')}
+    else if(d.user.status==='approved'){showView('shop');toast('Welcome back — dealer pricing active')}
+    else{showView('profile');toast('Signed in — account '+USTATUS_LABEL[d.user.status].toLowerCase())}
+  });
+}
+function openForgot(){
+  const b=$('fg-box');if(!b)return;
+  b.style.display=b.style.display==='none'?'block':'none';
+  if(b.style.display==='block'){
+    $('fg-step1').style.display='block';$('fg-step2').style.display='none';$('fg-err').style.display='none';
+    const e=$('li-email');if(e&&e.value.trim())$('fg-id').value=e.value.trim();
   }
 }
 async function askReset(again){
-  const err=$(again?'fg-err2':'fg-err1');err.style.display='none';
+  const err=$('fg-err');err.style.display='none';
   const id=$('fg-id').value.trim();
   if(!id){err.textContent='Enter your registered email or mobile number.';err.style.display='block';return}
   try{
     const d=await api('/forgot','POST',{id});
-    $('fg-note').innerHTML=d.withAdmin
-      ? 'Request sent to our team. They will WhatsApp the 6-digit code to <b>'+esc(String(d.to||'your registered number'))+'</b>. Enter it below once you have it — the code stays valid for 24 hours.'
-      : esc(d.hint||'If that account is registered, a code is on its way.');
+    $('fg-note').textContent=d.sent
+      ? (d.via==='email'?'Code emailed to '+(d.to||'your registered email')+'. It is valid for 30 minutes.'
+         :'Code sent to '+(d.to||'your mobile')+'. It is valid for 30 minutes.')
+      : 'Our team will send your code shortly. Enter it here once it arrives.';
     $('fg-step1').style.display='none';$('fg-step2').style.display='block';
-    toast(d.withAdmin?'Request sent to our team':'Reset requested');
+    toast(d.sent?'Reset code sent':'Request sent to our team');
   }catch(e){err.textContent=e.message;err.style.display='block'}
 }
 async function doReset(){
-  const err=$('fg-err2');err.style.display='none';
+  const err=$('fg-err');err.style.display='none';
   const code=$('fg-code').value.trim(),p1=$('fg-p1').value,p2=$('fg-p2').value;
   if(!/^\d{6}$/.test(code)){err.textContent='Enter the 6-digit code.';err.style.display='block';return}
   if(p1.length<6){err.textContent='New password must be at least 6 characters.';err.style.display='block';return}
@@ -1427,7 +1716,7 @@ async function doReset(){
   try{
     await api('/reset','POST',{id:$('fg-id').value.trim(),code,password:p1});
     toast('Password changed — please sign in');
-    authTab('login');
+    $('fg-box').style.display='none';
     $('li-email').value=$('fg-id').value.trim();$('li-pass').value='';
   }catch(e){err.textContent=e.message;err.style.display='block'}
 }
@@ -1435,13 +1724,7 @@ async function doLogin(){
   const err=$('li-err');err.style.display='none';
   try{
     const d=await api('/login','POST',{email:$('li-email').value.trim(),password:$('li-pass').value});
-    token=d.token;localStorage.setItem('bw_token',token);
-    state.role=d.role;state.user=d.user||null;
-    await refreshProducts();renderHeader();
-    refreshNotifs(true);syncPush();nativeAuth();
-    if(d.role==='admin'){showView('admin');toast('Welcome, Admin')}
-    else if(d.user.status==='approved'){showView('shop');toast('Welcome back — dealer pricing active')}
-    else{showView('profile');toast('Signed in — account '+USTATUS_LABEL[d.user.status].toLowerCase())}
+    afterLogin(d);
   }catch(e){err.textContent=e.message;err.style.display='block'}
 }
 async function doRegister(){
@@ -1538,7 +1821,9 @@ function verifyPanel(){
   if(!u||u.mobileOk)return '';
   return `<div class="cardbox" style="border:1px solid #ffd9a0;background:#fffaf0">
     <h3>Verify your WhatsApp number</h3>
-    <div class="hint" style="margin-bottom:10px">Our team sends a 6-digit code to <b>${esc(u.whatsapp||u.phone)}</b> on WhatsApp. Enter it below so we can reach you about orders and dispatch — usually within a few minutes during working hours.</div>
+    <div class="hint" style="margin-bottom:10px">${(state.payInfo&&(state.payInfo.smsProvider||state.payInfo.mailReady))
+      ?'A 6-digit code has been sent to <b>'+esc(u.whatsapp||u.phone)+'</b>'+((state.payInfo&&state.payInfo.mailReady)?' or your email <b>'+esc(u.email)+'</b>':'')+'. Enter it below so we can reach you about orders and dispatch.'
+      :'Our team sends a 6-digit code to <b>'+esc(u.whatsapp||u.phone)+'</b>. Enter it below so we can reach you about orders and dispatch.'}</div>
     <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
       <div style="max-width:190px"><label>6-digit code</label>
         <input id="vf-mobile" inputmode="numeric" maxlength="6" placeholder="123456"></div>
@@ -1550,8 +1835,9 @@ function verifyPanel(){
 }
 async function resendCode(){
   try{
-    await api('/verify/resend','POST',{kind:'mobile'});
-    toast('Our team has been told — they will WhatsApp the code shortly');
+    const d=await api('/verify/resend','POST',{kind:'mobile'});
+    toast(d.sent?(d.via==='email'?'Code emailed to you':'Code sent again to your mobile')
+      :'Our team has been told — they will send the code shortly');
   }catch(e){toast(e.message,1)}
 }
 async function submitVerify(){
@@ -1799,12 +2085,6 @@ async function renderRegDetail(){
       ${u.note?row('Note',esc(u.note)):''}
     </div>
 
-    ${u.resetCode?`<div class="dtblock">
-      <div class="dtbt">Password reset requested</div>
-      <div class="hint" style="margin:0 0 8px">Asked ${whenAgo(u.resetAt)}. Send this code to them on WhatsApp. It stays valid for 24 hours.</div>
-      ${row('Reset code',`<b class="gstin-code">${esc(u.resetCode)}</b>
-        <a class="lnk" href="https://wa.me/91${wa}?text=${encodeURIComponent('Blue Wave password reset code: '+u.resetCode+'. Valid for 15 minutes. Enter it in the app under Forgot your password.')}" target="_blank">Send on WhatsApp</a>`)}
-    </div>`:''}
     ${!u.mobileOk?`<div class="dtblock">
       <div class="dtbt">Pending verification</div>
       <div class="hint" style="margin:0 0 8px">Send this code to the applicant on WhatsApp. They enter it under Profile in the app to confirm the number is theirs.</div>
@@ -2468,6 +2748,7 @@ async function delTransport(id){
 }
 async function renderSettings(){
   const s=await api('/admin/settings');
+  window.__settings=s;
   $('adminBody').innerHTML=`<div class="cardbox"><h3>💳 Payment details (shown to customers at checkout)</h3>
     <div class="frow">
       <div><label>Payee / account name</label><input id="st-payee" value="${esc(s.payeeName)}"></div>
@@ -2495,18 +2776,62 @@ async function renderSettings(){
     </div>
     <div class="hint">Use <b>rzp_test_…</b> keys first to try it safely, then switch to <b>rzp_live_…</b> keys.</div>
   </div>
-  <div class="cardbox"><h3>Automatic messaging</h3>
-    <div class="hint" style="margin-bottom:8px">This channel sends <b>credit payment reminders</b> on their due dates. Verification and password-reset codes are not sent from here — they arrive as notifications in this admin panel and you pass them on by WhatsApp.</div>
-    <div class="notice ${s.remProvider?'ok':'info'}" style="margin-bottom:8px">
-      ${s.remProvider?'Automatic reminders are <b>ON</b> ('+(s.remProvider==='msg91'?'SMS via MSG91':'WhatsApp Business API')+') — credit customers are messaged on their due dates.'
-      :'Automatic reminders are <b>off</b>. Credit reminders are tracked in the <b>Credit</b> tab with one-tap WhatsApp buttons.'}
+  <div class="cardbox"><h3>SMS gateway for one-time codes</h3>
+    <div class="notice ${s.smsProvider?'ok':'info'}" style="margin-bottom:10px">
+      ${s.smsProvider?'Codes are sent automatically by <b>'+({msg91:'MSG91',fast2sms:'Fast2SMS',twilio:'Twilio',whatsapp:'WhatsApp Cloud API'}[s.smsProvider]||s.smsProvider)+'</b> — sign-in OTP, password reset and mobile verification.'
+      :'No gateway yet, so codes appear here as notifications for you to pass on. Choose a provider to send them automatically.'}
     </div>
-    <label>Sending channel</label>
-    <select id="st-remprov">
-      <option value="whatsapp" ${s.remProvider==='whatsapp'?'selected':''}>WhatsApp Business API (Meta Cloud) — recommended</option>
-      <option value="msg91" ${s.remProvider==='msg91'?'selected':''}>SMS via MSG91</option>
-      <option value="" ${!s.remProvider?'selected':''}>Manual — one-tap WhatsApp buttons only (free)</option>
+    <label>Provider</label>
+    <select id="st-smsprov" onchange="smsKeysUI()">
+      <option value="" ${!s.smsProvider?'selected':''}>None — codes come to this admin panel</option>
+      <option value="msg91" ${s.smsProvider==='msg91'?'selected':''}>MSG91 (India)</option>
+      <option value="fast2sms" ${s.smsProvider==='fast2sms'?'selected':''}>Fast2SMS (India, no DLT on quick route)</option>
+      <option value="twilio" ${s.smsProvider==='twilio'?'selected':''}>Twilio (worldwide)</option>
+      <option value="whatsapp" ${s.smsProvider==='whatsapp'?'selected':''}>WhatsApp Cloud API</option>
     </select>
+    <div id="smsKeys"></div>
+    <div class="frow" style="margin-top:10px">
+      <div><label>Test it — send a message to</label><input id="st-smstest" placeholder="98765 43210"></div>
+      <div style="display:flex;align-items:flex-end"><button class="smallbtn gr-btn" onclick="testSms()">Send test message</button></div>
+    </div>
+    <div class="hint">Codes always work: if the gateway fails or is switched off, the code still arrives in your notifications so you can pass it on.</div>
+    <button class="smallbtn gr-btn" style="margin-top:8px" onclick="smsLog()">View sending log</button>
+  </div>
+  <div class="cardbox"><h3>Email for one-time codes</h3>
+    <div class="notice ${s.smtpPassSet&&s.smtpHost?'ok':'info'}" style="margin-bottom:10px">
+      ${s.smtpPassSet&&s.smtpHost
+        ?'Email is set up. If an SMS cannot be sent, the code is emailed to the dealer automatically.'
+        :'Not set up yet. This is the quickest way to get codes delivered — no DLT, no SMS provider, just your own mailbox.'}
+    </div>
+    <div class="frow">
+      <div><label>Mail server (SMTP host)</label><input id="st-smtphost" value="${esc(s.smtpHost||'')}" placeholder="smtp.gmail.com"></div>
+      <div><label>Port</label><input id="st-smtpport" value="${esc(s.smtpPort||'587')}" placeholder="587"></div>
+    </div>
+    <div class="frow">
+      <div><label>Username</label><input id="st-smtpuser" value="${esc(s.smtpUser||'')}" placeholder="yourshop@gmail.com"></div>
+      <div><label>Password ${s.smtpPassSet?'(saved — blank keeps it)':''}</label><input id="st-smtppass" type="password" placeholder="${s.smtpPassSet?'••••••••':'App password'}"></div>
+    </div>
+    <div class="frow">
+      <div><label>From address</label><input id="st-smtpfrom" value="${esc(s.smtpFrom||'')}" placeholder="same as username"></div>
+      <div><label>From name</label><input id="st-smtpname" value="${esc(s.smtpFromName||'Blue Wave')}"></div>
+    </div>
+    <div class="frow">
+      <div><label>Test it — send an email to</label><input id="st-mailtest" placeholder="you@example.com"></div>
+      <div style="display:flex;align-items:flex-end"><button class="smallbtn gr-btn" onclick="testMail()">Send test email</button></div>
+    </div>
+    <div class="hint">Gmail: turn on 2-step verification, then create an <b>App password</b> and paste it above — your normal password will not work. Host <b>smtp.gmail.com</b>, port <b>587</b>. Zoho, Outlook and most web hosts work the same way.</div>
+  </div>
+  <div class="cardbox"><h3>Payment reminders for credit customers</h3>
+    <div class="hint" style="margin-bottom:8px">Reminders go out on the same channels as the one-time codes above — SMS if a gateway is set up, otherwise email. Nothing extra to configure.</div>
+    <div class="notice ${(s.smsProvider||s.smtpPassSet)&&s.remAuto!=='0'?'ok':'info'}" style="margin-bottom:8px">
+      ${!(s.smsProvider||s.smtpPassSet)
+        ? 'No channel yet — set up the SMS gateway or email above and reminders will start sending themselves.'
+        : s.remAuto==='0'
+          ? 'Automatic reminders are <b>switched off</b>. The Credit tab still shows who owes what, with one-tap WhatsApp buttons.'
+          : 'Automatic reminders are <b>on</b> — credit customers are messaged on the schedule below.'}
+    </div>
+    <label class="agree" style="margin:6px 0 12px"><input type="checkbox" id="st-remauto" ${s.remAuto!=='0'?'checked':''}>
+      <span>Send payment reminders automatically</span></label>
     <div class="frow">
       <div><label>Remind days BEFORE due date</label><input id="st-rembefore" value="${esc(s.remBefore)}" placeholder="3"><div class="hint">Comma separated, e.g. 7,3,1</div></div>
       <div><label>Remind days AFTER due date</label><input id="st-remafter" value="${esc(s.remAfter)}" placeholder="1,3,7"></div>
@@ -2518,7 +2843,6 @@ async function renderSettings(){
     <label>Message template</label>
     <textarea id="st-remtpl" rows="4">${esc(s.remTemplate)}</textarea>
     <div class="hint">Placeholders: <b>{name}</b> {order} {amount} {date} {dueDate} {due}</div>
-    <div id="remKeys" style="margin-top:10px"></div>
   </div>
   <div class="cardbox"><h3>🧾 GSTIN auto-verification (optional)</h3>
     <div class="notice ${s.gstApiKeySet?'ok':'info'}" style="margin-bottom:8px">
@@ -2552,8 +2876,7 @@ async function renderSettings(){
     <button class="smallbtn gr-btn" onclick="nativeCmd('server')">Server address</button>
     <button class="smallbtn gr-btn" onclick="nativeCmd('offline')">Load offline copy</button>
   </div>`:''}`;
-  const sel=$('st-remprov');
-  if(sel){remKeysUI(s);sel.addEventListener('change',()=>remKeysUI(s))}
+  smsKeysUI();
 }
 /* Native app hooks — only present inside the Android/iOS wrapper, and only
    reachable from the admin Settings screen, so dealers never see them. */
@@ -2627,24 +2950,113 @@ async function resetData(scope){
   try{await api('/admin/reset','POST',{scope,password:pw});toast('🗑 Deleted '+what.toLowerCase());renderAdmin(scope==='accounts'?'regs':'orders')}
   catch(e){toast(e.message,1)}
 }
-function remKeysUI(s){
-  const box=$('remKeys');if(!box)return;
-  const v=$('st-remprov').value;
-  box.innerHTML=v==='whatsapp'?`<div class="frow">
-      <div><label>WhatsApp Phone Number ID</label><input id="st-waphone" value="${esc(s.waPhoneId)}" placeholder="From Meta → WhatsApp → API Setup"></div>
-      <div><label>Permanent access token ${s.waTokenSet?'(saved — blank keeps it)':''}</label><input id="st-watoken" type="password" placeholder="${s.waTokenSet?'••••••••':'Paste token'}"></div>
+function smsKeysUI(){
+  const box=$('smsKeys');if(!box)return;
+  const s=window.__settings||{};
+  const v=$('st-smsprov').value;
+  box.innerHTML=v==='msg91'?`<div class="frow">
+      <div><label>Auth key ${s.smsKeySet?'(saved — blank keeps it)':''}</label><input id="st-smskey" type="password" placeholder="${s.smsKeySet?'••••••••':'From MSG91 → API → Auth key'}"></div>
+      <div><label>Sender ID (6 letters)</label><input id="st-smssender" value="${esc(s.smsSender||'HPMPMF')}" maxlength="6"></div>
     </div>
-    <div class="hint">Create a free WhatsApp Business (Cloud API) app at developers.facebook.com → add your business number → copy the Phone Number ID and a permanent token. Meta needs an approved template for business-initiated messages, which the reminder text below uses.</div>`
-  :v==='msg91'?`<div class="frow">
-      <div><label>MSG91 Auth Key ${s.smsKeySet?'(saved — blank keeps it)':''}</label><input id="st-smskey" type="password" placeholder="${s.smsKeySet?'••••••••':'Paste auth key'}"></div>
-      <div><label>Sender ID</label><input id="st-smssender" value="${esc(s.smsSender)}" placeholder="HPMPMF"></div>
-    </div><div class="hint">Get an account at msg91.com — DLT-registered sender ID and template are required for Indian SMS.</div>`
-  :`<div class="hint">No keys needed. Open the <b>Credit</b> tab and tap the WhatsApp button next to any due order to send the ready-written reminder.</div>`;
+    <div class="frow">
+      <div><label>DLT template ID (India)</label><input id="st-smstpl" value="${esc(s.smsTemplateId||'')}" placeholder="Leave blank to use the plain SMS route"></div>
+      <div><label>Route</label><input id="st-smsroute" value="${esc(s.smsRoute||'4')}" placeholder="4 = transactional"></div>
+    </div>
+    <div class="hint">Indian operators require DLT registration: register your sender ID and an OTP template on the MSG91 dashboard, then paste the template ID here. Without it, messages to Indian numbers are usually rejected by the operator, not by MSG91.</div>`
+  :v==='fast2sms'?`<div><label>API key ${s.smsKeySet?'(saved — blank keeps it)':''}</label><input id="st-smskey" type="password" placeholder="${s.smsKeySet?'••••••••':'From Fast2SMS → Dev API'}"></div>
+    <div class="hint">Uses the quick transactional route, which works without DLT approval for Indian numbers. Cheapest way to get started.</div>`
+  :v==='twilio'?`<div class="frow">
+      <div><label>Account SID</label><input id="st-twsid" value="${esc(s.twilioSid||'')}" placeholder="ACxxxxxxxx"></div>
+      <div><label>Auth token ${s.twilioTokenSet?'(saved — blank keeps it)':''}</label><input id="st-twtok" type="password" placeholder="${s.twilioTokenSet?'••••••••':'From the Twilio console'}"></div>
+    </div>
+    <div><label>From number</label><input id="st-twfrom" value="${esc(s.twilioFrom||'')}" placeholder="+1..."></div>
+    <div class="hint">Best for dealers outside India. Indian numbers still need a DLT-registered sender through Twilio.</div>`
+  :v==='whatsapp'?`<div class="frow">
+      <div><label>Phone Number ID</label><input id="st-waphone2" value="${esc(s.waPhoneId||'')}" placeholder="From Meta → WhatsApp → API Setup"></div>
+      <div><label>Permanent token ${s.waTokenSet?'(saved — blank keeps it)':''}</label><input id="st-watoken2" type="password" placeholder="${s.waTokenSet?'••••••••':'Paste token'}"></div>
+    </div>
+    <div class="hint">Free-form WhatsApp messages only reach people who messaged you in the last 24 hours; otherwise Meta needs an approved Authentication template.</div>`
+  :`<div class="hint">Codes will appear in your notifications with the dealer's name and number, ready to forward.</div>`;
 }
-async function saveSettings(){
+async function testSms(){
+  const to=$('st-smstest').value.trim();
+  if(!to)return toast('Enter a number to test with',1);
+  const prov=$('st-smsprov')?$('st-smsprov').value:'';
+  if(!prov)return genModal('SMS test',`<div class="notice warn">No provider is selected yet.</div>
+    <div class="hint">Choose one under <b>Provider</b>, fill in its keys, press <b>Save settings</b>, then test again.
+    Until then, codes keep arriving here as notifications for you to pass on.</div>
+    <button class="wide ghost" onclick="closeModal('modal-gen')">Close</button>`);
+  genModal('SMS test',`<div class="hint">Saving your keys and sending a test message…</div>`);
+  try{
+    await saveSettings(true);
+    const d=await api('/admin/sms-test','POST',{to});
+    const rows=[['Provider',d.provider||'none'],['Sent to','+'+(d.sentTo||to)],
+      ['Result',d.ok?'Accepted by the provider':'Not sent'],['Reason',d.status||''],
+      ...(d.detail?[['Provider said',d.detail]]:[])];
+    genModal('SMS test',`
+      <div class="notice ${d.ok?'ok':'warn'}">${d.ok
+        ?'The provider accepted the message. If it still does not arrive on an Indian number, the operator is blocking it — that is a DLT registration issue, not the app.'
+        :'The message was not sent. The provider\'s own reply is below.'}</div>
+      <div class="dtblock" style="margin:0">${rows.map(r=>`<div class="dtrow"><div class="dtk">${esc(r[0])}</div><div class="dtv">${esc(String(r[1]))}</div></div>`).join('')}</div>
+      <button class="wide ghost" onclick="smsLog()">See the last 20 attempts</button>
+      <button class="wide ghost" onclick="closeModal('modal-gen')">Close</button>`);
+  }catch(e){
+    genModal('SMS test',`<div class="notice warn">${esc(e.message)}</div>
+      <div class="hint">If this says the address was not found, the server has not been updated yet — upload the latest <b>server.js</b> and let it redeploy, then try again.</div>
+      <button class="wide ghost" onclick="closeModal('modal-gen')">Close</button>`);
+  }
+}
+async function testMail(){
+  const to=$('st-mailtest').value.trim();
+  if(!to)return toast('Enter an email address to test with',1);
+  genModal('Email test',`<div class="hint">Saving your settings and sending a test email…</div>`);
+  try{
+    await saveSettings(true);
+    const d=await api('/admin/mail-test','POST',{to});
+    genModal('Email test',`
+      <div class="notice ${d.ok?'ok':'warn'}">${d.ok
+        ?'Sent. Check that inbox — also look in spam the first time.'
+        :'Not sent. The mail server\'s own reply is below.'}</div>
+      <div class="dtblock" style="margin:0">
+        <div class="dtrow"><div class="dtk">Result</div><div class="dtv">${esc(d.status||'')}</div></div>
+        ${d.detail?`<div class="dtrow"><div class="dtk">Detail</div><div class="dtv">${esc(d.detail)}</div></div>`:''}
+      </div>
+      <button class="wide ghost" onclick="closeModal('modal-gen')">Close</button>`);
+  }catch(e){
+    genModal('Email test',`<div class="notice warn">${esc(e.message)}</div>
+      <div class="hint">If this says the address was not found, upload the latest <b>server.js</b> and let it redeploy first.</div>
+      <button class="wide ghost" onclick="closeModal('modal-gen')">Close</button>`);
+  }
+}
+async function smsLog(){
+  try{
+    const rows=await api('/admin/sms-log');
+    genModal('Recent sending attempts',rows.length?`<div class="dtblock" style="margin:0">
+      ${rows.map(r=>`<div class="dtrow"><div class="dtk">${esc(String(r.kind||'').replace(/_/g,' '))} · ${esc(r.channel||'')}</div>
+        <div class="dtv">${esc(r.phone||'')} — ${esc(r.status||'')}<br><span class="hint">${new Date(r.sent_at).toLocaleString('en-IN')}</span></div></div>`).join('')}
+      </div><button class="wide ghost" onclick="closeModal('modal-gen')">Close</button>`
+      :`<div class="empty">Nothing sent yet.</div><button class="wide ghost" onclick="closeModal('modal-gen')">Close</button>`);
+  }catch(e){toast(e.message,1)}
+}
+async function saveSettings(quiet){
   try{
     await api('/admin/settings','PUT',{
-      remProvider:$('st-remprov').value,remBefore:$('st-rembefore').value.trim(),
+      ...($('st-smsprov')?{smsProvider:$('st-smsprov').value}:{}),
+      ...($('st-smtphost')?{smtpHost:$('st-smtphost').value.trim()}:{}),
+      ...($('st-smtpport')?{smtpPort:$('st-smtpport').value.trim()}:{}),
+      ...($('st-smtpuser')?{smtpUser:$('st-smtpuser').value.trim()}:{}),
+      ...($('st-smtpfrom')?{smtpFrom:$('st-smtpfrom').value.trim()}:{}),
+      ...($('st-smtpname')?{smtpFromName:$('st-smtpname').value.trim()}:{}),
+      ...($('st-smtppass')&&$('st-smtppass').value?{smtpPass:$('st-smtppass').value}:{}),
+      ...($('st-smstpl')?{smsTemplateId:$('st-smstpl').value.trim()}:{}),
+      ...($('st-smsroute')?{smsRoute:$('st-smsroute').value.trim()}:{}),
+      ...($('st-twsid')?{twilioSid:$('st-twsid').value.trim()}:{}),
+      ...($('st-twfrom')?{twilioFrom:$('st-twfrom').value.trim()}:{}),
+      ...($('st-twtok')&&$('st-twtok').value.trim()?{twilioToken:$('st-twtok').value.trim()}:{}),
+      ...($('st-waphone2')?{waPhoneId:$('st-waphone2').value.trim()}:{}),
+      ...($('st-watoken2')&&$('st-watoken2').value.trim()?{waToken:$('st-watoken2').value.trim()}:{}),
+      ...($('st-remauto')?{remAuto:$('st-remauto').checked?'1':'0'}:{}),
+      remBefore:$('st-rembefore').value.trim(),
       remAfter:$('st-remafter').value.trim(),remOnDue:$('st-remondue').value,
       remHour:$('st-remhour').value,remTemplate:$('st-remtpl').value,
       ...($('st-waphone')?{waPhoneId:$('st-waphone').value.trim()}:{}),
@@ -2660,7 +3072,7 @@ async function saveSettings(){
       ...($('st-apass').value?{adminPassword:$('st-apass').value}:{})
     });
     state.payInfo=await api('/pay-info');
-    toast('💾 Settings saved');
+    if(!quiet)toast('Settings saved');
   }catch(e){toast(e.message,1)}
 }
 

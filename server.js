@@ -4,6 +4,8 @@
 const express = require('express');
 const { DatabaseSync } = require('node:sqlite'); // built into Node 22.5+
 const crypto = require('crypto');
+const net = require('net');
+const tls = require('tls');
 const path = require('path');
 const fs = require('fs');
 
@@ -167,6 +169,9 @@ try { db.exec('UPDATE users SET email_ok=1 WHERE email_ok=0'); } catch (e) { /* 
 /* password reset by code */
 try { db.exec("ALTER TABLE users ADD COLUMN reset_code TEXT DEFAULT ''"); } catch (e) { /* exists */ }
 try { db.exec("ALTER TABLE users ADD COLUMN reset_at TEXT DEFAULT ''"); } catch (e) { /* exists */ }
+/* one-time code for signing in with a mobile number */
+try { db.exec("ALTER TABLE users ADD COLUMN login_code TEXT DEFAULT ''"); } catch (e) { /* exists */ }
+try { db.exec("ALTER TABLE users ADD COLUMN login_at TEXT DEFAULT ''"); } catch (e) { /* exists */ }
 
 /* per-dealer custom price list (blank row = dealer uses the standard dealer price) */
 db.exec(`CREATE TABLE IF NOT EXISTS dealer_prices(
@@ -306,7 +311,7 @@ app.get('/api/pay-info', (req, res) => {
     bankName: getSetting('bankName'), accountNo: getSetting('accountNo'),
     ifsc: getSetting('ifsc'), whatsapp: getSetting('whatsapp'), gstPercent: gstPercent(),
     razorpay: { enabled: rzpEnabled(), keyId: rzpEnabled() ? rzpKeys().id : '' },
-    smsProvider: rs('remProvider') || ''
+    smsProvider: ss('smsProvider') || '', mailReady: mailReady()
   });
 });
 
@@ -377,9 +382,11 @@ app.post('/api/register', (req, res) => {
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,1,?)`)
     .run(id, f.name, f.phone, f.email, hashPw(f.password, salt), salt, f.company, f.gstin, f.type, f.addr, f.city, f.state, f.pincode, waNum.replace(/\D/g, '').slice(-10), mCode, now());
   notifyAdmin('registration', 'New registration — ' + f.company,
-    f.name + ' (' + f.type + ') from ' + (f.city || '—') + ', mobile ' + f.phone + '.' +
-    ' Verification code: ' + mCode + ' — send it to them on WhatsApp so they can confirm their number.' +
-    ' Then verify the GSTIN and approve the account.');
+    f.name + ' (' + f.type + ') from ' + (f.city || '—') + ', mobile ' + f.phone +
+    '. Verify the GSTIN and approve the account.');
+  /* the verification code goes straight to their mobile */
+  sendCode(db.prepare('SELECT * FROM users WHERE id=?').get(id), 'verification', mCode,
+    'They have just registered.').catch(() => {});
   const token = crypto.randomBytes(24).toString('hex');
   db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, id, 'user', now());
   res.json({ token, role: 'user', user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)) });
@@ -392,11 +399,31 @@ function findAccount(idRaw) {
   if (!id) return null;
   if (id.includes('@'))
     return db.prepare('SELECT * FROM users WHERE lower(email)=lower(?)').get(id) || null;
-  const ten = id.replace(/\D/g, '').slice(-10);
-  if (ten.length !== 10) return null;
-  return db.prepare(`SELECT * FROM users WHERE
-      substr(replace(replace(replace(phone,' ',''),'-',''),'+',''), -10)=?
-      OR substr(replace(replace(replace(whatsapp,' ',''),'-',''),'+',''), -10)=?`).get(ten, ten) || null;
+  const digits = id.replace(/\D/g, '');
+  if (digits.length < 6) return null;
+  const clean = "replace(replace(replace(replace(%c,' ',''),'-',''),'+',''),'(','')";
+  const norm = f => clean.replace('%c', f);
+  /* Numbers can arrive with a country code (+91, +971, +1 …) or without, so we
+     match on the last ten digits first — that identifies an Indian mobile
+     whichever way it was typed — then fall back to the whole number for
+     shorter foreign ones. */
+  const tail = digits.slice(-10);
+  let u = null;
+  if (tail.length === 10) {
+    u = db.prepare(`SELECT * FROM users WHERE substr(${norm('phone')}, -10)=?
+        OR substr(${norm('whatsapp')}, -10)=?`).get(tail, tail) || null;
+  }
+  if (!u) {
+    u = db.prepare(`SELECT * FROM users WHERE ${norm('phone')}=? OR ${norm('whatsapp')}=?`)
+      .get(digits, digits) || null;
+  }
+  if (!u && digits.length > 10) {
+    /* stored without the country code */
+    const short = digits.slice(-9);
+    u = db.prepare(`SELECT * FROM users WHERE substr(${norm('phone')}, -9)=?
+        OR substr(${norm('whatsapp')}, -9)=?`).get(short, short) || null;
+  }
+  return u;
 }
 
 app.post('/api/login', (req, res) => {
@@ -451,18 +478,18 @@ app.post('/api/verify/resend', requireUser, async (req, res) => {
     db.prepare('UPDATE users SET mobile_code=? WHERE id=?').run(code, u.id);
   }
   resendAt.set(key, Date.now());
-  notifyAdmin('verify', 'Verification code asked for again — ' + (u.company || u.name),
-    (u.name || '') + ' at ' + (u.company || '—') + ' (' + (u.whatsapp || u.phone) + ') has not received their code.' +
-    ' Code: ' + code + ' — send it to them on WhatsApp.');
-  res.json({ ok: true, sent: false, withAdmin: true });
+  const r = await sendCode(db.prepare('SELECT * FROM users WHERE id=?').get(u.id), 'verification', code,
+    'They asked for it again.');
+  res.json({ ok: true, sent: r.ok, withAdmin: !r.ok, via: r.via || '' });
 });
 
 /* admin sends the code over the gateway on demand */
-/* kept so older app builds don't error; codes are passed on by the admin now */
-app.post('/api/admin/users/:id/sendcode', requireAdmin, (req, res) => {
+app.post('/api/admin/users/:id/sendcode', requireAdmin, async (req, res) => {
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
   if (!u) return res.status(404).json({ error: 'User not found.' });
-  res.json({ ok: true, sent: false, withAdmin: true, code: u.mobile_ok ? '' : (u.mobile_code || '') });
+  if (!u.mobile_code) return res.status(400).json({ error: 'No code is pending for this account.' });
+  const r = await sendCode(u, 'verification', u.mobile_code, 'Sent from the admin panel.');
+  res.json({ ok: true, sent: r.ok, status: r.status, code: u.mobile_ok ? '' : u.mobile_code });
 });
 
 /* admin issues a fresh code (e.g. the customer changed number) */
@@ -473,68 +500,140 @@ app.post('/api/admin/users/:id/recode', requireAdmin, (req, res) => {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   db.prepare('UPDATE users SET mobile_code=?, mobile_ok=0 WHERE id=?').run(code, u.id);
   notify(u.id, 'verify', 'New verification code issued',
-    'Our team is sending you a fresh verification code on WhatsApp. Enter it on your profile screen.');
+    'A fresh verification code is on its way to your mobile. Enter it on your profile screen.');
+  sendCode(db.prepare('SELECT * FROM users WHERE id=?').get(u.id), 'verification', code, 'Reissued by admin.')
+    .catch(() => {});
   res.json({ ok: true, code });
 });
 
+/* ---------- signing in with a mobile number ----------
+ * The dealer types their number, we issue a 6-digit code that lasts 10 minutes
+ * and send it over whichever channel is configured. With no gateway set up the
+ * code lands in the admin panel and the team passes it on, exactly like the
+ * verification codes. */
+const otpAt = new Map();
+const OTP_WINDOW_MS = 10 * 60 * 1000;
+
+app.post('/api/otp/request', async (req, res) => {
+  const idRaw = String(req.body?.mobile || req.body?.id || '').trim();
+  if (!idRaw) return res.status(400).json({ error: 'Enter your registered mobile number.' });
+  const u = findAccount(idRaw);
+  /* same answer either way, so the form can't be used to find out who is registered */
+  const generic = { ok: true, sent: false, hint: 'If that number is registered, a code is on its way.' };
+  if (!u) return res.json(generic);
+  const key = 'o:' + u.id;
+  if (Date.now() - (otpAt.get(key) || 0) < 45000)
+    return res.status(429).json({ error: 'A code was just sent. Please wait a moment before asking again.' });
+  otpAt.set(key, Date.now());
+
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  db.prepare('UPDATE users SET login_code=?, login_at=? WHERE id=?').run(code, now(), u.id);
+  const to = String(u.whatsapp || u.phone || '');
+  const r = await sendCode(u, 'login', code, 'They are signing in.');
+  const mask = to.replace(/\D/g, '').slice(-10).replace(/^(\d{2})\d{6}(\d{2})$/, '$1******$2');
+  const maskMail = String(u.email || '').replace(/^(.).*(@.*)$/, '$1•••$2');
+  res.json({ ok: true, sent: r.ok, withAdmin: !r.ok, via: r.via || '',
+    to: r.via === 'email' ? maskMail : mask });
+});
+
+app.post('/api/otp/login', (req, res) => {
+  const idRaw = String(req.body?.mobile || req.body?.id || '').trim();
+  const code = String(req.body?.code || '').trim();
+  if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit code.' });
+  const u = findAccount(idRaw);
+  if (!u || !u.login_code) return res.status(400).json({ error: 'Ask for a code first.' });
+  const age = Date.now() - new Date(u.login_at || 0).getTime();
+  if (!(age >= 0 && age < OTP_WINDOW_MS)) {
+    db.prepare("UPDATE users SET login_code='' WHERE id=?").run(u.id);
+    return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
+  }
+  if (code !== String(u.login_code)) return res.status(400).json({ error: 'That code is not right. Please check and try again.' });
+  db.prepare("UPDATE users SET login_code='', login_at='', mobile_ok=1 WHERE id=?").run(u.id);
+  const token = crypto.randomBytes(24).toString('hex');
+  db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, u.id, 'user', now());
+  res.json({ token, role: 'user', user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)) });
+});
+
 /* ---------- forgotten password ----------
- * A 6-digit code goes to the registered mobile by SMS (same gateway as the
- * verification codes). Codes last 15 minutes. If no gateway is configured the
- * admin sees the code on the dealer's page and passes it on, so nobody is
- * locked out. */
+ * Back now that codes actually reach the customer: a 6-digit code by SMS, good
+ * for 30 minutes, then they set a new password. */
 const forgotAt = new Map();
-/* The admin passes the code on by hand, so it can't expire in a few minutes. */
-const RESET_WINDOW_MS = 24 * 60 * 60 * 1000;
+const RESET_WINDOW_MS = 30 * 60 * 1000;
+
 app.post('/api/forgot', async (req, res) => {
-  const idRaw = String(req.body?.id || '').trim();
+  const idRaw = String(req.body?.id || req.body?.mobile || '').trim();
   if (!idRaw) return res.status(400).json({ error: 'Enter your registered email or mobile number.' });
   const u = findAccount(idRaw);
-  /* Always answer the same way, so the form can't be used to discover
-     which numbers are registered. */
-  const generic = { ok: true, sent: false, hint: 'If that email or mobile is registered, a reset code is on its way.' };
+  const generic = { ok: true, sent: false, hint: 'If that account is registered, a code is on its way.' };
   if (!u) return res.json(generic);
   const key = 'f:' + u.id;
-  if (Date.now() - (forgotAt.get(key) || 0) < 60000)
-    return res.status(429).json({ error: 'A code was just sent. Please wait a minute before trying again.' });
+  if (Date.now() - (forgotAt.get(key) || 0) < 45000)
+    return res.status(429).json({ error: 'A code was just sent. Please wait a moment before asking again.' });
   forgotAt.set(key, Date.now());
   const code = String(Math.floor(100000 + Math.random() * 900000));
   db.prepare('UPDATE users SET reset_code=?, reset_at=? WHERE id=?').run(code, now(), u.id);
-  const to = String(u.whatsapp || u.phone || '');
-  /* The code goes to the admin app, not to the customer: the admin reads it
-     from the notification (or the dealer's page) and sends it across on
-     WhatsApp themselves. Nothing automatic, nothing to configure. */
-  notifyAdmin('verify', 'Password reset requested — ' + (u.company || u.name),
-    (u.name || '') + ' at ' + (u.company || '—') + ' (' + to + ') has asked to reset their password.' +
-    ' Code: ' + code + ' — valid for 24 hours.' +
-    ' Send it to them on WhatsApp, or open Registrations → this business to use the ready-made message.');
-  db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
-    .run('reset:' + u.id, 'password_reset', 'admin', to,
-      'Reset code ' + code + ' issued for ' + (u.company || u.name) + ' — to be sent by the admin.', 'with_admin', now());
-  const mask = to.replace(/\D/g, '').slice(-10).replace(/^(\d{2})\d{6}(\d{2})$/, '$1******$2');
-  res.json({ ok: true, sent: false, withAdmin: true, to: mask,
-    hint: 'Our team has your request and will send the code to your WhatsApp number shortly.' });
+  const r = await sendCode(u, 'password reset', code, 'They asked to reset their password.');
+  const to = String(u.whatsapp || u.phone || '').replace(/\D/g, '').slice(-10);
+  const maskMail = String(u.email || '').replace(/^(.).*(@.*)$/, '$1•••$2');
+  res.json({ ok: true, sent: r.ok, withAdmin: !r.ok, via: r.via || '',
+    to: r.via === 'email' ? maskMail : to.replace(/^(\d{2})\d{6}(\d{2})$/, '$1******$2') });
 });
 
 app.post('/api/reset', (req, res) => {
-  const idRaw = String(req.body?.id || '').trim();
   const code = String(req.body?.code || '').trim();
   const password = String(req.body?.password || '');
   if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit code.' });
   if (password.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters.' });
-  const u = findAccount(idRaw);
+  const u = findAccount(String(req.body?.id || req.body?.mobile || ''));
   if (!u || !u.reset_code) return res.status(400).json({ error: 'No reset is pending for that account. Ask for a new code.' });
   const age = Date.now() - new Date(u.reset_at || 0).getTime();
   if (!(age >= 0 && age < RESET_WINDOW_MS)) {
     db.prepare("UPDATE users SET reset_code='' WHERE id=?").run(u.id);
-    return res.status(400).json({ error: 'That code has expired — codes last 24 hours. Please ask for a new one.' });
+    return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
   }
   if (code !== String(u.reset_code)) return res.status(400).json({ error: 'That code does not match. Please check and try again.' });
   const salt = crypto.randomBytes(8).toString('hex');
   db.prepare("UPDATE users SET pass_hash=?, salt=?, reset_code='', reset_at='' WHERE id=?")
     .run(hashPw(password, salt), salt, u.id);
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);   // sign out everywhere
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);
   notify(u.id, 'verify', 'Password changed', 'Your password was reset. Sign in with the new one.');
   res.json({ ok: true });
+});
+
+app.post('/api/admin/mail-test', requireAdmin, async (req, res) => {
+  const to = String(req.body?.to || '').trim();
+  if (!/^\S+@\S+\.\S+$/.test(to)) return res.status(400).json({ error: 'Enter an email address to test with.' });
+  const r = await sendMail(to, 'Blue Wave test email',
+    'This is a test from your Blue Wave admin panel. If you can read this, one-time codes can be emailed to your dealers.');
+  db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
+    .run('test', 'mail_test', 'email', to, 'mail test', r.ok ? 'sent' : r.status, now());
+  res.json({ ok: r.ok, status: r.status, detail: r.detail || '' });
+});
+
+/* what was actually attempted, newest first — the quickest way to see why a
+   message never arrived */
+app.get('/api/admin/sms-log', requireAdmin, (req, res) => {
+  res.json(db.prepare(`SELECT kind, channel, phone, status, sent_at FROM reminders
+    ORDER BY id DESC LIMIT 20`).all());
+});
+
+/* let the admin prove the gateway works before dealers rely on it */
+app.post('/api/admin/sms-test', requireAdmin, async (req, res) => {
+  const to = String(req.body?.to || '').trim();
+  if (!to.replace(/\D/g, '')) return res.status(400).json({ error: 'Enter a mobile number to test with.' });
+  const r = await sendSms(to, 'Blue Wave test message: your SMS gateway is working. 123456');
+  db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
+    .run('test', 'sms_test', ss('smsProvider') || 'none', to, 'gateway test',
+      (r.ok ? 'sent' : r.status) + (r.detail ? ' — ' + r.detail : ''), now());
+  res.json({
+    ok: r.ok, status: r.status, detail: r.detail || '', provider: ss('smsProvider') || '',
+    sentTo: intlNumber(to),
+    configured: {
+      msg91: !!getSetting('smsKey'), fast2sms: !!getSetting('smsKey'),
+      twilio: !!(getSetting('twilioSid') && getSetting('twilioToken') && getSetting('twilioFrom')),
+      whatsapp: !!(getSetting('waPhoneId') && getSetting('waToken'))
+    }
+  });
 });
 
 app.get('/api/me', (req, res) => {
@@ -1031,36 +1130,273 @@ const waLink = (phone, text) =>
   'https://wa.me/' + String(phone || '').replace(/\D/g, '').replace(/^0+/, '').replace(/^(?!91)/, '91') +
   '?text=' + encodeURIComponent(text);
 
-async function sendMessage(phone, text) {
-  const provider = rs('remProvider');
-  const num = String(phone || '').replace(/\D/g, '').replace(/^0+/, '');
-  const intl = num.length === 10 ? '91' + num : num;
-  if (!provider) return { ok: false, status: 'no_provider' };
+/* =================== SMS GATEWAY ===================
+ * One-time codes (sign-in, password reset, number verification) go out through
+ * whichever SMS provider is configured in Admin → Settings. Everything is a
+ * plain HTTPS call, so no packages are needed.
+ *
+ * Providers, and what each needs:
+ *   msg91      authkey + sender id (+ optional DLT template id for India)
+ *   fast2sms   api key           (works without DLT on its 'q' route)
+ *   twilio     account sid + auth token + from-number (best outside India)
+ *   whatsapp   Meta Cloud API phone-number id + token
+ * ==================================================== */
+const SMS_DEFAULTS = { smsProvider: '', smsSender: 'HPMPMF', smsRoute: '4' };
+const ss = k => { const v = getSetting(k); return v === null || v === '' || v === undefined ? SMS_DEFAULTS[k] : v; };
+const intlNumber = phone => {
+  const n = String(phone || '').replace(/\D/g, '').replace(/^0+/, '');
+  return n.length === 10 ? '91' + n : n;
+};
+
+async function smsMsg91(to, text) {
+  const key = getSetting('smsKey');
+  if (!key) return { ok: false, status: 'MSG91 auth key not saved', detail: 'Paste the auth key in Settings and save.' };
+  const tplId = String(getSetting('smsTemplateId') || '').trim();
   try {
-    if (provider === 'whatsapp') {
-      const token = getSetting('waToken'), pid = getSetting('waPhoneId');
-      if (!token || !pid) return { ok: false, status: 'not_configured' };
-      const r = await fetch('https://graph.facebook.com/v20.0/' + pid + '/messages', {
+    /* DLT template route — what Indian operators require */
+    if (tplId) {
+      const r = await fetch('https://control.msg91.com/api/v5/flow/', {
         method: 'POST',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messaging_product: 'whatsapp', to: intl, type: 'text', text: { body: text } }),
-        signal: AbortSignal.timeout(10000)
+        headers: { authkey: key, 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({
+          template_id: tplId, short_url: '0',
+          recipients: [{ mobiles: intlNumber(to), OTP: (String(text).match(/\b(\d{6})\b/) || [, ''])[1], MESSAGE: text }]
+        }),
+        signal: AbortSignal.timeout(12000)
       });
-      const d = await r.json().catch(() => ({}));
-      return r.ok ? { ok: true, status: 'sent' } : { ok: false, status: (d.error && d.error.message) || 'whatsapp_error' };
+      const raw = await r.text();
+      let d = {}; try { d = JSON.parse(raw); } catch (e) { /* not json */ }
+      const okFlow = r.ok && String(d.type || '').toLowerCase() !== 'error';
+      return okFlow ? { ok: true, status: 'sent', detail: raw.slice(0, 300) }
+        : { ok: false, status: 'MSG91 replied ' + r.status, detail: raw.slice(0, 300) };
     }
-    if (provider === 'msg91') {
-      const key = getSetting('smsKey'), sender = getSetting('smsSender') || 'HPMPMF';
-      if (!key) return { ok: false, status: 'not_configured' };
-      const url = 'https://api.msg91.com/api/sendhttp.php?authkey=' + encodeURIComponent(key) +
-        '&mobiles=' + intl + '&message=' + encodeURIComponent(text) + '&sender=' + encodeURIComponent(sender) +
-        '&route=4&country=91';
-      const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-      return r.ok ? { ok: true, status: 'sent' } : { ok: false, status: 'sms_error' };
-    }
-  } catch (e) { return { ok: false, status: 'network_error' }; }
+    /* plain SMS route (works for international numbers and test accounts) */
+    const r = await fetch('https://api.msg91.com/api/v2/sendsms', {
+      method: 'POST',
+      headers: { authkey: key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender: ss('smsSender'), route: ss('smsRoute'), country: '91',
+        sms: [{ message: text, to: [intlNumber(to)] }]
+      }),
+      signal: AbortSignal.timeout(12000)
+    });
+    const raw = await r.text();
+    let d = {}; try { d = JSON.parse(raw); } catch (e) { /* not json */ }
+    return (r.ok && String(d.type || '').toLowerCase() !== 'error')
+      ? { ok: true, status: 'sent', detail: raw.slice(0, 300) }
+      : { ok: false, status: 'MSG91 replied ' + r.status, detail: raw.slice(0, 300) };
+  } catch (e) { return { ok: false, status: 'Could not reach MSG91', detail: e.message }; }
+}
+
+async function smsFast2Sms(to, text) {
+  const key = getSetting('smsKey');
+  if (!key) return { ok: false, status: 'Fast2SMS API key not saved', detail: 'Paste the API key in Settings and save.' };
+  const num = intlNumber(to).replace(/^91/, '');
+  try {
+    const r = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+      method: 'POST',
+      headers: { authorization: key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ route: 'q', message: text, language: 'english', flash: 0, numbers: num }),
+      signal: AbortSignal.timeout(12000)
+    });
+    const raw = await r.text();
+    let d = {}; try { d = JSON.parse(raw); } catch (e) { /* not json */ }
+    return (r.ok && d.return === true)
+      ? { ok: true, status: 'sent', detail: raw.slice(0, 300) }
+      : { ok: false, status: 'Fast2SMS replied ' + r.status, detail: raw.slice(0, 300) };
+  } catch (e) { return { ok: false, status: 'Could not reach Fast2SMS', detail: e.message }; }
+}
+
+async function smsTwilio(to, text) {
+  const sid = getSetting('twilioSid'), tok = getSetting('twilioToken'), from = getSetting('twilioFrom');
+  if (!sid || !tok || !from) return { ok: false, status: 'Twilio details incomplete',
+    detail: 'Account SID, auth token and from-number are all required.' };
+  try {
+    const body = new URLSearchParams({ To: '+' + intlNumber(to), From: from, Body: text });
+    const r = await fetch('https://api.twilio.com/2010-04-01/Accounts/' + sid + '/Messages.json', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(sid + ':' + tok).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body, signal: AbortSignal.timeout(12000)
+    });
+    const raw = await r.text();
+    let d = {}; try { d = JSON.parse(raw); } catch (e) { /* not json */ }
+    return r.ok ? { ok: true, status: 'sent', detail: 'SID ' + (d.sid || '') }
+      : { ok: false, status: 'Twilio replied ' + r.status, detail: (d.message || raw).slice(0, 300) };
+  } catch (e) { return { ok: false, status: 'Could not reach Twilio', detail: e.message }; }
+}
+
+async function smsWhatsApp(to, text) {
+  const token = getSetting('waToken'), pid = getSetting('waPhoneId');
+  if (!token || !pid) return { ok: false, status: 'WhatsApp details incomplete',
+    detail: 'Phone Number ID and permanent token are both required.' };
+  try {
+    const r = await fetch('https://graph.facebook.com/v20.0/' + pid + '/messages', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: intlNumber(to), type: 'text', text: { body: text } }),
+      signal: AbortSignal.timeout(12000)
+    });
+    const raw = await r.text();
+    let d = {}; try { d = JSON.parse(raw); } catch (e) { /* not json */ }
+    return r.ok ? { ok: true, status: 'sent', detail: raw.slice(0, 200) }
+      : { ok: false, status: 'WhatsApp replied ' + r.status, detail: ((d.error && d.error.message) || raw).slice(0, 300) };
+  } catch (e) { return { ok: false, status: 'Could not reach WhatsApp', detail: e.message }; }
+}
+
+/* =================== EMAIL =====================
+ * A small SMTP client, so codes can also be emailed. Every dealer gives an
+ * email at registration, an app password from Gmail/Zoho/your host is enough,
+ * and there is no DLT paperwork — which makes this the quickest way to get
+ * one-time codes actually delivered.
+ * =============================================== */
+function smtpSend({ host, port, secure, user, pass, from, fromName, to, subject, text }) {
+  return new Promise(resolve => {
+    let sock, done = false, step = 0, buf = '';
+    const finish = (ok, status) => {
+      if (done) return; done = true;
+      try { sock && sock.destroy(); } catch (e) { /* already closed */ }
+      resolve({ ok, status });
+    };
+    const timer = setTimeout(() => finish(false, 'Mail server did not answer in time'), 15000);
+    const msg = [
+      'From: ' + (fromName ? '"' + fromName + '" ' : '') + '<' + from + '>',
+      'To: <' + to + '>',
+      'Subject: ' + subject,
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=utf-8',
+      'Date: ' + new Date().toUTCString(),
+      '', text, '.'
+    ].join('\r\n');
+    const write = line => { try { sock.write(line + '\r\n'); } catch (e) { finish(false, 'Connection lost'); } };
+    let canStartTls = false;
+    const onLine = line => {
+      const code = parseInt(line.slice(0, 3));
+      if (/STARTTLS/i.test(line)) canStartTls = true;      // advertised in the EHLO reply
+      if (line[3] === '-') return;                         // multi-line reply, wait for the last
+      if (code >= 400) {
+        /* a server that does not do STARTTLS just carries on unencrypted */
+        if (step === 2) { write('AUTH LOGIN'); step = 3; return; }
+        return finish(false, 'Mail server said: ' + line.trim().slice(0, 160));
+      }
+      if (step === 0) { write('EHLO bluewave'); step = 1; return; }
+      if (step === 1) {                                     // after EHLO
+        if (!secure && canStartTls) { write('STARTTLS'); step = 2; return; }
+        write('AUTH LOGIN'); step = 3; return;
+      }
+      if (step === 2) {                                     // STARTTLS accepted → wrap the socket
+        const plain = sock;
+        plain.removeAllListeners('data');
+        sock = tls.connect({ socket: plain, servername: host, rejectUnauthorized: false }, () => {
+          sock.on('data', onData); write('EHLO bluewave'); step = 21;
+        });
+        sock.on('error', e => finish(false, 'TLS failed: ' + e.message));
+        return;
+      }
+      if (step === 21) { write('AUTH LOGIN'); step = 3; return; }
+      if (step === 3) { write(Buffer.from(user).toString('base64')); step = 4; return; }
+      if (step === 4) { write(Buffer.from(pass).toString('base64')); step = 5; return; }
+      if (step === 5) { write('MAIL FROM:<' + from + '>'); step = 6; return; }
+      if (step === 6) { write('RCPT TO:<' + to + '>'); step = 7; return; }
+      if (step === 7) { write('DATA'); step = 8; return; }
+      if (step === 8) { write(msg); step = 9; return; }
+      if (step === 9) {
+        /* say goodbye properly and give the server a moment to acknowledge */
+        write('QUIT'); clearTimeout(timer);
+        setTimeout(() => finish(true, 'sent'), 60);
+        return;
+      }
+    };
+    const onData = d => {
+      buf += d.toString('utf8');
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); if (line.trim()) onLine(line); }
+    };
+    try {
+      sock = secure
+        ? tls.connect({ host, port, servername: host, rejectUnauthorized: false })
+        : net.connect({ host, port });
+      sock.setTimeout(15000);
+      sock.on('data', onData);
+      sock.on('error', e => finish(false, 'Could not reach the mail server: ' + e.message));
+      sock.on('timeout', () => finish(false, 'Mail server timed out'));
+    } catch (e) { finish(false, e.message); }
+  });
+}
+
+const mailReady = () => !!(getSetting('smtpHost') && getSetting('smtpUser') && getSetting('smtpPass'));
+
+async function sendMail(to, subject, text) {
+  if (!to) return { ok: false, status: 'No email address on the account' };
+  if (!mailReady()) return { ok: false, status: 'Email not set up', detail: 'Add your mail server details in Settings.' };
+  const port = parseInt(getSetting('smtpPort')) || 587;
+  return smtpSend({
+    host: getSetting('smtpHost'), port, secure: port === 465,
+    user: getSetting('smtpUser'), pass: getSetting('smtpPass'),
+    from: getSetting('smtpFrom') || getSetting('smtpUser'),
+    fromName: getSetting('smtpFromName') || 'Blue Wave',
+    to, subject, text
+  });
+}
+
+/** Sends a one-time code. Returns {ok,status}; never throws. */
+async function sendSms(to, text) {
+  const p = ss('smsProvider');
+  if (!p) return { ok: false, status: 'No SMS provider chosen', detail: 'Pick one in Settings and save your keys.' };
+  if (!String(to || '').replace(/\D/g, '')) return { ok: false, status: 'No mobile number to send to' };
+  if (p === 'msg91') return smsMsg91(to, text);
+  if (p === 'fast2sms') return smsFast2Sms(to, text);
+  if (p === 'twilio') return smsTwilio(to, text);
+  if (p === 'whatsapp') return smsWhatsApp(to, text);
   return { ok: false, status: 'unknown_provider' };
 }
+
+/* Anything a customer should receive — one-time codes and payment reminders —
+ * goes through here: SMS gateway first, email second, and the admin is told if
+ * neither worked. One path, one place to fix. */
+async function deliver({ phone, email, name, subject, text, mailText }) {
+  let r = await sendSms(phone, text);
+  if (r.ok) return { ...r, via: ss('smsProvider') === 'whatsapp' ? 'whatsapp' : 'sms' };
+  if (mailReady() && email) {
+    const m = await sendMail(email, subject || 'Blue Wave', mailText || text);
+    if (m.ok) return { ...m, via: 'email' };
+    return { ok: false, status: r.status + ' / email: ' + m.status, via: '' };
+  }
+  return { ...r, via: '' };
+}
+
+/** Sends a code by whatever channel is available, and records what happened.
+ *  Order: SMS gateway → email → tell the admin. Something always reaches
+ *  someone, so a dealer is never stuck. */
+async function sendCode(user, purpose, code, extraNote) {
+  const to = String(user.whatsapp || user.phone || '');
+  const text = 'Blue Wave ' + purpose + ' code: ' + code +
+    '. Valid for 10 minutes. Do not share it with anyone. HPMP Manufacturers Pvt Ltd.';
+  const r = await deliver({
+    phone: to, email: user.email, name: user.name,
+    subject: 'Blue Wave ' + purpose + ' code: ' + code,
+    text,
+    mailText: 'Hello ' + (user.name || '') + ',\n\n' +
+      'Your Blue Wave ' + purpose + ' code is ' + code + '.\n' +
+      'It is valid for 10 minutes. Please do not share it with anyone.\n\n' +
+      'If you did not ask for this, you can ignore this email.\n\n' +
+      'HPMP Manufacturers Pvt Ltd'
+  });
+  const via = r.via;
+  db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
+    .run('code:' + user.id, purpose.replace(/\s+/g, '_'), via || ss('smsProvider') || 'admin',
+      via === 'email' ? user.email : to, text, r.ok ? 'sent' : r.status, now());
+
+  if (!r.ok) notifyAdmin('verify', purpose[0].toUpperCase() + purpose.slice(1) + ' code — ' + (user.company || user.name),
+    (user.name || '') + ' (' + to + ') needs their ' + purpose + ' code: ' + code + '.' +
+    (extraNote ? ' ' + extraNote : '') + ' Send it on WhatsApp.');
+  return { ...r, via };
+}
+
+/* kept for the manual "send now" button */
+async function sendMessage(phone, text) { return sendSms(phone, text); }
 
 /* every outstanding credit order with its due date and how many days remain */
 function creditOutstanding() {
@@ -1087,6 +1423,10 @@ function reminderKind(dueDays) {
 
 async function runCreditReminders(force) {
   const hour = parseInt(rs('remHour'));
+  /* off by choice, or nothing configured to send with */
+  const auto = getSetting('remAuto');
+  if (auto === '0') return { skipped: 'switched_off' };
+  if (!ss('smsProvider') && !mailReady()) return { skipped: 'no_channel' };
   if (!force && new Date().getHours() !== (isFinite(hour) ? hour : 10)) return { skipped: 'not_send_hour' };
   let sent = 0, skipped = 0;
   for (const row of creditOutstanding()) {
@@ -1097,10 +1437,18 @@ async function runCreditReminders(force) {
         AND (status='sent' OR date(sent_at)=date('now'))`).get(row.order.id, kind);
     if (already) { skipped++; continue; }
     const text = reminderText({ ...row.order, contact_name: row.contact.name }, row.user, row.dueDays);
-    const r = await sendMessage(row.phone, text);
+    const r = await deliver({
+      phone: row.phone, email: row.user && row.user.email, name: row.contact.name,
+      subject: 'Payment reminder — order ' + row.order.id, text
+    });
     db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
-      .run(row.order.id, kind, rs('remProvider') || 'none', row.phone, text, r.ok ? 'sent' : r.status, now());
+      .run(row.order.id, kind, r.via || ss('smsProvider') || 'none',
+        r.via === 'email' ? (row.user && row.user.email) || row.phone : row.phone,
+        text, r.ok ? 'sent' : r.status, now());
     if (r.ok) sent++;
+    else notifyAdmin('credit', 'Reminder could not be sent — ' + (row.contact.company || row.contact.name),
+      'Order ' + row.order.id + ' is ' + (row.dueDays < 0 ? Math.abs(row.dueDays) + ' day(s) overdue' : 'due in ' + row.dueDays + ' day(s)') +
+      '. Message not delivered (' + r.status + '). Chase them from the Credit tab.');
   }
   return { sent, skipped, checked: creditOutstanding().length };
 }
@@ -1155,7 +1503,10 @@ app.post('/api/admin/credit/:id/remind', requireAdmin, async (req, res) => {
   const row = creditOutstanding().find(x => x.order.id === req.params.id);
   if (!row) return res.status(404).json({ error: 'Credit order not found.' });
   const text = reminderText({ ...row.order, contact_name: row.contact.name }, row.user, row.dueDays);
-  const r = await sendMessage(row.phone, text);
+  const r = await deliver({
+    phone: row.phone, email: row.user && row.user.email, name: row.contact && row.contact.name,
+    subject: 'Payment reminder — order ' + row.order.id, text
+  });
   db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
     .run(row.order.id, 'manual', rs('remProvider') || 'none', row.phone, text, r.ok ? 'sent' : r.status, now());
   if (!r.ok) return res.status(400).json({ error: r.status === 'no_provider' || r.status === 'not_configured'
@@ -1400,9 +1751,17 @@ app.get('/api/admin/settings', requireAdmin, (req, res) => {
     adminEmail: getSetting('adminEmail'), gstPercent: gstPercent(),
     rzpKeyId: getSetting('rzpKeyId') || '', rzpSecretSet: !!getSetting('rzpKeySecret'),
     gstApiKeySet: !!getSetting('gstApiKey'),
-    remProvider: rs('remProvider'), remBefore: rs('remBefore'), remOnDue: rs('remOnDue'),
+    remProvider: rs('remProvider'), remAuto: getSetting('remAuto') === '0' ? '0' : '1',
+    remBefore: rs('remBefore'), remOnDue: rs('remOnDue'),
     remAfter: rs('remAfter'), remHour: rs('remHour'), remTemplate: rs('remTemplate'),
     waPhoneId: getSetting('waPhoneId') || '', waTokenSet: !!getSetting('waToken'),
+    smsProvider: ss('smsProvider'), smsRoute: ss('smsRoute'),
+    smtpHost: getSetting('smtpHost') || '', smtpPort: getSetting('smtpPort') || '587',
+    smtpUser: getSetting('smtpUser') || '', smtpFrom: getSetting('smtpFrom') || '',
+    smtpFromName: getSetting('smtpFromName') || 'Blue Wave', smtpPassSet: !!getSetting('smtpPass'),
+    smsTemplateId: getSetting('smsTemplateId') || '',
+    twilioSid: getSetting('twilioSid') || '', twilioFrom: getSetting('twilioFrom') || '',
+    twilioTokenSet: !!getSetting('twilioToken'),
     smsSender: getSetting('smsSender') || '', smsKeySet: !!getSetting('smsKey'),
   });
 });
@@ -1410,9 +1769,11 @@ app.get('/api/admin/settings', requireAdmin, (req, res) => {
 app.put('/api/admin/settings', requireAdmin, (req, res) => {
   const b = req.body || {};
   for (const k of ['payeeName', 'bankName', 'accountNo', 'ifsc', 'whatsapp', 'adminEmail', 'rzpKeyId',
-    'remProvider', 'remBefore', 'remOnDue', 'remAfter', 'remHour', 'remTemplate', 'waPhoneId', 'smsSender'])
+    'remProvider', 'remAuto', 'remBefore', 'remOnDue', 'remAfter', 'remHour', 'remTemplate', 'waPhoneId', 'smsSender',
+    'smsProvider', 'smsRoute', 'smsTemplateId', 'twilioSid', 'twilioFrom',
+    'smtpHost', 'smtpPort', 'smtpUser', 'smtpFrom', 'smtpFromName'])
     if (b[k] !== undefined) setSetting(k, String(b[k]).trim());
-  for (const k of ['waToken', 'smsKey'])
+  for (const k of ['waToken', 'smsKey', 'twilioToken', 'smtpPass'])
     if (b[k] !== undefined && String(b[k]).trim() !== '') setSetting(k, String(b[k]).trim());
   if (b.gstPercent !== undefined) { const g = parseFloat(b.gstPercent); if (isFinite(g) && g >= 0 && g <= 100) setSetting('gstPercent', g); }
   if (b.rzpKeySecret !== undefined && String(b.rzpKeySecret).trim() !== '')
