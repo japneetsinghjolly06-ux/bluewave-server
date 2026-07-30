@@ -23,7 +23,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Britannic Bold','Britannic','Arial Narrow','Segoe UI Semibold',system-ui,-apple-system,'Segoe UI',sans-serif;
-  color:var(--ink);font-size:15px;padding-bottom:78px;min-height:100vh;position:relative;
+  color:var(--ink);font-size:15px;padding-bottom:calc(78px + env(safe-area-inset-bottom,0px));min-height:100vh;position:relative;
   background:#ffffff}
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;width:100%;background:#fff}
@@ -54,7 +54,65 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .hdrback{background:none;border:none;font-size:25px;line-height:1;padding:2px 10px 2px 0;color:var(--brand-dark);font-weight:700;cursor:pointer;-webkit-tap-highlight-color:rgba(23,134,196,.15)}
 .hdrback:active{opacity:.55}
 .bellbtn{position:relative;background:none;border:none;font-size:21px;line-height:1;padding:4px 2px;color:var(--brand-dark)}
-.belldot{position:absolute;top:2px;right:0;width:9px;height:9px;border-radius:50%;background:var(--accent);border:1.5px solid #fff}
+.belldot{position:absolute;top:-2px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:var(--red);
+  border:1.5px solid #fff;color:#fff;font-size:10.5px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1}
+
+/* on-screen notification popups */
+#npops{position:fixed;top:8px;left:0;right:0;z-index:400;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.npop{pointer-events:auto;width:min(94%,430px);display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid var(--line);
+  border-left:4px solid var(--blue);border-radius:12px;padding:11px 12px;box-shadow:0 10px 30px rgba(11,42,74,.18);
+  transform:translateY(-16px);opacity:0;transition:transform .28s ease,opacity .28s ease;cursor:pointer}
+.npop.on{transform:translateY(0);opacity:1}
+.npop .ni{font-size:19px;line-height:1.1}
+.npop .nt{flex:1;display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--ink)}
+.npop .nt b{font-size:13.5px}
+.npop .nt span{color:var(--mut);font-size:12.5px;line-height:1.45}
+.npop .nx{background:none;border:none;color:var(--mut);font-size:14px;padding:0 2px;line-height:1}
+.citem.unread{background:#f2fbff;border-radius:10px}
+
+/* ===== registrations: a name list, then a full page per business ===== */
+.reglist{display:flex;flex-direction:column;gap:8px}
+.regrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
+  border-left:3px solid var(--blue);border-radius:8px;padding:12px;font-family:inherit;font-size:14px}
+.regrow:active{background:#f7fbfe}
+.rrmain{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.rrco{font-size:14.5px;font-weight:700;color:var(--brand-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rrsub{font-size:12px;color:var(--mut)}
+.rrtags{display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:4px;border:1px solid var(--line);color:var(--mut);background:#fafcfe;white-space:nowrap}
+.tag.yes{color:#1a7a4f;border-color:#bfe6d2;background:#f2fbf6}
+.tag.no{color:#9a4b4b;border-color:#f0cccc;background:#fdf5f5}
+
+/* the detail page */
+.dthead{padding:2px 2px 12px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.dtco{font-size:19px;font-weight:700;color:var(--brand-dark);line-height:1.25;overflow-wrap:anywhere}
+.dtsub{font-size:12.5px;color:var(--mut);margin:3px 0 9px}
+.dttags{display:flex;gap:6px;flex-wrap:wrap}
+.dtblock{background:#fff;border:1px solid var(--line);border-radius:10px;padding:13px 14px;margin-bottom:12px;overflow-wrap:anywhere}
+.dtbt{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--mut);
+  padding-bottom:8px;margin-bottom:2px;border-bottom:1px solid var(--line)}
+.dtrow{display:block;padding:9px 0;border-bottom:1px solid #f0f5fa}
+.dtrow:last-child{border-bottom:none;padding-bottom:2px}
+.dtk{display:block;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--mut);margin-bottom:3px}
+.dtv{display:block;font-size:14px;color:var(--ink);line-height:1.55}
+.dtv .gstin-code{display:inline-block;max-width:100%}
+.lnk{display:inline-block;margin:2px 0 0 8px;font-size:12px;color:var(--blue);text-decoration:none;
+  border-bottom:1px solid rgba(27,166,224,.4);white-space:nowrap}
+.dtblock .wide{margin-top:8px;max-width:100%}
+
+/* order tracking timeline */
+.tline{display:flex;flex-direction:column;margin:2px 0 0}
+.tstep{display:flex;gap:11px;align-items:flex-start;position:relative;padding:0 0 14px}
+.tstep:last-child{padding-bottom:0}
+.tstep:not(:last-child)::before{content:'';position:absolute;left:9px;top:20px;bottom:0;width:2px;background:var(--line)}
+.tstep.ok:not(:last-child)::before{background:var(--green)}
+.tdot{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);background:#fff;color:#fff;
+  font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;font-weight:700}
+.tstep.ok .tdot{background:var(--green);border-color:var(--green)}
+.tbody{display:flex;flex-direction:column;gap:1px;font-size:13.5px;color:var(--mut)}
+.tstep.ok .tbody b{color:var(--ink)}
+.tbody b{font-size:13.5px;color:var(--mut)}
+.tbody span{font-size:12.5px;color:var(--mut)}
 .userchip{display:flex;align-items:center;gap:7px;background:var(--blue-lt);padding:6px 11px;border-radius:9px;font-size:12.5px;cursor:pointer;color:var(--brand-dark)}
 .userchip .dot{width:8px;height:8px;border-radius:50%}
 
@@ -400,6 +458,7 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   <section id="view-auth" class="view"></section>
   <section id="view-checkout" class="view"></section>
   <section id="view-admin" class="view"></section>
+  <section id="view-reg" class="view"></section>
 </main>
 
 <nav class="bnav" id="bnav"></nav>
@@ -465,7 +524,7 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
 <script>
 /* ============ API LAYER ============ */
 let token=localStorage.getItem('bw_token')||'';
-const state={products:[],role:null,user:null,payInfo:null,transports:[]};
+const state={products:[],role:null,user:null,payInfo:null,transports:[],offer:null,notifs:{unread:0,items:[]}};
 async function api(path,method='GET',body){
   const r=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
   let d={};try{d=await r.json()}catch(e){}
@@ -474,7 +533,17 @@ async function api(path,method='GET',body){
   return d;
 }
 async function refreshMe(){const d=await api('/me');state.role=d.role;state.user=d.user||null}
-async function refreshProducts(){state.products=await api('/products')}
+async function refreshProducts(){
+  const d=await api('/products');
+  if(Array.isArray(d)){state.products=d;state.offer=null}
+  else{state.products=d.products||[];state.offer=d.offer||null}
+}
+function offerBanner(){
+  const o=state.offer;
+  if(!o||!o.percent)return '';
+  return `<div class="notice ok" style="background:linear-gradient(120deg,#fff3d9,#ffe6bd);border-color:#ffcf85;color:#7a4a00">
+    🎉 <b>${esc(o.name)}</b> — extra <b>${o.percent}% off</b> your dealer prices${o.ends?' until '+esc(o.ends):''}. Already applied to every rate you see.</div>`;
+}
 async function refreshTransports(){try{state.transports=await api('/transports')}catch(e){state.transports=[]}}
 
 /* ============ HELPERS ============ */
@@ -562,7 +631,9 @@ function showView(v){
   if(v==='orders')renderOrdersView();
   if(v==='profile')renderProfile();
   if(v==='admin')renderAdmin(adminTab);
+  if(v==='reg')renderRegDetail();
   renderNav();window.scrollTo(0,0);
+  try{sessionStorage.setItem('bw_view',v)}catch(e){}
 }
 /* black outline icons for the bottom navigation */
 const svgIcon=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
@@ -625,44 +696,96 @@ function renderNav(){
 }
 function renderHeader(){
   const b=$('hdrBack');
-  if(b){b.style.display=['product','auth','checkout','shop'].includes(currentView)?'block':'none';
-    b.onclick=currentView==='auth'?closeAuth:currentView==='checkout'?closeCheckout:currentView==='shop'?()=>showView('category'):closeProduct;}
+  if(b){b.style.display=['product','auth','checkout','shop','reg'].includes(currentView)?'block':'none';
+    b.onclick=currentView==='auth'?closeAuth:currentView==='checkout'?closeCheckout:currentView==='shop'?()=>showView('category')
+      :currentView==='reg'?closeRegDetail:closeProduct;}
   const h=$('hdrAuth');
   h.innerHTML=`<button class="bellbtn" onclick="openNotifications()" title="Notifications">${PICON.bell}<span class="belldot" id="bellDot" style="display:none"></span></button>`;
   updateBell();
 }
-function notifItems(){
-  const u=currentUser(),out=[];
-  if(isAdmin())return out;
-  if(!u)out.push(['👋','Welcome to Blue Wave','Register your business with GSTIN to unlock wholesale dealer pricing.']);
-  else if(u.status==='pending')out.push(['⏳','Approval pending','Our team is verifying your GSTIN. Dealer pricing unlocks on approval.']);
-  else if(u.status==='approved')out.push(['✅','Dealer pricing active','Wholesale rates are applied to your cart automatically.']);
-  else if(u.status==='rejected')out.push(['⚠️','Registration not approved',u.note||'Contact sales@hpmpmanufacturerspvtltd.com for help.']);
-  (lastOrders||[]).slice(0,4).forEach(o=>{
-    if(o.lrNumber)out.push(['🚚','Order '+o.id+' dispatched','Sent via '+(o.dispatchTransport||'transport')+' · LR '+o.lrNumber]);
-    else if(o.status==='awaiting_payment')out.push(['💳','Payment pending for '+o.id,'Complete payment to start processing your order.']);
-    else out.push(['📦','Order '+o.id,STATUS_LABEL[o.status]]);
-  });
-  return out;
+/* ============ NOTIFICATIONS ============
+   Orders, registrations, approvals and offers arrive from the server. New ones
+   pop up on screen while the app is open and stay in the bell list. */
+let notifSeen=new Set();
+let notifTimer=null;
+function loadSeen(){
+  try{notifSeen=new Set(JSON.parse(localStorage.getItem('bw_notif_seen')||'[]'))}catch(e){notifSeen=new Set()}
 }
+function saveSeen(){
+  try{localStorage.setItem('bw_notif_seen',JSON.stringify([...notifSeen].slice(-200)))}catch(e){}
+}
+async function refreshNotifs(popup){
+  if(!isAdmin()&&!currentUser()){state.notifs={unread:0,items:[]};updateBell();return}
+  try{
+    const d=await api('/notifications');
+    state.notifs=d||{unread:0,items:[]};
+    const fresh=(state.notifs.items||[]).filter(n=>!n.read&&!notifSeen.has(n.id));
+    if(popup)fresh.slice(0,2).reverse().forEach((n,i)=>setTimeout(()=>notifPopup(n),i*600));
+    fresh.forEach(n=>notifSeen.add(n.id));
+    if(fresh.length)saveSeen();
+    updateBell();
+  }catch(e){}
+}
+function startNotifPolling(){
+  if(notifTimer)clearInterval(notifTimer);
+  notifTimer=setInterval(()=>refreshNotifs(true),30000);
+}
+function notifPopup(n){
+  const box=$('npops')||(()=>{const d=document.createElement('div');d.id='npops';document.body.appendChild(d);return d})();
+  const el=document.createElement('div');
+  el.className='npop';
+  el.innerHTML=`<span class="ni">${NICON[n.kind]||'🔔'}</span>
+    <span class="nt"><b>${esc(n.title)}</b><span>${esc(n.body)}</span></span>
+    <button class="nx" aria-label="Dismiss">✕</button>`;
+  el.querySelector('.nx').onclick=e=>{e.stopPropagation();el.remove()};
+  el.onclick=()=>{el.remove();openNotifications()};
+  box.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('on'));
+  setTimeout(()=>{el.classList.remove('on');setTimeout(()=>el.remove(),400)},7000);
+}
+const NICON={registration:'🧾',order:'📦',approval:'✅',offer:'🎉',credit:'💳',verify:'🔐'};
 function updateBell(){
   const dot=$('bellDot');if(!dot)return;
-  const n=notifItems().length;
-  dot.style.display=n?'block':'none';
+  const n=(state.notifs&&state.notifs.unread)||0;
+  dot.style.display=n?'flex':'none';
+  dot.textContent=n>9?'9+':String(n||'');
 }
-function openNotifications(){
-  const items=notifItems();
-  genModal('🔔 Notifications',items.length?items.map(i=>`<div class="citem" style="align-items:flex-start">
-    <div style="font-size:20px">${i[0]}</div>
-    <div style="flex:1"><div class="nm">${esc(i[1])}</div><div class="pr">${esc(i[2])}</div></div></div>`).join('')
-    :'<div class="empty"><span class="big">🔔</span>No new notifications.</div>');
+function whenAgo(iso){
+  const s=Math.floor((Date.now()-new Date(iso).getTime())/1000);
+  if(s<60)return 'just now';
+  if(s<3600)return Math.floor(s/60)+' min ago';
+  if(s<86400)return Math.floor(s/3600)+' hr ago';
+  if(s<604800)return Math.floor(s/86400)+' d ago';
+  return new Date(iso).toLocaleDateString('en-IN');
 }
+async function openNotifications(){
+  await refreshNotifs(false);
+  const items=(state.notifs&&state.notifs.items)||[];
+  genModal('🔔 Notifications',(items.length?items.map(n=>`<div class="citem ${n.read?'':'unread'}" style="align-items:flex-start">
+      <div style="font-size:20px">${NICON[n.kind]||'🔔'}</div>
+      <div style="flex:1"><div class="nm">${esc(n.title)}</div><div class="pr">${esc(n.body)}</div>
+      <div class="hint" style="margin:2px 0 0">${whenAgo(n.createdAt)}</div></div></div>`).join('')
+    :'<div class="empty"><span class="big">🔔</span>Nothing new right now.</div>')
+    +(items.length?`<button class="wide ghost" onclick="markNotifsRead()">Mark all as read</button>
+      <button class="wide ghost" onclick="clearNotifs()">Clear the list</button>`:''));
+  if(items.some(n=>!n.read))markNotifsRead(true);
+}
+async function markNotifsRead(quiet){
+  try{await api('/notifications/read','POST',{});await refreshNotifs(false);if(!quiet)openNotifications()}catch(e){}
+}
+async function clearNotifs(){
+  try{await api('/notifications','DELETE');await refreshNotifs(false);closeModal('modal-gen');toast('Notifications cleared')}catch(e){toast(e.message,1)}
+}
+
 let lastOrders=[];
 async function logout(){
-  if(!confirm('Log out?'))return;
+  /* No confirm() here on purpose: logging out is harmless, and a browser
+     confirm box is blocked inside the iPhone app, which made the button
+     look dead. */
   try{await api('/logout','POST')}catch(e){}
   token='';localStorage.removeItem('bw_token');state.role=null;state.user=null;
-  await refreshProducts();renderHeader();showView('home');toast('Logged out');
+  state.notifs={unread:0,items:[]};
+  await refreshProducts();renderHeader();updateBell();showView('home');toast('Logged out');
 }
 
 /* ============ HOME ============ */
@@ -674,6 +797,7 @@ function renderHome(){
     :u&&u.status==='approved'?`<div class="notice ok">✅ Welcome back, <b>${esc(u.company)}</b> — dealer pricing is active.</div>`
     :u&&u.status==='pending'?`<div class="notice warn">⏳ Your dealer account is pending approval — you can order at MRP meanwhile.</div>`:'';
   $('view-home').innerHTML=`
+  ${offerBanner()}
   <div class="hero">
     <div class="rating">⭐ Trusted by dealers &amp; distributors across India</div>
     <h1>Premium AC brackets &amp; heavy-duty appliance trolleys, built to perform</h1>
@@ -1026,6 +1150,7 @@ async function doLogin(){
     token=d.token;localStorage.setItem('bw_token',token);
     state.role=d.role;state.user=d.user||null;
     await refreshProducts();renderHeader();
+    refreshNotifs(true);
     if(d.role==='admin'){showView('admin');toast('Welcome, Admin')}
     else if(d.user.status==='approved'){showView('shop');toast('Welcome back — dealer pricing active')}
     else{showView('profile');toast('Signed in — account '+USTATUS_LABEL[d.user.status].toLowerCase())}
@@ -1118,6 +1243,40 @@ async function renderOrdersView(){
 
 /* ============ PROFILE ============ */
 function genModal(title,html){$('genBox').innerHTML=`<button class="mx" onclick="closeModal('modal-gen')">✕</button><div class="mtitle">${title}</div>${html}`;openModal('modal-gen')}
+/* Customer-side verification. The code is issued at registration and passed on
+   by the admin over WhatsApp or email, which proves the number/address is real. */
+function verifyPanel(){
+  const u=currentUser();
+  if(!u||(u.mobileOk&&u.emailOk))return '';
+  return `<div class="cardbox" style="border:1px solid #ffd9a0;background:#fffaf0">
+    <h3>🔐 Verify your contact details</h3>
+    <div class="hint" style="margin-bottom:10px">We send a 6-digit code to your WhatsApp number and your email. Entering them confirms we can reach you about orders and dispatch.</div>
+    ${u.mobileOk?'<div class="notice ok">✓ Mobile number verified</div>':`
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div style="max-width:190px"><label>Mobile code (${esc(u.whatsapp||u.phone)})</label>
+          <input id="vf-mobile" inputmode="numeric" maxlength="6" placeholder="6 digits"></div>
+        <button class="smallbtn ok-btn" onclick="submitVerify('mobile')">Verify mobile</button>
+      </div>`}
+    ${u.emailOk?'<div class="notice ok" style="margin-top:8px">✓ Email verified</div>':`
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:10px">
+        <div style="max-width:190px"><label>Email code (${esc(u.email)})</label>
+          <input id="vf-email" inputmode="numeric" maxlength="6" placeholder="6 digits"></div>
+        <button class="smallbtn ok-btn" onclick="submitVerify('email')">Verify email</button>
+      </div>`}
+    <div class="hint" style="margin-top:10px">Not received it? WhatsApp us on <b>${esc((state.payInfo&&state.payInfo.whatsapp)||'+91 79952 65800')}</b> and we'll resend.</div>
+  </div>`;
+}
+async function submitVerify(kind){
+  const el=$('vf-'+kind);if(!el)return;
+  const code=el.value.trim();
+  if(!/^\d{6}$/.test(code))return toast('Enter the 6-digit code',1);
+  try{
+    const d=await api('/verify','POST',{kind,code});
+    state.user=d.user;
+    toast(kind==='mobile'?'✓ Mobile number verified':'✓ Email verified');
+    renderProfile();renderHeader();
+  }catch(e){toast(e.message,1)}
+}
 async function renderProfile(){
   renderHeader();
   const v=$('view-profile');
@@ -1145,6 +1304,7 @@ async function renderProfile(){
       <button class="pf-edit" onclick="${u?'pfAddress()':`openAuth('register')`}" title="Edit">${PICON.pencil}</button>
     </div>
     ${badges}
+    ${verifyPanel()}
     <div class="plist">${rows.map(r=>`<button class="prow" onclick="${r[2]}"><span class="pi">${r[0]}</span><span class="pl">${r[1]}</span><span class="chev">›</span></button>`).join('')}</div>
     <div style="margin-top:30px">${(u||isAdmin())?`<button class="wide ghost" onclick="logout()"><span class="btn-ic">${PICON.logout}</span> Logout</button>`:`<button class="wide blue" onclick="openAuth('login')"><span class="btn-ic">${PICON.key}</span> Login</button>`}</div>`;
 }
@@ -1264,7 +1424,7 @@ async function renderAdmin(tab){
   let ov={users:0,pending:0,orders:0,paySubmitted:0,revenue:0};
   try{ov=await api('/admin/overview')}catch(e){toast(e.message,1)}
   let credOverdue=0;try{credOverdue=(await api('/admin/credit')).overdue}catch(e){}
-  const tabs=[['regs','🧾 Registrations',ov.pending],['credit','💳 Credit',credOverdue],['pricing','💰 Pricing',0],['logistics','🚚 Logistics',0],['settings','⚙️ Settings',0]];
+  const tabs=[['regs','🧾 Registrations',ov.pending],['credit','💳 Credit',credOverdue],['pricing','💰 Pricing',0],['offers','🎉 Offers',0],['logistics','🚚 Logistics',0],['settings','⚙️ Settings',0]];
   v.innerHTML=`<div class="pf-head" style="justify-content:space-between;padding:6px 2px 12px">
       <h2 style="font-size:19px">⚙️ Admin panel</h2>
       <button class="smallbtn gr-btn" onclick="logout()">↪ Logout</button>
@@ -1281,36 +1441,109 @@ async function renderAdmin(tab){
     if(adminTab==='regs')await renderRegs();
     if(adminTab==='pricing')await renderPricing();
     if(adminTab==='credit')await renderCredit();
+    if(adminTab==='offers')await renderOffers();
     if(adminTab==='logistics')await renderLogistics();
     if(adminTab==='settings')await renderSettings();
   }catch(e){$('adminBody').innerHTML='<div class="empty">⚠️ '+esc(e.message)+'</div>'}
 }
 async function renderRegs(){
   const users=await api('/admin/users');
-  $('adminBody').innerHTML=`<div class="cardbox"><h3>Dealer registration approvals</h3>
-    <div class="hint" style="margin-bottom:10px">Verify each GSTIN on the <a href="https://services.gst.gov.in/services/searchtp" target="_blank">GST portal</a> before approving. Approved dealers instantly see wholesale pricing.</div>
-    ${users.length?users.map(u=>`
-      <div class="regdetail" style="background:#fff;border:1px solid var(--line)">
-        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center">
-          <div><b>${esc(u.company)}</b> · ${esc(u.type)} <span class="badge b-${u.status}">${USTATUS_LABEL[u.status]}</span>
-          ${u.status==='approved'?(u.terms==='credit'?`<span class="badge b-shipped">💳 Credit · ${u.creditDays||30} days</span>`:`<span class="badge b-approved">💰 Advance payment</span>`):''}</div>
-          <div>
-            ${u.status!=='approved'?`<button class="smallbtn ok-btn" onclick="setUserStatus('${u.id}','approved','advance')">✓ Approve · Advance</button>
-            <button class="smallbtn ok-btn" style="background:#5b3fb0" onclick="setUserStatus('${u.id}','approved','credit')">✓ Approve · Credit</button>`
-            :`<button class="smallbtn gr-btn" onclick="setUserStatus('${u.id}','approved','${u.terms==='credit'?'advance':'credit'}')">↔ Switch to ${u.terms==='credit'?'Advance':'Credit'}</button>`}
-            ${u.status!=='rejected'?`<button class="smallbtn no-btn" onclick="setUserStatus('${u.id}','rejected')">✕ Reject</button>`:''}
-            ${u.status==='approved'?`<button class="smallbtn gr-btn" onclick="dealerPrices('${u.id}')">💰 Set prices</button>`:''}
-            <button class="smallbtn gr-btn" onclick="editDealer('${u.id}')">✏️ Edit details</button>
-            <button class="smallbtn no-btn" style="background:#7a1f1f" onclick="delUser('${u.id}','${esc(u.company)}')">🗑 Delete account</button>
-          </div>
-        </div>
-        👤 ${esc(u.name)} · 📞 ${esc(u.phone)} · 📧 ${esc(u.email)}<br>
-        💬 WhatsApp: <b>${esc(u.whatsapp||u.phone)}</b> <a href="https://wa.me/91${esc(String(u.whatsapp||u.phone).replace(/\D/g,'').slice(-10))}" target="_blank"><button class="copybtn">Chat</button></a><br>
-        GSTIN: <span class="gstin-code">${esc(u.gstin)}</span> <button class="copybtn" onclick="copyTxt('${esc(u.gstin)}')">Copy</button> <button class="copybtn" onclick="verifyGstin('${esc(u.gstin)}')">🔍 Verify</button><br>
-        📍 ${esc(u.addr)}, ${esc(u.city)}, ${esc(u.state)}${u.pincode?' - '+esc(u.pincode):''} · Registered ${new Date(u.createdAt).toLocaleDateString('en-IN')}
-        ${u.note?`<br>📝 Note: ${esc(u.note)}`:''}
-      </div>`).join(''):'<div class="empty"><span class="big">🧾</span>No registrations yet.</div>'}
+  regCache=users;
+  const pend=users.filter(u=>u.status==='pending').length;
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>Dealer registrations</h3>
+    <div class="hint" style="margin-bottom:12px">${users.length} account${users.length===1?'':'s'}${pend?` · ${pend} awaiting review`:''}. Tap a business to see full details and approve.</div>
+    ${users.length?`<div class="reglist">${users.map(u=>`
+      <button class="regrow" onclick="openRegDetail('${u.id}')">
+        <span class="rrmain">
+          <span class="rrco">${esc(u.company)}</span>
+          <span class="rrsub">${esc(u.type)}${u.city?' · '+esc(u.city):''}</span>
+        </span>
+        <span class="rrtags">
+          <span class="badge b-${u.status}">${USTATUS_LABEL[u.status]}</span>
+          ${!(u.mobileOk&&u.emailOk)?'<span class="tag no">unverified</span>':''}
+        </span>
+        <span class="chev">›</span>
+      </button>`).join('')}</div>`
+    :'<div class="empty">No registrations yet. New applications appear here for review.</div>'}
   </div>`;
+}
+let regCache=[],regViewId='';
+function openRegDetail(id){regViewId=id;showView('reg')}
+function closeRegDetail(){showView('admin')}
+async function refreshRegScreen(){
+  if(currentView==='reg'){await renderRegDetail();return}
+  renderAdmin('regs');
+}
+async function renderRegDetail(){
+  const v=$('view-reg');
+  v.innerHTML='<div class="empty">Loading…</div>';
+  let u;
+  try{
+    const users=await api('/admin/users');
+    regCache=users;
+    u=users.find(x=>x.id===regViewId);
+  }catch(e){v.innerHTML='<div class="empty">'+esc(e.message)+'</div>';return}
+  if(!u){v.innerHTML='<div class="empty">This account no longer exists.<br><br><button class="wide ghost" style="max-width:220px" onclick="closeRegDetail()">Back to registrations</button></div>';return}
+  const wa=String(u.whatsapp||u.phone).replace(/\D/g,'').slice(-10);
+  const row=(label,value)=>`<div class="dtrow"><div class="dtk">${label}</div><div class="dtv">${value}</div></div>`;
+  v.innerHTML=`
+    <div class="dthead">
+      <div class="dtco">${esc(u.company)}</div>
+      <div class="dtsub">${esc(u.type)} · applied ${new Date(u.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
+      <div class="dttags">
+        <span class="badge b-${u.status}">${USTATUS_LABEL[u.status]}</span>
+        ${u.status==='approved'?(u.terms==='credit'?`<span class="badge b-shipped">Credit ${u.creditDays||30} days</span>`:`<span class="badge b-approved">Advance payment</span>`):''}
+        ${u.discount?`<span class="badge b-approved">${u.discount}% extra discount</span>`:''}
+        <span class="tag ${u.mobileOk?'yes':'no'}">Mobile ${u.mobileOk?'verified':'unverified'}</span>
+        <span class="tag ${u.emailOk?'yes':'no'}">Email ${u.emailOk?'verified':'unverified'}</span>
+      </div>
+    </div>
+
+    <div class="dtblock">
+      <div class="dtbt">Business details</div>
+      ${row('Contact person',esc(u.name))}
+      ${row('Mobile',`${esc(u.phone)} <a class="lnk" href="tel:${esc(u.phone)}">Call</a>`)}
+      ${row('WhatsApp',`${esc(u.whatsapp||u.phone)} <a class="lnk" href="https://wa.me/91${wa}" target="_blank">Message</a>`)}
+      ${row('Email',esc(u.email))}
+      ${row('GSTIN',`<span class="gstin-code">${esc(u.gstin)}</span>
+        <a class="lnk" href="javascript:copyTxt('${esc(u.gstin)}')">Copy</a>
+        <a class="lnk" href="javascript:verifyGstin('${esc(u.gstin)}')">Check</a>`)}
+      ${row('Address',`${esc(u.addr)}<br>${esc(u.city)}, ${esc(u.state)}${u.pincode?' - '+esc(u.pincode):''}`)}
+      ${u.note?row('Note',esc(u.note)):''}
+    </div>
+
+    ${!(u.mobileOk&&u.emailOk)?`<div class="dtblock">
+      <div class="dtbt">Pending verification</div>
+      <div class="hint" style="margin:0 0 8px">Pass the code to the applicant; they enter it under Profile in the app.</div>
+      ${!u.mobileOk?row('Mobile code',`<b class="gstin-code">${esc(u.mobileCode||'—')}</b>
+        <a class="lnk" href="https://wa.me/91${wa}?text=${encodeURIComponent('Blue Wave verification code: '+(u.mobileCode||'')+'. Enter it in the app under Profile to verify your mobile number.')}" target="_blank">Send on WhatsApp</a>
+        <a class="lnk" href="javascript:newCode('${u.id}','mobile')">Reissue</a>`):''}
+      ${!u.emailOk?row('Email code',`<b class="gstin-code">${esc(u.emailCode||'—')}</b>
+        <a class="lnk" href="mailto:${esc(u.email)}?subject=${encodeURIComponent('Blue Wave email verification')}&body=${encodeURIComponent('Your Blue Wave email verification code is '+(u.emailCode||'')+'. Enter it in the app under Profile.')}">Send by email</a>
+        <a class="lnk" href="javascript:newCode('${u.id}','email')">Reissue</a>`):''}
+    </div>`:''}
+
+    ${u.status==='approved'?`<div class="dtblock">
+      <div class="dtbt">Pricing for this account</div>
+      <label>Extra discount % off dealer price</label>
+      <input id="dc-${u.id}" type="number" min="0" max="90" step="0.5" value="${u.discount||0}">
+      <div class="hint">Applied on top of their dealer rate, and stacks with any festive offer running.</div>
+      <button class="wide blue" style="margin-top:10px" onclick="saveDiscount('${u.id}')">Save discount</button>
+      <button class="wide ghost" onclick="dealerPrices('${u.id}')">Set item-wise prices</button>
+    </div>`:''}
+
+    <div class="dtblock">
+      <div class="dtbt">Actions</div>
+      ${u.status!=='approved'?`
+        <button class="wide blue" onclick="setUserStatus('${u.id}','approved','advance')">Approve — advance payment</button>
+        <button class="wide blue" style="background:#5b3fb0" onclick="setUserStatus('${u.id}','approved','credit')">Approve — credit account</button>`
+        :`<button class="wide ghost" onclick="setUserStatus('${u.id}','approved','${u.terms==='credit'?'advance':'credit'}')">Switch to ${u.terms==='credit'?'advance payment':'credit account'}</button>`}
+      ${u.status!=='rejected'?`<button class="wide ghost" onclick="setUserStatus('${u.id}','rejected')">Reject application</button>`:''}
+      <button class="wide ghost" onclick="editDealer('${u.id}')">Edit details</button>
+      <button class="wide ghost" style="color:var(--red);border-color:#f0c0c0" onclick="delUser('${u.id}','${esc(u.company)}')">Delete account</button>
+    </div>
+    <button class="wide ghost" style="margin-top:6px" onclick="closeRegDetail()">Back to registrations</button>`;
+  window.scrollTo(0,0);
 }
 async function editDealer(uid){
   try{
@@ -1379,21 +1612,41 @@ async function delUser(id,company){
   if(!confirm('Delete the account of "'+company+'" permanently? Their past orders keep their records.'))return;
   const pw=prompt('🔐 Enter the ADMIN password to verify this deletion:');
   if(pw===null)return;
-  try{await api('/admin/users/'+id+'/delete','POST',{password:pw});toast('🗑 Account deleted: '+company);renderAdmin('regs')}
+  try{await api('/admin/users/'+id+'/delete','POST',{password:pw});toast('Account deleted: '+company);
+    if(currentView==='reg')closeRegDetail();else renderAdmin('regs')}
+  catch(e){toast(e.message,1)}
+}
+async function saveDiscount(id){
+  const el=$('dc-'+id);if(!el)return;
+  const discount=Number(el.value);
+  if(!isFinite(discount)||discount<0||discount>90)return toast('Discount must be between 0 and 90',1);
+  try{await api('/admin/users/'+id+'/status','POST',{status:'approved',discount});
+    toast(discount?discount+'% extra discount applied':'Extra discount removed');refreshRegScreen()}
+  catch(e){toast(e.message,1)}
+}
+async function newCode(id,kind){
+  try{const d=await api('/admin/users/'+id+'/recode','POST',{kind});
+    toast('New '+kind+' code: '+d.code);refreshRegScreen()}
   catch(e){toast(e.message,1)}
 }
 async function setUserStatus(id,st,terms){
   let note='',creditDays=0;
   if(st==='rejected'){note=prompt('Reason for rejection (shown to the applicant):','Details could not be verified');if(note===null)return}
+  let discount=0;
   if(st==='approved'&&terms==='credit'){
     const d=prompt('Credit period in days for this customer:','30');
     if(d===null)return;
     creditDays=Math.max(1,parseInt(d)||30);
   }
+  if(st==='approved'){
+    const g=prompt('Extra discount for this customer, % off the dealer price (0 for none):','0');
+    if(g===null)return;
+    discount=Math.max(0,Math.min(90,parseFloat(g)||0));
+  }
   try{
-    await api('/admin/users/'+id+'/status','POST',{status:st,note,...(terms?{terms,creditDays}:{})});
-    toast(st==='rejected'?'Registration rejected':terms==='credit'?'✅ Approved as credit customer ('+creditDays+' days)':'✅ Approved on advance payment basis');
-    renderAdmin('regs');
+    await api('/admin/users/'+id+'/status','POST',{status:st,note,discount,...(terms?{terms,creditDays}:{})});
+    toast(st==='rejected'?'Registration rejected':terms==='credit'?'Approved as credit customer ('+creditDays+' days)':'Approved on advance payment basis');
+    refreshRegScreen();
   }catch(e){toast(e.message,1)}
 }
 async function renderOrders(){
@@ -1578,6 +1831,31 @@ function printDocument(inner){
 }
 
 /* customer-facing order card — same clear item-wise layout the admin sees */
+/* Step-by-step tracking for the dealer's own orders */
+function trackTimeline(o){
+  const done=s=>{
+    const order=['awaiting_payment','payment_submitted','paid','confirmed','shipped','delivered'];
+    if(o.status==='cancelled')return false;
+    return order.indexOf(o.status)>=order.indexOf(s);
+  };
+  const dispatchLine=o.dispatchMode==='local'&&o.vehicleNo
+      ? 'Local delivery · vehicle '+o.vehicleNo+(o.driverName?' · '+o.driverName:'')
+      : o.lrNumber ? (o.dispatchTransport||'Transport')+' · LR '+o.lrNumber : 'Being handed to transport';
+  const steps=[
+    ['Order placed',new Date(o.createdAt).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}),true],
+    [o.status==='awaiting_payment'?'Payment pending':'Payment received',o.payRef?'Reference '+o.payRef:'',done('payment_submitted')],
+    ['Confirmed by Blue Wave','Packing your material',done('confirmed')],
+    ['Dispatched',done('shipped')?dispatchLine:'',done('shipped')],
+    ['Delivered',o.status==='delivered'?'Completed':'',done('delivered')]
+  ];
+  if(o.status==='cancelled')
+    return `<div class="osec"><div class="olabel">Tracking</div><div class="notice warn">This order was cancelled. Contact us if that looks wrong.</div></div>`;
+  return `<div class="osec"><div class="olabel">Tracking</div>
+    <div class="tline">${steps.map(s=>`<div class="tstep ${s[2]?'ok':''}">
+      <span class="tdot">${s[2]?'✓':''}</span>
+      <span class="tbody"><b>${esc(s[0])}</b>${s[1]?`<span>${esc(String(s[1]))}</span>`:''}</span>
+    </div>`).join('')}</div></div>`;
+}
 function myOrderCard(o){
   const taxable=o.gst?Math.round((o.total-o.gst)*100)/100:o.total;
   return `<div class="ocard">
@@ -1585,6 +1863,7 @@ function myOrderCard(o){
       <div><b>${o.id}</b><span class="oitems"> · ${new Date(o.createdAt).toLocaleDateString('en-IN')}</span></div>
       <div><span class="badge b-${o.status}">${STATUS_LABEL[o.status]}</span></div>
     </div>
+    ${trackTimeline(o)}
     <div class="osec">
       <div class="olabel">Items ordered</div>
       <table class="otable"><thead><tr><th>#</th><th>Product</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead><tbody>
@@ -1820,6 +2099,56 @@ async function runReminders(){
   try{const r=await api('/admin/credit/run','POST');toast('Checked '+(r.checked||0)+' credit orders · '+(r.sent||0)+' reminder(s) sent');renderAdmin('credit')}
   catch(e){toast(e.message,1)}
 }
+async function renderOffers(){
+  const list=await api('/admin/offers');
+  const today=new Date().toISOString().slice(0,10);
+  const live=list.filter(o=>o.active&&(!o.starts||o.starts<=today)&&(!o.ends||o.ends>=today))
+                 .sort((a,b)=>b.percent-a.percent)[0];
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>🎉 Festive offers</h3>
+    <div class="hint" style="margin-bottom:10px">A percentage off <b>dealer prices</b> for a chosen period. Guests keep seeing plain MRP. When two offers overlap the biggest one applies, and every approved dealer gets a notification the moment you create it.</div>
+    ${live?`<div class="notice ok">Running now: <b>${esc(live.name)}</b> — ${live.percent}% off dealer prices${live.ends?' until '+esc(live.ends):''}</div>`
+          :'<div class="notice info">No offer is running today. Dealers see their normal rates.</div>'}
+    <div class="frow">
+      <div><label>Offer name</label><input id="of-name" placeholder="Diwali Dhamaka"></div>
+      <div><label>Discount %</label><input id="of-pc" type="number" min="1" max="90" step="0.5" placeholder="5"></div>
+    </div>
+    <div class="frow">
+      <div><label>Starts (blank = today)</label><input id="of-from" type="date"></div>
+      <div><label>Ends (blank = no end)</label><input id="of-to" type="date"></div>
+    </div>
+    <button class="wide blue" style="max-width:260px" onclick="addOffer()">＋ Create offer</button>
+  </div>
+  <div class="cardbox"><h3>All offers</h3>
+    ${list.length?list.map(o=>{
+      const running=o.active&&(!o.starts||o.starts<=today)&&(!o.ends||o.ends>=today);
+      return `<div class="regdetail" style="background:#fff;border:1px solid var(--line)">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center">
+          <div><b>${esc(o.name)}</b> · <b>${o.percent}%</b> off dealer prices
+            ${running?'<span class="badge b-approved">Running</span>':o.active?'<span class="badge b-cancelled">Scheduled / ended</span>':'<span class="badge b-cancelled">Paused</span>'}</div>
+          <div>
+            <button class="smallbtn gr-btn" onclick="toggleOffer('${o.id}',${o.active?0:1})">${o.active?'⏸ Pause':'▶ Resume'}</button>
+            <button class="smallbtn no-btn" onclick="delOffer('${o.id}','${esc(o.name)}')">🗑 Delete</button>
+          </div>
+        </div>
+        📅 ${o.starts?esc(o.starts):'from today'} → ${o.ends?esc(o.ends):'no end date'}
+      </div>`}).join(''):'<div class="empty"><span class="big">🎉</span>No offers created yet.</div>'}
+  </div>`;
+}
+async function addOffer(){
+  const name=$('of-name').value.trim(),percent=$('of-pc').value.trim();
+  if(!name)return toast('Give the offer a name',1);
+  if(!percent)return toast('Enter the discount percentage',1);
+  try{await api('/admin/offers','POST',{name,percent,starts:$('of-from').value,ends:$('of-to').value});
+    toast('🎉 Offer created — dealers notified');renderAdmin('offers')}
+  catch(e){toast(e.message,1)}
+}
+async function toggleOffer(id,active){
+  try{await api('/admin/offers/'+id,'PUT',{active});renderAdmin('offers')}catch(e){toast(e.message,1)}
+}
+async function delOffer(id,name){
+  if(!confirm('Delete the offer "'+name+'"? Dealer prices go back to normal.'))return;
+  try{await api('/admin/offers/'+id,'DELETE');toast('Offer deleted');renderAdmin('offers')}catch(e){toast(e.message,1)}
+}
 async function renderLogistics(){
   const ts=await api('/admin/transports');
   $('adminBody').innerHTML=`<div class="cardbox"><h3>🚚 Logistics — transport list</h3>
@@ -1914,13 +2243,81 @@ async function renderSettings(){
     <div class="hint">Share only with your backend/approval team.</div>
   </div>
   <button class="wide blue" style="max-width:260px" onclick="saveSettings()">💾 Save settings</button>
+  <div class="cardbox" style="margin-top:16px"><h3>💾 Backup &amp; restore</h3>
+    <div class="hint" style="margin-bottom:10px">Saves every dealer, order, price and setting into one file. Keep a copy each week — if the hosting ever resets, restore puts everything back exactly as it was.${nativeApp()?' In the app the file goes to your phone\'s Downloads folder.':''}</div>
+    <button class="smallbtn gr-btn" onclick="downloadBackup()">⬇ Download backup</button>
+    <button class="smallbtn gr-btn" onclick="$('restoreFile').click()">⬆ Restore from backup</button>
+    <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" onchange="restoreBackup(this)">
+  </div>
   <div class="cardbox" style="margin-top:16px;border:1px solid #f0c0c0"><h3 style="color:var(--red)">⚠️ Danger zone</h3>
     <div class="hint" style="margin-bottom:10px">Each action asks for the admin password before deleting. Products, prices, transports and settings are always kept. Deletions cannot be undone.</div>
     <button class="smallbtn no-btn" onclick="resetData('accounts')">🗑 Delete ALL accounts</button>
     <button class="smallbtn no-btn" onclick="resetData('orders')">🗑 Delete ALL orders</button>
-  </div>`;
+  </div>
+  ${nativeApp()?`<div class="cardbox" style="margin-top:16px"><h3>📱 App maintenance</h3>
+    <div class="hint" style="margin-bottom:10px">Backend team only. Dealers never see these — they are inside the admin login. The server address decides which database this phone talks to.</div>
+    <div style="font-size:13px;margin-bottom:8px">Connected to: <b id="nativeSrv">${esc(location.origin.startsWith('file')?'Offline copy on this phone':location.origin)}</b></div>
+    <button class="smallbtn gr-btn" onclick="nativeCmd('server')">🌐 Server address</button>
+    <button class="smallbtn gr-btn" onclick="nativeCmd('offline')">📴 Load offline copy</button>
+  </div>`:''}`;
   const sel=$('st-remprov');
   if(sel){remKeysUI(s);sel.addEventListener('change',()=>remKeysUI(s))}
+}
+/* Native app hooks — only present inside the Android/iOS wrapper, and only
+   reachable from the admin Settings screen, so dealers never see them. */
+function nativeApp(){
+  return !!(window.BlueWaveApp||(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.BlueWaveApp));
+}
+function nativeCmd(cmd){
+  try{
+    if(window.BlueWaveApp){
+      if(cmd==='server')BlueWaveApp.serverSettings();
+      else if(cmd==='offline')BlueWaveApp.offlineDemo();
+      return;
+    }
+    if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.BlueWaveApp)
+      window.webkit.messageHandlers.BlueWaveApp.postMessage(cmd);
+  }catch(e){toast('Not available in this app version',1)}
+}
+async function downloadBackup(){
+  try{
+    const d=await api('/admin/backup');
+    const stamp=new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+    const name='bluewave-backup-'+stamp+'.json';
+    const text=JSON.stringify(d);
+    const c=d.data||{};
+    const summary=(c.users||[]).length+' accounts, '+(c.orders||[]).length+' orders';
+    /* Inside the Android/iOS app a blob download does nothing, so the file is
+       written by the app itself — Downloads folder on Android, share sheet on iPhone. */
+    if(window.BlueWaveApp&&window.BlueWaveApp.saveBackup){
+      window.BlueWaveApp.saveBackup(name,text);
+      return toast('💾 Backup saved to Downloads — '+summary);
+    }
+    if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.BlueWaveApp){
+      window.webkit.messageHandlers.BlueWaveApp.postMessage({action:'save',name:name,json:text});
+      return toast('💾 Backup ready — choose where to keep it');
+    }
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([text],{type:'application/json'}));
+    a.download=name;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast('💾 Backup saved — '+summary);
+  }catch(e){toast(e.message,1)}
+}
+async function restoreBackup(input){
+  const f=input.files&&input.files[0];input.value='';
+  if(!f)return;
+  let backup;
+  try{backup=JSON.parse(await f.text())}catch(e){return toast('That file is not readable JSON',1)}
+  if(!backup||backup.app!=='bluewave')return toast('That is not a Blue Wave backup file',1);
+  const n=(backup.data&&backup.data.users||[]).length, o=(backup.data&&backup.data.orders||[]).length;
+  if(!confirm('Restore '+n+' accounts and '+o+' orders from this backup?\n\nEverything currently in the app is replaced.'))return;
+  const pw=prompt('🔐 Enter the ADMIN password to confirm the restore:');
+  if(pw===null)return;
+  try{await api('/admin/restore','POST',{password:pw,backup});
+    toast('✅ Restored from backup');renderAdmin('regs')}
+  catch(e){toast(e.message,1)}
 }
 async function resetData(scope){
   const what=scope==='accounts'?'ALL registered business accounts':'ALL orders';
@@ -2002,7 +2399,18 @@ if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch
   try{
     await Promise.all([refreshProducts(),refreshMe(),refreshTransports(),api('/pay-info').then(d=>state.payInfo=d)]);
   }catch(e){toast('Could not reach the server — check your connection.',1)}
-  renderHeader();showView('home');
+  renderHeader();
+  loadSeen();
+  refreshNotifs(false);
+  startNotifPolling();
+  /* a reload (pull-to-refresh) keeps you on the same screen instead of
+     dropping you back at the beginning */
+  let back='home';
+  try{if(location.hash==='#open')sessionStorage.removeItem('bw_view')}catch(e){}
+  try{const v=sessionStorage.getItem('bw_view');
+    if(v&&['home','shop','category','orders','profile','admin'].includes(v))back=v}catch(e){}
+  if(back==='admin'&&!isAdmin())back='home';
+  showView(back);
 })();
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('mousedown',e=>{if(e.target===m)m.classList.remove('on')}));
 
@@ -2011,6 +2419,20 @@ document.querySelectorAll('.modal').forEach(m=>m.addEventListener('mousedown',e=
   const s=document.getElementById('splash');
   if(!s)return;
   const hide=()=>{s.classList.add('gone');setTimeout(()=>{s.style.display='none'},700)};
+  /* Only on a genuine app open. A reload inside the same session (pull to
+     refresh, admin → reload) skips straight to the app. */
+  /* The Android/iOS wrapper adds #open only when the app is actually launched;
+     a reload keeps the plain address, so the animation is skipped. */
+  let fresh=false;
+  try{fresh=location.hash==='#open'}catch(e){}
+  if(fresh){
+    try{sessionStorage.removeItem('bw_view')}catch(e){}
+    try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  }
+  let seen=false;
+  try{seen=sessionStorage.getItem('bw_opened')==='1'}catch(e){}
+  if(seen&&!fresh){s.classList.add('gone');s.style.display='none';return}
+  try{sessionStorage.setItem('bw_opened','1')}catch(e){}
   setTimeout(hide,5000);   /* opening animation ~5 seconds */
   document.addEventListener('click',()=>{if(!s.classList.contains('gone'))hide()},{once:true});
 })();
