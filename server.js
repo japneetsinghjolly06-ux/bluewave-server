@@ -145,6 +145,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS notifications(
   order_id TEXT DEFAULT '', created_at TEXT, read_at TEXT DEFAULT '')`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, created_at)');
 
+/* browsers/phones signed up for push (one row per device) */
+db.exec(`CREATE TABLE IF NOT EXISTS push_subs(
+  id TEXT PRIMARY KEY, user_id TEXT, endpoint TEXT UNIQUE, p256dh TEXT, auth TEXT, created_at TEXT)`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_push_user ON push_subs(user_id)');
+
 /* festive offers — a percentage off dealer prices for a date range */
 db.exec(`CREATE TABLE IF NOT EXISTS offers(
   id TEXT PRIMARY KEY, name TEXT, percent REAL, starts TEXT, ends TEXT,
@@ -157,6 +162,8 @@ try { db.exec("ALTER TABLE users ADD COLUMN mobile_code TEXT DEFAULT ''"); } cat
 try { db.exec("ALTER TABLE users ADD COLUMN email_code TEXT DEFAULT ''"); } catch (e) { /* exists */ }
 try { db.exec('ALTER TABLE users ADD COLUMN mobile_ok INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
 try { db.exec('ALTER TABLE users ADD COLUMN email_ok INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
+/* email verification was dropped — only the WhatsApp number is verified now */
+try { db.exec('UPDATE users SET email_ok=1 WHERE email_ok=0'); } catch (e) { /* nothing to do */ }
 /* password reset by code */
 try { db.exec("ALTER TABLE users ADD COLUMN reset_code TEXT DEFAULT ''"); } catch (e) { /* exists */ }
 try { db.exec("ALTER TABLE users ADD COLUMN reset_at TEXT DEFAULT ''"); } catch (e) { /* exists */ }
@@ -220,7 +227,7 @@ const requireAdmin = (req, res, next) => req.role === 'admin' ? next() : res.sta
 const requireUser = (req, res, next) => (req.role === 'user' && req.user) ? next() : res.status(401).json({ error: 'Login required' });
 const isDealer = req => req.role === 'user' && req.user && req.user.status === 'approved';
 const pubUser = u => u && ({ id: u.id, name: u.name, phone: u.phone, email: u.email, company: u.company, gstin: u.gstin, type: u.type, addr: u.addr, city: u.city, state: u.state, pincode: u.pincode || '', whatsapp: u.whatsapp || u.phone || '', status: u.status, note: u.note, terms: u.terms || 'advance', creditDays: u.credit_days || 0, discount: u.discount || 0,
-  mobileOk: !!u.mobile_ok, emailOk: !!u.email_ok, createdAt: u.created_at });
+  mobileOk: !!u.mobile_ok, createdAt: u.created_at });
 
 /* price this dealer pays for a product: their custom rate if set, else the standard dealer rate */
 const customPrice = (userId, productId) => {
@@ -259,6 +266,8 @@ function notify(userId, kind, title, body, orderId) {
   db.prepare('INSERT INTO notifications(id,user_id,kind,title,body,order_id,created_at) VALUES(?,?,?,?,?,?,?)')
     .run('n' + crypto.randomBytes(6).toString('hex'), String(userId), kind, title, body,
       orderId || '', new Date().toISOString());
+  /* also reaches the phone when the app is closed */
+  try { pushNotify(userId, title, body, kind); } catch (e) { /* push is best-effort */ }
 }
 const notifyAdmin = (kind, title, body, orderId) => notify('admin', kind, title, body, orderId);
 const fmtMoney = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -364,15 +373,13 @@ app.post('/api/register', (req, res) => {
   const salt = crypto.randomBytes(8).toString('hex');
   const id = uid('u');
   const mCode = String(Math.floor(100000 + Math.random() * 900000));
-  const eCode = String(Math.floor(100000 + Math.random() * 900000));
-  db.prepare(`INSERT INTO users(id,name,phone,email,pass_hash,salt,company,gstin,type,addr,city,state,pincode,whatsapp,status,mobile_code,email_code,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?)`)
-    .run(id, f.name, f.phone, f.email, hashPw(f.password, salt), salt, f.company, f.gstin, f.type, f.addr, f.city, f.state, f.pincode, waNum.replace(/\D/g, '').slice(-10), mCode, eCode, now());
-  notifyAdmin('registration', 'New dealer registration',
-    f.company + ' (' + f.type + ') from ' + (f.city || '—') + ' — ' + f.name + ', ' + f.phone + '. Verify the GSTIN and approve.');
-  /* send the mobile code immediately; don't hold up the signup response */
-  const fresh = db.prepare('SELECT * FROM users WHERE id=?').get(id);
-  sendVerifyCode(fresh, 'mobile').catch(() => {});
+  db.prepare(`INSERT INTO users(id,name,phone,email,pass_hash,salt,company,gstin,type,addr,city,state,pincode,whatsapp,status,mobile_code,email_ok,created_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,1,?)`)
+    .run(id, f.name, f.phone, f.email, hashPw(f.password, salt), salt, f.company, f.gstin, f.type, f.addr, f.city, f.state, f.pincode, waNum.replace(/\D/g, '').slice(-10), mCode, now());
+  notifyAdmin('registration', 'New registration — ' + f.company,
+    f.name + ' (' + f.type + ') from ' + (f.city || '—') + ', mobile ' + f.phone + '.' +
+    ' Verification code: ' + mCode + ' — send it to them on WhatsApp so they can confirm their number.' +
+    ' Then verify the GSTIN and approve the account.');
   const token = crypto.randomBytes(24).toString('hex');
   db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, id, 'user', now());
   res.json({ token, role: 'user', user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)) });
@@ -411,91 +418,62 @@ app.post('/api/login', (req, res) => {
   res.json({ token, role: 'user', user: pubUser(u) });
 });
 
-/* Sends a verification code over whichever gateway is configured in
- * Admin → Settings → Payment reminders (MSG91 SMS or WhatsApp Cloud API).
- * If no gateway is set up the admin still sees the code and passes it on, so
- * verification never gets stuck. */
-async function sendVerifyCode(u, kind) {
-  const code = kind === 'mobile' ? u.mobile_code : u.email_code;
-  if (!code) return { ok: false, status: 'no_code' };
-  const text = 'Blue Wave verification code: ' + code +
-    '. Enter it in the app under Profile to verify your ' +
-    (kind === 'mobile' ? 'mobile number' : 'email address') +
-    '. HPMP Manufacturers Pvt Ltd.';
-  const to = kind === 'mobile' ? (u.whatsapp || u.phone) : (u.whatsapp || u.phone);
-  const r = await sendMessage(to, text);
-  db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
-    .run('verify:' + u.id, 'verify_' + kind, rs('remProvider') || 'none', String(to || ''), text, r.ok ? 'sent' : r.status, now());
-  return r;
-}
-
 /* ---------- mobile & email verification ----------
  * No SMS/email gateway is needed: the admin sees each pending code in the
  * Registrations tab and sends it to the customer on WhatsApp (one tap) or by
  * email. The customer types it back in, which proves the number is theirs. */
 app.post('/api/verify', requireUser, (req, res) => {
-  const kind = String(req.body?.kind || '');
   const code = String(req.body?.code || '').trim();
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
-  if (!['mobile', 'email'].includes(kind)) return res.status(400).json({ error: 'Bad verification type.' });
   if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit code.' });
-  const expected = kind === 'mobile' ? u.mobile_code : u.email_code;
-  if (!expected) return res.status(400).json({ error: 'No code was issued. Ask us to resend it.' });
-  if (code !== String(expected)) return res.status(400).json({ error: 'That code does not match. Please check and try again.' });
-  db.prepare('UPDATE users SET ' + (kind === 'mobile' ? 'mobile_ok=1' : 'email_ok=1') + ' WHERE id=?').run(u.id);
+  if (!u.mobile_code) return res.status(400).json({ error: 'No code was issued. Ask us to resend it.' });
+  if (code !== String(u.mobile_code)) return res.status(400).json({ error: 'That code does not match. Please check and try again.' });
+  db.prepare('UPDATE users SET mobile_ok=1, email_ok=1 WHERE id=?').run(u.id);
   const after = db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-  if (after.mobile_ok && after.email_ok)
-    notifyAdmin('registration', 'Contact details verified',
-      after.company + ' has verified both mobile and email. Ready for your approval.');
+  notifyAdmin('registration', 'Mobile number verified',
+    after.company + ' has verified their WhatsApp number. Ready for your approval.');
   res.json({ ok: true, user: pubUser(after) });
 });
 
 /* customer taps "resend" — same code, sent again over the gateway */
 const resendAt = new Map();
 app.post('/api/verify/resend', requireUser, async (req, res) => {
-  const kind = String(req.body?.kind || '');
-  if (!['mobile', 'email'].includes(kind)) return res.status(400).json({ error: 'Bad verification type.' });
+  const kind = 'mobile';
   const key = req.user.id + ':' + kind;
   const last = resendAt.get(key) || 0;
   if (Date.now() - last < 60000)
     return res.status(429).json({ error: 'Please wait a minute before asking for another code.' });
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
-  if (kind === 'mobile' ? u.mobile_ok : u.email_ok) return res.status(400).json({ error: 'Already verified.' });
-  let code = kind === 'mobile' ? u.mobile_code : u.email_code;
+  if (u.mobile_ok) return res.status(400).json({ error: 'Already verified.' });
+  let code = u.mobile_code;
   if (!code) {
     code = String(Math.floor(100000 + Math.random() * 900000));
-    db.prepare('UPDATE users SET ' + (kind === 'mobile' ? 'mobile_code=?' : 'email_code=?') + ' WHERE id=?').run(code, u.id);
+    db.prepare('UPDATE users SET mobile_code=? WHERE id=?').run(code, u.id);
   }
   resendAt.set(key, Date.now());
-  const r = await sendVerifyCode(db.prepare('SELECT * FROM users WHERE id=?').get(u.id), kind);
-  if (!r.ok) notifyAdmin('verify', 'Verification code needs sending by hand',
-    (u.company || u.name) + ' asked for their ' + kind + ' code again, and no SMS gateway is set up. Open their registration and send it on WhatsApp.');
-  res.json({ ok: true, sent: r.ok, status: r.status });
+  notifyAdmin('verify', 'Verification code asked for again — ' + (u.company || u.name),
+    (u.name || '') + ' at ' + (u.company || '—') + ' (' + (u.whatsapp || u.phone) + ') has not received their code.' +
+    ' Code: ' + code + ' — send it to them on WhatsApp.');
+  res.json({ ok: true, sent: false, withAdmin: true });
 });
 
 /* admin sends the code over the gateway on demand */
-app.post('/api/admin/users/:id/sendcode', requireAdmin, async (req, res) => {
-  const kind = String(req.body?.kind || '');
-  if (!['mobile', 'email'].includes(kind)) return res.status(400).json({ error: 'Bad verification type.' });
+/* kept so older app builds don't error; codes are passed on by the admin now */
+app.post('/api/admin/users/:id/sendcode', requireAdmin, (req, res) => {
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
   if (!u) return res.status(404).json({ error: 'User not found.' });
-  const r = await sendVerifyCode(u, kind);
-  res.json({ ok: true, sent: r.ok, status: r.status });
+  res.json({ ok: true, sent: false, withAdmin: true, code: u.mobile_ok ? '' : (u.mobile_code || '') });
 });
 
 /* admin issues a fresh code (e.g. the customer changed number) */
 app.post('/api/admin/users/:id/recode', requireAdmin, (req, res) => {
-  const kind = String(req.body?.kind || '');
-  if (!['mobile', 'email'].includes(kind)) return res.status(400).json({ error: 'Bad verification type.' });
+  const kind = 'mobile';
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
   if (!u) return res.status(404).json({ error: 'User not found.' });
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  db.prepare('UPDATE users SET ' + (kind === 'mobile' ? "mobile_code=?, mobile_ok=0" : "email_code=?, email_ok=0") + ' WHERE id=?')
-    .run(code, u.id);
+  db.prepare('UPDATE users SET mobile_code=?, mobile_ok=0 WHERE id=?').run(code, u.id);
   notify(u.id, 'verify', 'New verification code issued',
-    'We have sent you a fresh ' + kind + ' verification code. Enter it on your profile screen.');
-  const after = db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-  sendVerifyCode(after, kind).then(r => { /* logged in reminders */ }).catch(() => {});
+    'Our team is sending you a fresh verification code on WhatsApp. Enter it on your profile screen.');
   res.json({ ok: true, code });
 });
 
@@ -505,6 +483,8 @@ app.post('/api/admin/users/:id/recode', requireAdmin, (req, res) => {
  * admin sees the code on the dealer's page and passes it on, so nobody is
  * locked out. */
 const forgotAt = new Map();
+/* The admin passes the code on by hand, so it can't expire in a few minutes. */
+const RESET_WINDOW_MS = 24 * 60 * 60 * 1000;
 app.post('/api/forgot', async (req, res) => {
   const idRaw = String(req.body?.id || '').trim();
   if (!idRaw) return res.status(400).json({ error: 'Enter your registered email or mobile number.' });
@@ -519,17 +499,20 @@ app.post('/api/forgot', async (req, res) => {
   forgotAt.set(key, Date.now());
   const code = String(Math.floor(100000 + Math.random() * 900000));
   db.prepare('UPDATE users SET reset_code=?, reset_at=? WHERE id=?').run(code, now(), u.id);
-  const to = u.whatsapp || u.phone;
-  const text = 'Blue Wave password reset code: ' + code +
-    '. It is valid for 15 minutes. If you did not ask for this, ignore this message. HPMP Manufacturers Pvt Ltd.';
-  const r = await sendMessage(to, text);
+  const to = String(u.whatsapp || u.phone || '');
+  /* The code goes to the admin app, not to the customer: the admin reads it
+     from the notification (or the dealer's page) and sends it across on
+     WhatsApp themselves. Nothing automatic, nothing to configure. */
+  notifyAdmin('verify', 'Password reset requested — ' + (u.company || u.name),
+    (u.name || '') + ' at ' + (u.company || '—') + ' (' + to + ') has asked to reset their password.' +
+    ' Code: ' + code + ' — valid for 24 hours.' +
+    ' Send it to them on WhatsApp, or open Registrations → this business to use the ready-made message.');
   db.prepare('INSERT INTO reminders(order_id,kind,channel,phone,message,status,sent_at) VALUES(?,?,?,?,?,?,?)')
-    .run('reset:' + u.id, 'password_reset', rs('remProvider') || 'none', String(to || ''), text, r.ok ? 'sent' : r.status, now());
-  notifyAdmin('verify', 'Password reset requested',
-    (u.company || u.name) + ' asked to reset their password.' +
-    (r.ok ? ' The code was sent by SMS.' : ' No SMS gateway is set up — open their registration and pass the code on.'));
-  const mask = String(to || '').replace(/\D/g, '').slice(-10).replace(/^(\d{2})\d{6}(\d{2})$/, '$1******$2');
-  res.json({ ok: true, sent: r.ok, to: mask, hint: r.ok ? 'Code sent to the mobile ending ' + mask.slice(-2) : generic.hint });
+    .run('reset:' + u.id, 'password_reset', 'admin', to,
+      'Reset code ' + code + ' issued for ' + (u.company || u.name) + ' — to be sent by the admin.', 'with_admin', now());
+  const mask = to.replace(/\D/g, '').slice(-10).replace(/^(\d{2})\d{6}(\d{2})$/, '$1******$2');
+  res.json({ ok: true, sent: false, withAdmin: true, to: mask,
+    hint: 'Our team has your request and will send the code to your WhatsApp number shortly.' });
 });
 
 app.post('/api/reset', (req, res) => {
@@ -541,9 +524,9 @@ app.post('/api/reset', (req, res) => {
   const u = findAccount(idRaw);
   if (!u || !u.reset_code) return res.status(400).json({ error: 'No reset is pending for that account. Ask for a new code.' });
   const age = Date.now() - new Date(u.reset_at || 0).getTime();
-  if (!(age >= 0 && age < 15 * 60 * 1000)) {
+  if (!(age >= 0 && age < RESET_WINDOW_MS)) {
     db.prepare("UPDATE users SET reset_code='' WHERE id=?").run(u.id);
-    return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
+    return res.status(400).json({ error: 'That code has expired — codes last 24 hours. Please ask for a new one.' });
   }
   if (code !== String(u.reset_code)) return res.status(400).json({ error: 'That code does not match. Please check and try again.' });
   const salt = crypto.randomBytes(8).toString('hex');
@@ -738,6 +721,139 @@ app.post('/api/orders/:id/rzp-verify', (req, res) => {
 });
 
 /* ---------- admin API ---------- */
+/* ================= WEB PUSH =================
+ * Real background / lock-screen notifications, sent straight from this server
+ * using the Web Push protocol: VAPID (ES256 JWT) for identifying ourselves and
+ * aes128gcm for encrypting the payload. No third-party service, no npm package.
+ * ============================================ */
+const b64url = buf => Buffer.from(buf).toString('base64')
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64url = str => Buffer.from(String(str).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+
+/* our permanent identity for push; generated once and kept in settings */
+function vapidKeys() {
+  let pub = getSetting('vapidPub'), priv = getSetting('vapidPriv');
+  if (!pub || !priv) {
+    const kp = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    pub = b64url(kp.publicKey.export({ type: 'spki', format: 'der' }).slice(-65));
+    priv = b64url(kp.privateKey.export({ type: 'pkcs8', format: 'der' }));
+    setSetting('vapidPub', pub); setSetting('vapidPriv', priv);
+  }
+  return { pub, priv };
+}
+const vapidPrivKey = () => crypto.createPrivateKey({
+  key: unb64url(vapidKeys().priv), format: 'der', type: 'pkcs8'
+});
+
+/* ES256 JWT proving the push came from us */
+function vapidHeaders(endpoint) {
+  const aud = new URL(endpoint).origin;
+  const head = b64url(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
+  const body = b64url(JSON.stringify({
+    aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600,
+    sub: 'mailto:' + (getSetting('adminEmail') || 'admin@example.com')
+  }));
+  const der = crypto.sign('sha256', Buffer.from(head + '.' + body), vapidPrivKey());
+  /* DER (r,s) → raw 64-byte signature the spec expects */
+  let off = 2; if (der[1] & 0x80) off += der[1] & 0x7f;
+  const rLen = der[off + 1]; let r = der.slice(off + 2, off + 2 + rLen);
+  const sOff = off + 2 + rLen; const sLen = der[sOff + 1];
+  let sg = der.slice(sOff + 2, sOff + 2 + sLen);
+  const pad = b => b.length >= 32 ? b.slice(b.length - 32) : Buffer.concat([Buffer.alloc(32 - b.length), b]);
+  const sig = b64url(Buffer.concat([pad(r), pad(sg)]));
+  return {
+    Authorization: 'vapid t=' + head + '.' + body + '.' + sig + ', k=' + vapidKeys().pub,
+    'Content-Encoding': 'aes128gcm',
+    TTL: '86400'
+  };
+}
+
+function hkdf(salt, ikm, info, len) {
+  const prk = crypto.createHmac('sha256', salt).update(ikm).digest();
+  return crypto.createHmac('sha256', prk)
+    .update(Buffer.concat([info, Buffer.from([1])])).digest().slice(0, len);
+}
+
+/* encrypt one payload for one subscription (RFC 8291) */
+function encryptPush(sub, payload) {
+  const clientPub = unb64url(sub.p256dh);
+  const authSecret = unb64url(sub.auth);
+  const ecdh = crypto.createECDH('prime256v1');
+  ecdh.generateKeys();
+  const serverPub = ecdh.getPublicKey();
+  const shared = ecdh.computeSecret(clientPub);
+  const salt = crypto.randomBytes(16);
+  const prkInfo = Buffer.concat([
+    Buffer.from('WebPush: info\0'), clientPub, serverPub
+  ]);
+  const ikm = hkdf(authSecret, shared, prkInfo, 32);
+  const cek = hkdf(salt, ikm, Buffer.from('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = hkdf(salt, ikm, Buffer.from('Content-Encoding: nonce\0'), 12);
+  const plain = Buffer.concat([Buffer.from(payload, 'utf8'), Buffer.from([2])]);  // padding delimiter
+  const cipher = crypto.createCipheriv('aes-128-gcm', cek, nonce);
+  const body = Buffer.concat([cipher.update(plain), cipher.final(), cipher.getAuthTag()]);
+  const rs = Buffer.alloc(4); rs.writeUInt32BE(4096, 0);
+  return Buffer.concat([salt, rs, Buffer.from([serverPub.length]), serverPub, body]);
+}
+
+async function pushToSub(sub, data) {
+  try {
+    const body = encryptPush(sub, JSON.stringify(data));
+    const r = await fetch(sub.endpoint, {
+      method: 'POST',
+      headers: { ...vapidHeaders(sub.endpoint), 'Content-Type': 'application/octet-stream',
+        'Content-Length': String(body.length) },
+      body, signal: AbortSignal.timeout(10000)
+    });
+    /* the browser tells us when a device has uninstalled or expired */
+    if (r.status === 404 || r.status === 410) db.prepare('DELETE FROM push_subs WHERE id=?').run(sub.id);
+    return r.ok;
+  } catch (e) { return false; }
+}
+
+/* fire-and-forget: every in-app notification also goes out as a real push */
+function pushNotify(userId, title, body, kind) {
+  const subs = db.prepare('SELECT * FROM push_subs WHERE user_id=?').all(String(userId));
+  if (!subs.length) return;
+  const data = { title, body, kind: kind || 'info', at: Date.now() };
+  subs.forEach(sub => { pushToSub(sub, data).catch(() => {}); });
+}
+
+app.get('/api/push/key', (req, res) => res.json({ key: vapidKeys().pub }));
+
+app.post('/api/push/subscribe', (req, res) => {
+  const key = req.role === 'admin' ? 'admin' : (req.user && req.user.id);
+  if (!key) return res.status(401).json({ error: 'Login required' });
+  const s = req.body?.sub || {};
+  const endpoint = String(s.endpoint || '');
+  const p256dh = String(s.keys?.p256dh || ''), auth = String(s.keys?.auth || '');
+  if (!endpoint || !p256dh || !auth) return res.status(400).json({ error: 'Incomplete subscription.' });
+  db.prepare(`INSERT INTO push_subs(id,user_id,endpoint,p256dh,auth,created_at) VALUES(?,?,?,?,?,?)
+    ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh,
+      auth=excluded.auth, created_at=excluded.created_at`)
+    .run('s' + crypto.randomBytes(6).toString('hex'), key, endpoint, p256dh, auth, now());
+  res.json({ ok: true });
+});
+
+app.post('/api/push/unsubscribe', (req, res) => {
+  const endpoint = String(req.body?.endpoint || '');
+  if (endpoint) db.prepare('DELETE FROM push_subs WHERE endpoint=?').run(endpoint);
+  res.json({ ok: true });
+});
+
+/* lets a device check for anything new since it last looked — used by the
+   Android app's background check, which has no web push of its own */
+app.get('/api/notifications/since', (req, res) => {
+  const key = req.role === 'admin' ? 'admin' : (req.user && req.user.id);
+  if (!key) return res.json({ items: [], unread: 0 });
+  const since = String(req.query.since || '');
+  const rows = since
+    ? db.prepare('SELECT * FROM notifications WHERE user_id=? AND created_at>? ORDER BY created_at').all(key, since)
+    : db.prepare('SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 5').all(key);
+  const unread = db.prepare("SELECT COUNT(*) c FROM notifications WHERE user_id=? AND (read_at='' OR read_at IS NULL)").get(key).c;
+  res.json({ unread, now: now(), items: rows.map(pubNotif) });
+});
+
 /* ---------- notifications ---------- */
 function notifKey(req) {
   if (req.role === 'admin') return 'admin';
@@ -818,7 +934,7 @@ app.get('/api/admin/users', requireAdmin, (req, res) => {
   /* the admin also sees the pending verification codes, so they can pass them
      to the customer on WhatsApp or by email */
   res.json(db.prepare("SELECT * FROM users ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, created_at DESC")
-    .all().map(u => ({ ...pubUser(u), mobileCode: u.mobile_ok ? '' : (u.mobile_code || ''), emailCode: u.email_ok ? '' : (u.email_code || ''),
+    .all().map(u => ({ ...pubUser(u), mobileCode: u.mobile_ok ? '' : (u.mobile_code || ''),
       resetCode: u.reset_code || '', resetAt: u.reset_at || '' })));
 });
 

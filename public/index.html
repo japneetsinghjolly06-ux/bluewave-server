@@ -69,6 +69,16 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .npop .nt span{color:var(--mut);font-size:12.5px;line-height:1.45}
 .npop .nx{background:none;border:none;color:var(--mut);font-size:14px;padding:0 2px;line-height:1}
 .citem.unread{background:#f2fbff;border-radius:10px}
+
+/* notifications page */
+.nlist{display:flex;flex-direction:column;gap:8px}
+.nrow{display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 13px}
+.nrow.unread{border-left:3px solid var(--blue);background:#f7fcff}
+.nico{font-size:18px;line-height:1.2;flex-shrink:0}
+.nbody{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ntitle{font-size:14px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.ntext{font-size:13px;color:var(--mut);line-height:1.5;overflow-wrap:anywhere}
+.ntime{font-size:11.5px;color:var(--mut);opacity:.8}
 @keyframes spin{to{transform:rotate(360deg)}}
 /* pull-to-refresh indicator */
 #ptr{position:fixed;top:-40px;left:50%;margin-left:-19px;width:38px;height:38px;border-radius:50%;
@@ -470,6 +480,7 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   <section id="view-checkout" class="view"></section>
   <section id="view-admin" class="view"></section>
   <section id="view-reg" class="view"></section>
+  <section id="view-notif" class="view"></section>
 </main>
 
 <nav class="bnav" id="bnav"></nav>
@@ -672,6 +683,7 @@ function showView(v){
   if(v==='profile')renderProfile();
   if(v==='admin')renderAdmin(adminTab);
   if(v==='reg')renderRegDetail();
+  if(v==='notif')renderNotifPage();
   renderNav();window.scrollTo(0,0);
   try{sessionStorage.setItem('bw_view',v)}catch(e){}
 }
@@ -737,9 +749,9 @@ function renderNav(){
 }
 function renderHeader(){
   const b=$('hdrBack');
-  if(b){b.style.display=['product','auth','checkout','shop','reg'].includes(currentView)?'block':'none';
+  if(b){b.style.display=['product','auth','checkout','shop','reg','notif'].includes(currentView)?'block':'none';
     b.onclick=currentView==='auth'?closeAuth:currentView==='checkout'?closeCheckout:currentView==='shop'?()=>showView('category')
-      :currentView==='reg'?closeRegDetail:closeProduct;}
+      :currentView==='reg'?closeRegDetail:currentView==='notif'?closeNotifs:closeProduct;}
   const h=$('hdrAuth');
   h.innerHTML=`<button class="bellbtn" onclick="openNotifications()" title="Notifications">${PICON.bell}<span class="belldot" id="bellDot" style="display:none"></span></button>`;
   updateBell();
@@ -772,6 +784,81 @@ async function softRefresh(){
     refreshing=false;
     ptrBusy(false);
   }
+}
+
+/* ============ PUSH NOTIFICATIONS ============
+   Keeps order updates, approvals and offers arriving when the app is closed.
+   Works in the installed web app on Android and on iPhone (iOS 16.4+ once the
+   app is added to the home screen). The Android APK does its own background
+   check instead, since a WebView cannot receive web push. */
+function pushSupported(){
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+function pushState(){
+  if(!pushSupported())return 'unsupported';
+  return Notification.permission;   /* 'default' | 'granted' | 'denied' */
+}
+function pushPrompt(){
+  if(!currentUser()&&!isAdmin())return '';
+  /* inside the Android app the wrapper handles background alerts itself */
+  if(window.BlueWaveApp&&window.BlueWaveApp.setAuth)
+    return `<div class="hint" style="margin-top:14px">This app checks for updates in the background and shows them on your lock screen, even when it is closed.</div>`;
+  const st=pushState();
+  if(st==='granted')return `<div class="hint" style="margin-top:14px">Alerts are on for this device — you will be notified even with the app closed.</div>`;
+  if(st==='unsupported')
+    return `<div class="notice info" style="margin-top:14px">To get alerts with the app closed on this device, open the app from your home screen (Android: Chrome menu → Install app; iPhone: Safari → Share → Add to Home Screen).</div>`;
+  if(st==='denied')
+    return `<div class="notice warn" style="margin-top:14px">Notifications are blocked for this app in your browser settings. Allow them there to get alerts when the app is closed.</div>`;
+  return `<div class="cardbox" style="margin-top:14px;border:1px solid var(--line)">
+    <h3>Get alerts when the app is closed</h3>
+    <div class="hint" style="margin-bottom:10px">Order confirmations, dispatch details, approvals and festive offers arrive on your lock screen.</div>
+    <button class="wide blue" onclick="enablePush()">Turn on notifications</button>
+  </div>`;
+}
+async function enablePush(){
+  if(!pushSupported())return toast('This device cannot show alerts while the app is closed',1);
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){renderNotifPage();return toast('Notifications not allowed',1)}
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      const d=await api('/push/key');
+      if(!d.key)throw new Error('Push is not set up on the server yet.');
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(d.key)});
+    }
+    await api('/push/subscribe','POST',{sub:sub.toJSON()});
+    toast('Alerts on — you will hear from us even with the app closed');
+    if(currentView==='notif')renderNotifPage();
+  }catch(e){toast(e.message||'Could not turn on alerts',1)}
+}
+function urlB64ToU8(s){
+  const pad='='.repeat((4-s.length%4)%4);
+  const raw=atob((s+pad).replace(/-/g,'+').replace(/_/g,'/'));
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+/* keep the device signed up whenever an approved account opens the app */
+async function syncPush(){
+  if(!pushSupported()||Notification.permission!=='granted')return;
+  if(!currentUser()&&!isAdmin())return;
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      const d=await api('/push/key');
+      if(!d.key)return;
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(d.key)});
+    }
+    await api('/push/subscribe','POST',{sub:sub.toJSON()});
+  }catch(e){}
+}
+/* tapping a lock-screen notification lands on the notifications page */
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{
+  if(e.data&&e.data.bw==='open-notifications')openNotifications();
+});
+if(location.hash==='#notifications'){
+  try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  setTimeout(()=>openNotifications(),900);
 }
 
 /* Pull down at the top of any screen to refresh. This runs the same in-app
@@ -895,23 +982,50 @@ function whenAgo(iso){
   if(s<604800)return Math.floor(s/86400)+' d ago';
   return new Date(iso).toLocaleDateString('en-IN');
 }
-async function openNotifications(){
+let notifBackTo='home';
+function openNotifications(){
+  if(currentView!=='notif')notifBackTo=currentView;
+  showView('notif');
+}
+function closeNotifs(){showView(notifBackTo==='notif'?'home':(notifBackTo||'home'))}
+async function renderNotifPage(){
+  const v=$('view-notif');
+  v.innerHTML=`<div class="pf-head"><h2>Notifications</h2></div><div class="empty">Loading…</div>`;
   await refreshNotifs(false);
   const items=(state.notifs&&state.notifs.items)||[];
-  genModal('🔔 Notifications',(items.length?items.map(n=>`<div class="citem ${n.read?'':'unread'}" style="align-items:flex-start">
-      <div style="font-size:20px">${NICON[n.kind]||'🔔'}</div>
-      <div style="flex:1"><div class="nm">${esc(n.title)}</div><div class="pr">${esc(n.body)}</div>
-      <div class="hint" style="margin:2px 0 0">${whenAgo(n.createdAt)}</div></div></div>`).join('')
-    :'<div class="empty"><span class="big">🔔</span>Nothing new right now.</div>')
-    +(items.length?`<button class="wide ghost" onclick="markNotifsRead()">Mark all as read</button>
-      <button class="wide ghost" onclick="clearNotifs()">Clear the list</button>`:''));
-  if(items.some(n=>!n.read))markNotifsRead(true);
+  const unread=items.filter(n=>!n.read).length;
+  v.innerHTML=`<div class="pf-head" style="justify-content:space-between;align-items:center">
+      <h2>Notifications</h2>
+      ${unread?`<span class="badge b-pending">${unread} new</span>`:''}
+    </div>
+    ${items.length?`<div class="nlist">${items.map(n=>`
+      <div class="nrow ${n.read?'':'unread'}">
+        <span class="nico">${NICON[n.kind]||'🔔'}</span>
+        <span class="nbody">
+          <span class="ntitle">${esc(n.title)}</span>
+          <span class="ntext">${esc(n.body)}</span>
+          <span class="ntime">${whenAgo(n.createdAt)}</span>
+        </span>
+      </div>`).join('')}</div>
+      <button class="wide ghost" style="margin-top:14px" onclick="markNotifsRead()">Mark all as read</button>
+      <button class="wide ghost" onclick="clearNotifs()">Clear the list</button>`
+    :`<div class="empty"><span class="big">🔔</span>Nothing new right now.<br><span class="hint">Order updates, approvals and offers appear here.</span></div>`}
+    ${pushPrompt()}`;
+  window.scrollTo(0,0);
+  if(unread)markNotifsRead(true);
 }
 async function markNotifsRead(quiet){
-  try{await api('/notifications/read','POST',{});await refreshNotifs(false);if(!quiet)openNotifications()}catch(e){}
+  try{
+    await api('/notifications/read','POST',{});
+    await refreshNotifs(false);
+    if(!quiet&&currentView==='notif')renderNotifPage();
+  }catch(e){}
 }
 async function clearNotifs(){
-  try{await api('/notifications','DELETE');await refreshNotifs(false);closeModal('modal-gen');toast('Notifications cleared')}catch(e){toast(e.message,1)}
+  try{await api('/notifications','DELETE');await refreshNotifs(false);
+    if(currentView==='notif')renderNotifPage();
+    toast('Notifications cleared');
+  }catch(e){toast(e.message,1)}
 }
 
 let lastOrders=[];
@@ -922,6 +1036,9 @@ async function logout(){
   try{await api('/logout','POST')}catch(e){}
   token='';localStorage.removeItem('bw_token');state.role=null;state.user=null;
   state.notifs={unread:0,items:[]};
+  nativeAuth();
+  try{if(pushSupported()){const reg=await navigator.serviceWorker.ready;const s=await reg.pushManager.getSubscription();
+    if(s){await api('/push/unsubscribe','POST',{endpoint:s.endpoint}).catch(()=>{});await s.unsubscribe()}}}catch(e){}
   await refreshProducts();renderHeader();updateBell();showView('home');toast('Logged out');
 }
 
@@ -997,10 +1114,9 @@ function renderShop(){
   const title=activeCat==='All'?'All products':activeCat;
   const count=state.products.filter(p=>activeCat==='All'||p.cat===activeCat).length;
   $('view-shop').innerHTML=`
-    <div style="display:flex;align-items:center;gap:10px;padding:2px 0 8px">
-      <button class="hdrback" onclick="showView('category')" title="Back to categories" aria-label="Back to categories">←</button>
-      <div><h2 style="font-size:18px;color:var(--navy)">${esc(title)}</h2>
-        <div class="hint" style="margin:0">${count} product${count>1?'s':''}</div></div>
+    <div style="padding:2px 0 8px">
+      <h2 style="font-size:18px;color:var(--navy)">${esc(title)}</h2>
+      <div class="hint" style="margin:0">${count} product${count>1?'s':''}</div>
     </div>
     ${notice}
     <div class="grid" id="shopGrid"></div>`;
@@ -1135,8 +1251,7 @@ function openCheckout(){
     <label>Email</label><input id="co-email" type="email">
     <label>Delivery address <span class="req">*</span></label><textarea id="co-addr" rows="2"></textarea>`;
   $('view-checkout').innerHTML=`
-    <div class="pf-head" style="justify-content:flex-start;gap:10px;padding:4px 0 10px">
-      <button class="hdrback" onclick="closeCheckout()" title="Go back" aria-label="Go back">←</button>
+    <div class="pf-head" style="padding:4px 0 10px">
       <h2 style="font-size:19px">Checkout</h2>
     </div>
     <div class="msub">Review your order and confirm. Pay online or by bank transfer next.</div>
@@ -1296,11 +1411,11 @@ async function askReset(again){
   if(!id){err.textContent='Enter your registered email or mobile number.';err.style.display='block';return}
   try{
     const d=await api('/forgot','POST',{id});
-    $('fg-note').innerHTML=d.sent
-      ? 'Code sent by SMS to the mobile ending <b>'+esc(String(d.to||'').slice(-2))+'</b>. It is valid for 15 minutes.'
-      : esc(d.hint||'If that account exists, a code is on its way.')+' If you do not receive it, WhatsApp us and we will read it out.';
+    $('fg-note').innerHTML=d.withAdmin
+      ? 'Request sent to our team. They will WhatsApp the 6-digit code to <b>'+esc(String(d.to||'your registered number'))+'</b>. Enter it below once you have it — the code stays valid for 24 hours.'
+      : esc(d.hint||'If that account is registered, a code is on its way.');
     $('fg-step1').style.display='none';$('fg-step2').style.display='block';
-    toast(d.sent?'Reset code sent':'Reset requested');
+    toast(d.withAdmin?'Request sent to our team':'Reset requested');
   }catch(e){err.textContent=e.message;err.style.display='block'}
 }
 async function doReset(){
@@ -1323,7 +1438,7 @@ async function doLogin(){
     token=d.token;localStorage.setItem('bw_token',token);
     state.role=d.role;state.user=d.user||null;
     await refreshProducts();renderHeader();
-    refreshNotifs(true);
+    refreshNotifs(true);syncPush();nativeAuth();
     if(d.role==='admin'){showView('admin');toast('Welcome, Admin')}
     else if(d.user.status==='approved'){showView('shop');toast('Welcome back — dealer pricing active')}
     else{showView('profile');toast('Signed in — account '+USTATUS_LABEL[d.user.status].toLowerCase())}
@@ -1420,43 +1535,33 @@ function genModal(title,html){$('genBox').innerHTML=`<button class="mx" onclick=
    by the admin over WhatsApp or email, which proves the number/address is real. */
 function verifyPanel(){
   const u=currentUser();
-  if(!u||(u.mobileOk&&u.emailOk))return '';
+  if(!u||u.mobileOk)return '';
   return `<div class="cardbox" style="border:1px solid #ffd9a0;background:#fffaf0">
-    <h3>🔐 Verify your contact details</h3>
-    <div class="hint" style="margin-bottom:10px">${state.payInfo&&state.payInfo.smsProvider
-      ?'A 6-digit code has been sent to your mobile by SMS. Enter it below to confirm we can reach you about orders and dispatch.'
-      :'We issue a 6-digit code for your mobile and your email. Entering them confirms we can reach you about orders and dispatch.'}</div>
-    ${u.mobileOk?'<div class="notice ok">✓ Mobile number verified</div>':`
-      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
-        <div style="max-width:190px"><label>Mobile code (${esc(u.whatsapp||u.phone)})</label>
-          <input id="vf-mobile" inputmode="numeric" maxlength="6" placeholder="6 digits"></div>
-        <button class="smallbtn ok-btn" onclick="submitVerify('mobile')">Verify mobile</button>
-        <button class="smallbtn gr-btn" onclick="resendCode('mobile')">Resend code</button>
-      </div>`}
-    ${u.emailOk?'<div class="notice ok" style="margin-top:8px">✓ Email verified</div>':`
-      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:10px">
-        <div style="max-width:190px"><label>Email code (${esc(u.email)})</label>
-          <input id="vf-email" inputmode="numeric" maxlength="6" placeholder="6 digits"></div>
-        <button class="smallbtn ok-btn" onclick="submitVerify('email')">Verify email</button>
-        <button class="smallbtn gr-btn" onclick="resendCode('email')">Resend code</button>
-      </div>`}
-    <div class="hint" style="margin-top:10px">Still not received it? WhatsApp us on <b>${esc((state.payInfo&&state.payInfo.whatsapp)||'+91 79952 65800')}</b>.</div>
+    <h3>Verify your WhatsApp number</h3>
+    <div class="hint" style="margin-bottom:10px">Our team sends a 6-digit code to <b>${esc(u.whatsapp||u.phone)}</b> on WhatsApp. Enter it below so we can reach you about orders and dispatch — usually within a few minutes during working hours.</div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div style="max-width:190px"><label>6-digit code</label>
+        <input id="vf-mobile" inputmode="numeric" maxlength="6" placeholder="123456"></div>
+      <button class="smallbtn ok-btn" onclick="submitVerify()">Verify number</button>
+      <button class="smallbtn gr-btn" onclick="resendCode()">Not received it?</button>
+    </div>
+    <div class="hint" style="margin-top:10px">You can order at MRP straight away — verification only unlocks dealer pricing once your account is approved. Any trouble, WhatsApp us on <b>${esc((state.payInfo&&state.payInfo.whatsapp)||'+91 79952 65800')}</b>.</div>
   </div>`;
 }
-async function resendCode(kind){
+async function resendCode(){
   try{
-    const d=await api('/verify/resend','POST',{kind});
-    toast(d.sent?'Code sent again to your mobile':'Request noted — our team will send you the code shortly');
+    await api('/verify/resend','POST',{kind:'mobile'});
+    toast('Our team has been told — they will WhatsApp the code shortly');
   }catch(e){toast(e.message,1)}
 }
-async function submitVerify(kind){
-  const el=$('vf-'+kind);if(!el)return;
+async function submitVerify(){
+  const el=$('vf-mobile');if(!el)return;
   const code=el.value.trim();
   if(!/^\d{6}$/.test(code))return toast('Enter the 6-digit code',1);
   try{
-    const d=await api('/verify','POST',{kind,code});
+    const d=await api('/verify','POST',{kind:'mobile',code});
     state.user=d.user;
-    toast(kind==='mobile'?'✓ Mobile number verified':'✓ Email verified');
+    toast('WhatsApp number verified');
     renderProfile();renderHeader();
   }catch(e){toast(e.message,1)}
 }
@@ -1643,7 +1748,7 @@ async function renderRegs(){
         </span>
         <span class="rrtags">
           <span class="badge b-${u.status}">${USTATUS_LABEL[u.status]}</span>
-          ${!(u.mobileOk&&u.emailOk)?'<span class="tag no">unverified</span>':''}
+          ${!u.mobileOk?'<span class="tag no">unverified</span>':''}
         </span>
         <span class="chev">›</span>
       </button>`).join('')}</div>`
@@ -1677,8 +1782,7 @@ async function renderRegDetail(){
         <span class="badge b-${u.status}">${USTATUS_LABEL[u.status]}</span>
         ${u.status==='approved'?(u.terms==='credit'?`<span class="badge b-shipped">Credit ${u.creditDays||30} days</span>`:`<span class="badge b-approved">Advance payment</span>`):''}
         ${u.discount?`<span class="badge b-approved">${u.discount}% extra discount</span>`:''}
-        <span class="tag ${u.mobileOk?'yes':'no'}">Mobile ${u.mobileOk?'verified':'unverified'}</span>
-        <span class="tag ${u.emailOk?'yes':'no'}">Email ${u.emailOk?'verified':'unverified'}</span>
+        <span class="tag ${u.mobileOk?'yes':'no'}">WhatsApp ${u.mobileOk?'verified':'unverified'}</span>
       </div>
     </div>
 
@@ -1696,23 +1800,18 @@ async function renderRegDetail(){
     </div>
 
     ${u.resetCode?`<div class="dtblock">
-      <div class="dtbt">Password reset pending</div>
-      <div class="hint" style="margin:0 0 8px">Asked for ${whenAgo(u.resetAt)}. Valid 15 minutes from then.</div>
+      <div class="dtbt">Password reset requested</div>
+      <div class="hint" style="margin:0 0 8px">Asked ${whenAgo(u.resetAt)}. Send this code to them on WhatsApp. It stays valid for 24 hours.</div>
       ${row('Reset code',`<b class="gstin-code">${esc(u.resetCode)}</b>
         <a class="lnk" href="https://wa.me/91${wa}?text=${encodeURIComponent('Blue Wave password reset code: '+u.resetCode+'. Valid for 15 minutes. Enter it in the app under Forgot your password.')}" target="_blank">Send on WhatsApp</a>`)}
     </div>`:''}
-    ${!(u.mobileOk&&u.emailOk)?`<div class="dtblock">
+    ${!u.mobileOk?`<div class="dtblock">
       <div class="dtbt">Pending verification</div>
-      <div class="hint" style="margin:0 0 8px">${state.payInfo&&state.payInfo.smsProvider
-        ?'The mobile code is sent by SMS automatically at signup. Resend it here if needed; the email code is passed on by you.'
-        :'No SMS gateway is set up yet, so pass the code to the applicant yourself. Set one up in Settings → Payment reminders and codes will send themselves.'}</div>
-      ${!u.mobileOk?row('Mobile code',`<b class="gstin-code">${esc(u.mobileCode||'—')}</b>
-        ${state.payInfo&&state.payInfo.smsProvider?`<a class="lnk" href="javascript:sendCode('${u.id}','mobile')">Send by SMS</a>`:''}
-        <a class="lnk" href="https://wa.me/91${wa}?text=${encodeURIComponent('Blue Wave verification code: '+(u.mobileCode||'')+'. Enter it in the app under Profile to verify your mobile number.')}" target="_blank">Send on WhatsApp</a>
-        <a class="lnk" href="javascript:newCode('${u.id}','mobile')">Reissue</a>`):''}
-      ${!u.emailOk?row('Email code',`<b class="gstin-code">${esc(u.emailCode||'—')}</b>
-        <a class="lnk" href="mailto:${esc(u.email)}?subject=${encodeURIComponent('Blue Wave email verification')}&body=${encodeURIComponent('Your Blue Wave email verification code is '+(u.emailCode||'')+'. Enter it in the app under Profile.')}">Send by email</a>
-        <a class="lnk" href="javascript:newCode('${u.id}','email')">Reissue</a>`):''}
+      <div class="hint" style="margin:0 0 8px">Send this code to the applicant on WhatsApp. They enter it under Profile in the app to confirm the number is theirs.</div>
+      ${row('Verification code',`<b class="gstin-code">${esc(u.mobileCode||'—')}</b>
+        <a class="lnk" href="https://wa.me/91${wa}?text=${encodeURIComponent('Blue Wave verification code: '+(u.mobileCode||'')+'. Enter it in the app under Profile to verify your WhatsApp number.')}" target="_blank">Send on WhatsApp</a>
+        <a class="lnk" href="javascript:copyTxt('${esc(u.mobileCode||'')}')">Copy</a>
+        <a class="lnk" href="javascript:newCode('${u.id}')">Reissue</a>`)}
     </div>`:''}
 
     ${u.status==='approved'?`<div class="dtblock">
@@ -1816,15 +1915,9 @@ async function saveDiscount(id){
     toast(discount?discount+'% extra discount applied':'Extra discount removed');refreshRegScreen()}
   catch(e){toast(e.message,1)}
 }
-async function sendCode(id,kind){
-  try{
-    const d=await api('/admin/users/'+id+'/sendcode','POST',{kind});
-    toast(d.sent?'Code sent by SMS':'Could not send — '+(d.status||'gateway not configured'));
-  }catch(e){toast(e.message,1)}
-}
-async function newCode(id,kind){
-  try{const d=await api('/admin/users/'+id+'/recode','POST',{kind});
-    toast('New '+kind+' code: '+d.code);refreshRegScreen()}
+async function newCode(id){
+  try{const d=await api('/admin/users/'+id+'/recode','POST',{kind:'mobile'});
+    toast('New code: '+d.code);refreshRegScreen()}
   catch(e){toast(e.message,1)}
 }
 async function setUserStatus(id,st,terms){
@@ -2403,16 +2496,16 @@ async function renderSettings(){
     <div class="hint">Use <b>rzp_test_…</b> keys first to try it safely, then switch to <b>rzp_live_…</b> keys.</div>
   </div>
   <div class="cardbox"><h3>Automatic messaging</h3>
-    <div class="hint" style="margin-bottom:8px">One channel powers two things: <b>credit payment reminders</b> and <b>mobile verification codes</b> sent to new registrations.</div>
+    <div class="hint" style="margin-bottom:8px">This channel sends <b>credit payment reminders</b> on their due dates. Verification and password-reset codes are not sent from here — they arrive as notifications in this admin panel and you pass them on by WhatsApp.</div>
     <div class="notice ${s.remProvider?'ok':'info'}" style="margin-bottom:8px">
-      ${s.remProvider?'Automatic sending is <b>ON</b> ('+(s.remProvider==='msg91'?'SMS via MSG91':'WhatsApp Business API')+') — credit reminders go out on their due dates, and every new registration gets its verification code by itself.'
-      :'Automatic sending is <b>off</b>. Credit reminders are tracked in the <b>Credit</b> tab with one-tap WhatsApp buttons, and verification codes have to be passed to customers by hand. Choose a channel below to automate both.'}
+      ${s.remProvider?'Automatic reminders are <b>ON</b> ('+(s.remProvider==='msg91'?'SMS via MSG91':'WhatsApp Business API')+') — credit customers are messaged on their due dates.'
+      :'Automatic reminders are <b>off</b>. Credit reminders are tracked in the <b>Credit</b> tab with one-tap WhatsApp buttons.'}
     </div>
     <label>Sending channel</label>
     <select id="st-remprov">
-      <option value="" ${!s.remProvider?'selected':''}>Manual — one-tap WhatsApp buttons only (free)</option>
-      <option value="whatsapp" ${s.remProvider==='whatsapp'?'selected':''}>WhatsApp Business API (Meta Cloud)</option>
+      <option value="whatsapp" ${s.remProvider==='whatsapp'?'selected':''}>WhatsApp Business API (Meta Cloud) — recommended</option>
       <option value="msg91" ${s.remProvider==='msg91'?'selected':''}>SMS via MSG91</option>
+      <option value="" ${!s.remProvider?'selected':''}>Manual — one-tap WhatsApp buttons only (free)</option>
     </select>
     <div class="frow">
       <div><label>Remind days BEFORE due date</label><input id="st-rembefore" value="${esc(s.remBefore)}" placeholder="3"><div class="hint">Comma separated, e.g. 7,3,1</div></div>
@@ -2464,6 +2557,14 @@ async function renderSettings(){
 }
 /* Native app hooks — only present inside the Android/iOS wrapper, and only
    reachable from the admin Settings screen, so dealers never see them. */
+/* The Android app checks for new notifications in the background, so it needs
+   to know the server address and this session's token. */
+function nativeAuth(){
+  try{
+    if(window.BlueWaveApp&&window.BlueWaveApp.setAuth)
+      window.BlueWaveApp.setAuth(token||'',(currentUser()||isAdmin())?'1':'');
+  }catch(e){}
+}
 function nativeApp(){
   return !!(window.BlueWaveApp||(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.BlueWaveApp));
 }
@@ -2532,7 +2633,8 @@ function remKeysUI(s){
   box.innerHTML=v==='whatsapp'?`<div class="frow">
       <div><label>WhatsApp Phone Number ID</label><input id="st-waphone" value="${esc(s.waPhoneId)}" placeholder="From Meta → WhatsApp → API Setup"></div>
       <div><label>Permanent access token ${s.waTokenSet?'(saved — blank keeps it)':''}</label><input id="st-watoken" type="password" placeholder="${s.waTokenSet?'••••••••':'Paste token'}"></div>
-    </div><div class="hint">Create a free WhatsApp Business (Cloud API) app at developers.facebook.com. Business-initiated messages need an approved template in some cases.</div>`
+    </div>
+    <div class="hint">Create a free WhatsApp Business (Cloud API) app at developers.facebook.com → add your business number → copy the Phone Number ID and a permanent token. Meta needs an approved template for business-initiated messages, which the reminder text below uses.</div>`
   :v==='msg91'?`<div class="frow">
       <div><label>MSG91 Auth Key ${s.smsKeySet?'(saved — blank keeps it)':''}</label><input id="st-smskey" type="password" placeholder="${s.smsKeySet?'••••••••':'Paste auth key'}"></div>
       <div><label>Sender ID</label><input id="st-smssender" value="${esc(s.smsSender)}" placeholder="HPMPMF"></div>
@@ -2602,6 +2704,8 @@ if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch
   loadSeen();
   refreshNotifs(false);
   startNotifPolling();
+  syncPush();
+  nativeAuth();
   /* a reload (pull-to-refresh) keeps you on the same screen instead of
      dropping you back at the beginning */
   let back='home';
