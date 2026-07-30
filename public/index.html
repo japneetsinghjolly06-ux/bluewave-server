@@ -91,6 +91,17 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .flagimg{border-radius:2px;display:block}
 .pb-cc{font-size:15px;font-weight:700;color:var(--ink)}
 .pb-caret{font-size:11px;color:var(--mut);line-height:1}
+
+/* OTP screen */
+.otpwrap{max-width:420px;margin:0 auto;min-height:calc(100vh - 230px);display:flex;flex-direction:column;justify-content:center}
+.otpboxes{display:flex;gap:9px;justify-content:center;margin:22px 0 6px}
+.otpbox{width:46px;height:56px;text-align:center;font-size:22px;font-weight:700;color:var(--ink);
+  border:1.5px solid var(--line);border-radius:12px;background:#fff;padding:0;margin:0;
+  box-shadow:0 2px 8px rgba(11,42,74,.05);transition:border-color .15s,box-shadow .15s}
+.otpbox:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(27,166,224,.15)}
+.otpbox:not(:placeholder-shown){border-color:var(--navy)}
+@media(max-width:380px){.otpbox{width:42px;height:52px;font-size:20px}.otpboxes{gap:7px}}
+@media (max-height:640px){.otpwrap{min-height:0;padding-top:14px}}
 .ccpanel{position:relative;margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:10px;
   box-shadow:0 10px 30px rgba(11,42,74,.16);overflow:hidden;z-index:60}
 .ccpanel input{margin:8px;width:calc(100% - 16px);font-size:14px}
@@ -522,6 +533,7 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   <section id="view-admin" class="view"></section>
   <section id="view-reg" class="view"></section>
   <section id="view-notif" class="view"></section>
+  <section id="view-otp" class="view"></section>
 </main>
 
 <nav class="bnav" id="bnav"></nav>
@@ -553,12 +565,6 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
       </div>
       <div style="text-align:right;margin-top:8px">
         <a href="javascript:loginMode('email')" class="switchlink">Login with Email</a>
-      </div>
-      <div id="li-otp-wrap" style="display:none;margin-top:12px">
-        <label>Enter the 6-digit code</label>
-        <input id="li-otp" inputmode="numeric" maxlength="6" placeholder="123456">
-        <div class="hint" id="li-otp-note"></div>
-        <a href="javascript:sendOtp(1)" class="switchlink" style="font-size:12.5px">Send the code again</a>
       </div>
     </div>
 
@@ -754,6 +760,7 @@ function showView(v){
   if(v==='admin')renderAdmin(adminTab);
   if(v==='reg')renderRegDetail();
   if(v==='notif')renderNotifPage();
+  if(v==='otp')renderOtpPage();
   renderNav();window.scrollTo(0,0);
   try{sessionStorage.setItem('bw_view',v)}catch(e){}
 }
@@ -821,9 +828,9 @@ function renderNav(){
 }
 function renderHeader(){
   const b=$('hdrBack');
-  if(b){b.style.display=['product','auth','checkout','shop','reg','notif'].includes(currentView)?'block':'none';
+  if(b){b.style.display=['product','auth','checkout','shop','reg','notif','otp'].includes(currentView)?'block':'none';
     b.onclick=currentView==='auth'?closeAuth:currentView==='checkout'?closeCheckout:currentView==='shop'?()=>showView('category')
-      :currentView==='reg'?closeRegDetail:currentView==='notif'?closeNotifs:closeProduct;}
+      :currentView==='reg'?closeRegDetail:currentView==='notif'?closeNotifs:currentView==='otp'?closeOtp:closeProduct;}
   const h=$('hdrAuth');
   h.innerHTML=`<button class="bellbtn" onclick="openNotifications()" title="Notifications">${PICON.bell}<span class="belldot" id="bellDot" style="display:none"></span></button>`;
   updateBell();
@@ -1599,8 +1606,6 @@ function ccPick(iso,dial,len){
   try{localStorage.setItem('bw_cc',dial);localStorage.setItem('bw_cc_iso',iso)}catch(e){}
   paintCc();ccClose();
   /* a new country means the old code no longer applies */
-  otpSentTo='';
-  const w=$('li-otp-wrap');if(w)w.style.display='none';
   const b=$('li-btn');if(b&&loginWay==='mobile')b.textContent='Get OTP';
   const m=$('li-mob');if(m)m.focus();
 }
@@ -1616,7 +1621,7 @@ function localLen(){
   return c?c[3]:10;
 }
 
-let loginWay='mobile',otpSentTo='';
+let loginWay='mobile';
 function loginMode(way){
   loginWay=way;
   ccClose();
@@ -1625,7 +1630,7 @@ function loginMode(way){
   m.style.display=way==='mobile'?'block':'none';
   e.style.display=way==='email'?'block':'none';
   const err=$('li-err');if(err)err.style.display='none';
-  if(b)b.textContent=(way==='mobile'&&!otpSentTo)?'Get OTP':'Login';
+  if(b)b.textContent=way==='mobile'?'Get OTP':'Login';
 }
 function agreed(){
   const c=$('li-agree');
@@ -1641,10 +1646,9 @@ function agreed(){
 async function loginGo(){
   if(!agreed())return;
   if(loginWay==='email')return doLogin();
-  if(!otpSentTo)return sendOtp();
-  return doOtpLogin();
+  return sendOtp();
 }
-async function sendOtp(again){
+async function sendOtp(){
   const err=$('li-err');err.style.display='none';
   const local=($('li-mob').value||'').replace(/\D/g,'');
   const want=localLen();
@@ -1652,28 +1656,121 @@ async function sendOtp(again){
     err.textContent='Enter your '+want+'-digit mobile number.';err.style.display='block';return;
   }
   const mob=fullMobile();
+  const btn=$('li-btn');if(btn){btn.disabled=true;btn.textContent='Sending…'}
   try{
     const d=await api('/otp/request','POST',{mobile:mob});
-    otpSentTo=mob;
-    $('li-otp-wrap').style.display='block';
-    $('li-btn').textContent='Login';
-    $('li-otp-note').textContent=d.sent
-      ? (d.via==='email'?'Code emailed to '+(d.to||'your registered email')+'. It is valid for 10 minutes.'
-         :'Code sent to '+(d.to||('+'+mob))+'. It is valid for 10 minutes.')
-      : 'Our team will send your code shortly. Enter it here once it arrives.';
-    if(!again)setTimeout(()=>{const o=$('li-otp');if(o)o.focus()},150);
-    toast(d.sent?'Code sent':'Request sent to our team');
+    openOtpPage({mode:'login',mobile:mob,shown:d.to||('+'+mob),
+      note:d.sent?(d.via==='email'?'We emailed a 6-digit code to '+(d.to||'your registered email'):'')
+        :'Our team will send your code shortly. Enter it here once it arrives.'});
   }catch(e){err.textContent=e.message;err.style.display='block'}
+  finally{const b=$('li-btn');if(b){b.disabled=false;b.textContent='Get OTP'}}
 }
-async function doOtpLogin(){
-  const err=$('li-err');err.style.display='none';
-  const code=$('li-otp').value.trim();
-  if(!/^\d{6}$/.test(code)){err.textContent='Enter the 6-digit code.';err.style.display='block';return}
+/* ============ OTP SCREEN ============
+   A page of its own with six single-digit boxes. Used for signing in and for
+   confirming the number right after registering — one code, one SMS, and the
+   number is verified at the same time. */
+let otpCtx={mode:'login',mobile:'',shown:'',note:''};
+let otpTick=null;
+function openOtpPage(ctx){otpCtx={...otpCtx,...ctx};showView('otp')}
+function closeOtp(){
+  if(otpTick){clearInterval(otpTick);otpTick=null}
+  if(otpCtx.mode==='signup'&&currentUser())showView('profile');
+  else openAuth('login');
+}
+function renderOtpPage(){
+  const v=$('view-otp');
+  v.innerHTML=`<div class="otpwrap">
+    <div class="mtitle" style="text-align:center">${otpCtx.mode==='signup'?'Confirm your number':'Enter the code'}</div>
+    <div class="msub" style="text-align:center">${otpCtx.note||('We sent a 6-digit code to <b>'+esc(otpCtx.shown||otpCtx.mobile)+'</b>')}</div>
+    <div class="otpboxes" id="otpBoxes">
+      ${[0,1,2,3,4,5].map(i=>`<input class="otpbox" id="otp${i}" inputmode="numeric" maxlength="1" placeholder=" " autocomplete="${i===0?'one-time-code':'off'}" aria-label="Digit ${i+1}">`).join('')}
+    </div>
+    <div class="err" id="otp-err"></div>
+    <button class="wide blue" id="otp-btn" onclick="submitOtpPage()">Verify</button>
+    <div style="text-align:center;margin-top:14px;font-size:13.5px;color:var(--mut)">
+      Didn't get it? <a href="javascript:resendOtpPage()" class="switchlink" id="otp-resend">Resend code</a><span id="otp-timer"></span>
+    </div>
+    <div style="text-align:center;margin-top:10px">
+      <a href="javascript:closeOtp()" class="switchlink" style="color:var(--mut);font-size:13px">
+        ${otpCtx.mode==='signup'?'Do this later':'Change number'}</a>
+    </div>
+  </div>`;
+  wireOtpBoxes();
+  startOtpTimer(30);
+  setTimeout(()=>{const f=$('otp0');if(f)f.focus()},120);
+  window.scrollTo(0,0);
+}
+function otpValue(){return [0,1,2,3,4,5].map(i=>($('otp'+i)||{}).value||'').join('')}
+function wireOtpBoxes(){
+  [0,1,2,3,4,5].forEach(i=>{
+    const el=$('otp'+i);if(!el)return;
+    el.addEventListener('input',()=>{
+      el.value=el.value.replace(/\D/g,'').slice(-1);
+      if(el.value&&i<5)$('otp'+(i+1)).focus();
+      if(otpValue().length===6)submitOtpPage();
+    });
+    el.addEventListener('keydown',e=>{
+      if(e.key==='Backspace'&&!el.value&&i>0){$('otp'+(i-1)).focus();$('otp'+(i-1)).value=''}
+      if(e.key==='ArrowLeft'&&i>0)$('otp'+(i-1)).focus();
+      if(e.key==='ArrowRight'&&i<5)$('otp'+(i+1)).focus();
+    });
+    el.addEventListener('paste',e=>{
+      const t=((e.clipboardData||window.clipboardData).getData('text')||'').replace(/\D/g,'').slice(0,6);
+      if(!t)return;
+      e.preventDefault();
+      [...t].forEach((d,n)=>{const b=$('otp'+n);if(b)b.value=d});
+      const next=Math.min(t.length,5);$('otp'+next).focus();
+      if(t.length===6)submitOtpPage();
+    });
+  });
+}
+function startOtpTimer(secs){
+  let left=secs;
+  if(otpTick)clearInterval(otpTick);
+  const paint=()=>{
+    const link=$('otp-resend'),lbl=$('otp-timer');
+    if(!lbl||!link)return;
+    if(left>0){link.style.pointerEvents='none';link.style.opacity='.45';lbl.textContent=' in '+left+'s'}
+    else{link.style.pointerEvents='';link.style.opacity='';lbl.textContent='';clearInterval(otpTick);otpTick=null}
+  };
+  paint();
+  otpTick=setInterval(()=>{left--;paint()},1000);
+}
+async function submitOtpPage(){
+  const err=$('otp-err');err.style.display='none';
+  const code=otpValue();
+  if(code.length!==6){err.textContent='Enter all six digits.';err.style.display='block';return}
+  const btn=$('otp-btn');if(btn){btn.disabled=true;btn.textContent='Checking…'}
   try{
-    const d=await api('/otp/login','POST',{mobile:otpSentTo,code});
-    otpSentTo='';
-    afterLogin(d);
-  }catch(e){err.textContent=e.message;err.style.display='block'}
+    if(otpCtx.mode==='signup'){
+      const d=await api('/verify','POST',{kind:'mobile',code});
+      state.user=d.user;
+      if(otpTick)clearInterval(otpTick);
+      toast('Number confirmed');
+      showView('profile');
+    }else{
+      const d=await api('/otp/login','POST',{mobile:otpCtx.mobile,code});
+      if(otpTick)clearInterval(otpTick);
+      afterLogin(d);
+    }
+  }catch(e){
+    err.textContent=e.message;err.style.display='block';
+    [0,1,2,3,4,5].forEach(i=>{const b=$('otp'+i);if(b)b.value=''});
+    const f=$('otp0');if(f)f.focus();
+  }finally{
+    const b2=$('otp-btn');if(b2){b2.disabled=false;b2.textContent='Verify'}
+  }
+}
+async function resendOtpPage(){
+  try{
+    const d=otpCtx.mode==='signup'
+      ? await api('/verify/resend','POST',{kind:'mobile'})
+      : await api('/otp/request','POST',{mobile:otpCtx.mobile});
+    otpCtx.shown=d.to||otpCtx.shown;
+    const err=$('otp-err');if(err)err.style.display='none';
+    toast(d.sent?(d.via==='email'?'Code emailed to you':'Code sent again'):'Our team will send it shortly');
+    startOtpTimer(30);
+  }catch(e){const err=$('otp-err');err.textContent=e.message;err.style.display='block'}
 }
 function afterLogin(d){
   token=d.token;localStorage.setItem('bw_token',token);
@@ -1737,8 +1834,12 @@ async function doRegister(){
       pincode:$('rg-pincode').value.trim(),whatsapp:$('rg-whatsapp').value.trim()});
     token=d.token;localStorage.setItem('bw_token',token);
     state.role='user';state.user=d.user;
-    renderHeader();showView('profile');
-    toast('✅ Account created! Our admin team will verify your GSTIN and approve dealer pricing.');
+    renderHeader();refreshNotifs(false);syncPush();nativeAuth();
+    toast('Account created — our team will verify your GSTIN and approve dealer pricing.');
+    /* the code sent at sign-up confirms the number straight away: one SMS, not two */
+    const num=$('rg-whatsapp').value.trim()||$('rg-phone').value.trim();
+    openOtpPage({mode:'signup',mobile:num,shown:num,
+      note:'To finish, enter the 6-digit code we just sent to <b>'+esc(num)+'</b>'});
   }catch(e){err.textContent=e.message;err.style.display='block'}
 }
 
@@ -1817,38 +1918,29 @@ function genModal(title,html){$('genBox').innerHTML=`<button class="mx" onclick=
 /* Customer-side verification. The code is issued at registration and passed on
    by the admin over WhatsApp or email, which proves the number/address is real. */
 function verifyPanel(){
+  /* The number is confirmed with the code sent at sign-up or sign-in, so there
+     is no second prompt here — that would mean paying for another SMS. */
   const u=currentUser();
   if(!u||u.mobileOk)return '';
   return `<div class="cardbox" style="border:1px solid #ffd9a0;background:#fffaf0">
-    <h3>Verify your WhatsApp number</h3>
-    <div class="hint" style="margin-bottom:10px">${(state.payInfo&&(state.payInfo.smsProvider||state.payInfo.mailReady))
-      ?'A 6-digit code has been sent to <b>'+esc(u.whatsapp||u.phone)+'</b>'+((state.payInfo&&state.payInfo.mailReady)?' or your email <b>'+esc(u.email)+'</b>':'')+'. Enter it below so we can reach you about orders and dispatch.'
-      :'Our team sends a 6-digit code to <b>'+esc(u.whatsapp||u.phone)+'</b>. Enter it below so we can reach you about orders and dispatch.'}</div>
-    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
-      <div style="max-width:190px"><label>6-digit code</label>
-        <input id="vf-mobile" inputmode="numeric" maxlength="6" placeholder="123456"></div>
-      <button class="smallbtn ok-btn" onclick="submitVerify()">Verify number</button>
-      <button class="smallbtn gr-btn" onclick="resendCode()">Not received it?</button>
-    </div>
-    <div class="hint" style="margin-top:10px">You can order at MRP straight away — verification only unlocks dealer pricing once your account is approved. Any trouble, WhatsApp us on <b>${esc((state.payInfo&&state.payInfo.whatsapp)||'+91 79952 65800')}</b>.</div>
+    <h3>Confirm your mobile number</h3>
+    <div class="hint" style="margin-bottom:10px">Your number is not confirmed yet. Confirming it lets us reach you about orders and dispatch.</div>
+    <button class="wide blue" onclick="startVerifyAgain()">Send me a code</button>
   </div>`;
+}
+async function startVerifyAgain(){
+  try{
+    const u=currentUser();
+    const d=await api('/verify/resend','POST',{kind:'mobile'});
+    openOtpPage({mode:'signup',mobile:(u&&(u.whatsapp||u.phone))||'',shown:(u&&(u.whatsapp||u.phone))||'',
+      note:d.sent?'':'Our team will send your code shortly. Enter it here once it arrives.'});
+  }catch(e){toast(e.message,1)}
 }
 async function resendCode(){
   try{
     const d=await api('/verify/resend','POST',{kind:'mobile'});
     toast(d.sent?(d.via==='email'?'Code emailed to you':'Code sent again to your mobile')
       :'Our team has been told — they will send the code shortly');
-  }catch(e){toast(e.message,1)}
-}
-async function submitVerify(){
-  const el=$('vf-mobile');if(!el)return;
-  const code=el.value.trim();
-  if(!/^\d{6}$/.test(code))return toast('Enter the 6-digit code',1);
-  try{
-    const d=await api('/verify','POST',{kind:'mobile',code});
-    state.user=d.user;
-    toast('WhatsApp number verified');
-    renderProfile();renderHeader();
   }catch(e){toast(e.message,1)}
 }
 async function renderProfile(){
@@ -2955,14 +3047,24 @@ function smsKeysUI(){
   const s=window.__settings||{};
   const v=$('st-smsprov').value;
   box.innerHTML=v==='msg91'?`<div class="frow">
-      <div><label>Auth key ${s.smsKeySet?'(saved — blank keeps it)':''}</label><input id="st-smskey" type="password" placeholder="${s.smsKeySet?'••••••••':'From MSG91 → API → Auth key'}"></div>
-      <div><label>Sender ID (6 letters)</label><input id="st-smssender" value="${esc(s.smsSender||'HPMPMF')}" maxlength="6"></div>
+      <div><label>Auth key ${s.smsKeySet?'(saved — blank keeps it)':''}</label><input id="st-smskey" type="password" placeholder="${s.smsKeySet?'••••••••':'MSG91 dashboard → API → Auth key'}"></div>
+      <div><label>Sender ID (6 letters)</label><input id="st-smssender" value="${esc(s.smsSender||'HPMPMF')}" maxlength="6" placeholder="HPMPMF"></div>
     </div>
     <div class="frow">
-      <div><label>DLT template ID (India)</label><input id="st-smstpl" value="${esc(s.smsTemplateId||'')}" placeholder="Leave blank to use the plain SMS route"></div>
+      <div><label>DLT template ID</label><input id="st-smstpl" value="${esc(s.smsTemplateId||'')}" placeholder="e.g. 651a2b3c4d5e6f7a8b9c0d1e"></div>
       <div><label>Route</label><input id="st-smsroute" value="${esc(s.smsRoute||'4')}" placeholder="4 = transactional"></div>
     </div>
-    <div class="hint">Indian operators require DLT registration: register your sender ID and an OTP template on the MSG91 dashboard, then paste the template ID here. Without it, messages to Indian numbers are usually rejected by the operator, not by MSG91.</div>`
+    <div class="notice info" style="margin-top:8px">
+      ${s.smsTemplateId
+        ? 'With a template ID saved, codes go through MSG91\'s <b>OTP API</b>, and reminders through the <b>Flow API</b>.'
+        : 'No template ID yet, so everything goes through the plain <b>Send SMS</b> route. That works for test accounts and international numbers, but Indian operators will drop it.'}
+    </div>
+    <div class="hint" style="margin-top:8px"><b>Getting MSG91 working, in order:</b><br>
+      1. MSG91 → <b>Auth key</b> — paste it above.<br>
+      2. Register your <b>sender ID</b> (6 letters, e.g. HPMPMF) on the DLT portal and add it in MSG91.<br>
+      3. Create an <b>OTP template</b> on DLT with one variable, e.g. <i>"##OTP## is your Blue Wave verification code."</i>, get it approved, add it in MSG91 and paste its <b>template ID</b> above.<br>
+      4. Press <b>Send test message</b> — the reply from MSG91 is shown in full, including which endpoint was used.<br>
+      Until the DLT steps are done, keep the email settings filled in so codes still reach dealers.</div>`
   :v==='fast2sms'?`<div><label>API key ${s.smsKeySet?'(saved — blank keeps it)':''}</label><input id="st-smskey" type="password" placeholder="${s.smsKeySet?'••••••••':'From Fast2SMS → Dev API'}"></div>
     <div class="hint">Uses the quick transactional route, which works without DLT approval for Indian numbers. Cheapest way to get started.</div>`
   :v==='twilio'?`<div class="frow">

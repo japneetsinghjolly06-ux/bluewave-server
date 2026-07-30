@@ -1,4 +1,4 @@
-const CACHE = 'bluewave-v92';
+const CACHE = 'bluewave-v94';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
