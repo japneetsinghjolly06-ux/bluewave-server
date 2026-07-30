@@ -69,8 +69,17 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .npop .nt span{color:var(--mut);font-size:12.5px;line-height:1.45}
 .npop .nx{background:none;border:none;color:var(--mut);font-size:14px;padding:0 2px;line-height:1}
 .citem.unread{background:#f2fbff;border-radius:10px}
-.bellbtn.spin svg{animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* pull-to-refresh indicator */
+#ptr{position:fixed;top:-40px;left:50%;margin-left:-19px;width:38px;height:38px;border-radius:50%;
+  background:#fff;border:1px solid var(--line);box-shadow:0 4px 14px rgba(11,42,74,.14);
+  display:flex;align-items:center;justify-content:center;z-index:250;opacity:0;pointer-events:none;
+  transition:opacity .18s ease}
+#ptr .ptrs{display:flex;transition:transform .18s ease}
+#ptr svg{width:20px;height:20px;stroke:var(--blue)}
+#ptr.ready .ptrs{transform:rotate(180deg)}
+#ptr.ready{border-color:var(--blue)}
+#ptr.busy .ptrs{animation:spin .8s linear infinite}
 
 /* ===== registrations: a name list, then a full page per business ===== */
 .reglist{display:flex;flex-direction:column;gap:8px}
@@ -703,8 +712,7 @@ function renderHeader(){
     b.onclick=currentView==='auth'?closeAuth:currentView==='checkout'?closeCheckout:currentView==='shop'?()=>showView('category')
       :currentView==='reg'?closeRegDetail:closeProduct;}
   const h=$('hdrAuth');
-  h.innerHTML=`<button class="bellbtn" id="refBtn" onclick="softRefresh()" title="Refresh">${PICON.refresh}</button>
-    <button class="bellbtn" onclick="openNotifications()" title="Notifications">${PICON.bell}<span class="belldot" id="bellDot" style="display:none"></span></button>`;
+  h.innerHTML=`<button class="bellbtn" onclick="openNotifications()" title="Notifications">${PICON.bell}<span class="belldot" id="bellDot" style="display:none"></span></button>`;
   updateBell();
 }
 /* Refresh inside the app: pulls fresh prices, orders and notifications and
@@ -714,7 +722,7 @@ let refreshing=false;
 async function softRefresh(){
   if(refreshing)return;
   refreshing=true;
-  const b=$('refBtn');if(b)b.classList.add('spin');
+  ptrBusy(true);
   try{
     await Promise.all([
       refreshProducts(),
@@ -733,9 +741,75 @@ async function softRefresh(){
     toast('Could not refresh — check your connection',1);
   }finally{
     refreshing=false;
-    const b2=$('refBtn');if(b2)b2.classList.remove('spin');
+    ptrBusy(false);
   }
 }
+
+/* Pull down at the top of any screen to refresh. This runs the same in-app
+   refresh as before: fresh prices, orders and notifications, redrawn where you
+   are. The page itself is never reloaded, so the app never restarts. */
+function ptrEl(){
+  let el=$('ptr');
+  if(!el){
+    el=document.createElement('div');
+    el.id='ptr';
+    el.innerHTML='<span class="ptrs">'+PICON.refresh+'</span>';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function ptrShow(px,ready){
+  const el=ptrEl();
+  el.style.transform='translateY('+Math.min(px,96)+'px)';
+  el.style.opacity=String(Math.min(1,px/46));
+  el.classList.toggle('ready',!!ready);
+}
+function ptrHide(){
+  const el=ptrEl();
+  el.style.transform='translateY(0)';
+  el.style.opacity='0';
+  el.classList.remove('ready','busy');
+}
+function ptrBusy(on){
+  const el=ptrEl();
+  if(on){el.classList.add('busy');el.classList.remove('ready');el.style.opacity='1';el.style.transform='translateY(56px)'}
+  else ptrHide();
+}
+(function(){
+  const TRIGGER=72;
+  let startY=null,pulling=false,dy=0;
+  const atTop=()=>(window.scrollY||document.documentElement.scrollTop||0)<=0;
+  const blocked=()=>refreshing||document.querySelector('.modal.on')||currentView==='auth';
+  document.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1||blocked()||!atTop()){startY=null;return}
+    startY=e.touches[0].clientY;pulling=false;dy=0;
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(startY===null||blocked())return;
+    dy=e.touches[0].clientY-startY;
+    if(dy>6&&atTop()){
+      pulling=true;
+      ptrShow(dy*0.55,dy>=TRIGGER);
+      if(e.cancelable)e.preventDefault();   /* stop the page rubber-banding instead */
+    }else if(pulling&&dy<=6){
+      pulling=false;ptrHide();
+    }
+  },{passive:false});
+  document.addEventListener('touchend',()=>{
+    if(pulling&&dy>=TRIGGER)softRefresh();
+    else if(pulling)ptrHide();
+    startY=null;pulling=false;dy=0;
+  },{passive:true});
+  /* mouse wheel / trackpad overscroll on desktop */
+  let wheelPull=0,wheelT=null;
+  window.addEventListener('wheel',e=>{
+    if(blocked()||!atTop()||e.deltaY>=0){wheelPull=0;return}
+    wheelPull+=-e.deltaY;
+    if(wheelPull>4)ptrShow(wheelPull*0.5,wheelPull>=140);
+    clearTimeout(wheelT);
+    wheelT=setTimeout(()=>{if(wheelPull>=140)softRefresh();else ptrHide();wheelPull=0},170);
+  },{passive:true});
+})();
 
 /* ============ NOTIFICATIONS ============
    Orders, registrations, approvals and offers arrive from the server. New ones
@@ -2291,7 +2365,6 @@ async function renderSettings(){
   ${nativeApp()?`<div class="cardbox" style="margin-top:16px"><h3>📱 App maintenance</h3>
     <div class="hint" style="margin-bottom:10px">Backend team only. Dealers never see these — they are inside the admin login. The server address decides which database this phone talks to.</div>
     <div style="font-size:13px;margin-bottom:8px">Connected to: <b id="nativeSrv">${esc(location.origin.startsWith('file')?'Offline copy on this phone':location.origin)}</b></div>
-    <button class="smallbtn gr-btn" onclick="softRefresh()">Refresh data</button>
     <button class="smallbtn gr-btn" onclick="nativeCmd('server')">Server address</button>
     <button class="smallbtn gr-btn" onclick="nativeCmd('offline')">Load offline copy</button>
   </div>`:''}`;
