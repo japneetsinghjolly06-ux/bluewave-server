@@ -147,6 +147,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS notifications(
   order_id TEXT DEFAULT '', created_at TEXT, read_at TEXT DEFAULT '')`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, created_at)');
 
+/* codes issued to numbers that have not registered yet */
+db.exec(`CREATE TABLE IF NOT EXISTS otp_codes(
+  mobile TEXT PRIMARY KEY, code TEXT, created_at TEXT, tries INTEGER DEFAULT 0)`);
+
 /* browsers/phones signed up for push (one row per device) */
 db.exec(`CREATE TABLE IF NOT EXISTS push_subs(
   id TEXT PRIMARY KEY, user_id TEXT, endpoint TEXT UNIQUE, p256dh TEXT, auth TEXT, created_at TEXT)`);
@@ -515,43 +519,136 @@ const otpAt = new Map();
 const OTP_WINDOW_MS = 10 * 60 * 1000;
 
 app.post('/api/otp/request', async (req, res) => {
-  const idRaw = String(req.body?.mobile || req.body?.id || '').trim();
-  if (!idRaw) return res.status(400).json({ error: 'Enter your registered mobile number.' });
-  const u = findAccount(idRaw);
-  /* same answer either way, so the form can't be used to find out who is registered */
-  const generic = { ok: true, sent: false, hint: 'If that number is registered, a code is on its way.' };
-  if (!u) return res.json(generic);
-  const key = 'o:' + u.id;
+  const raw = String(req.body?.mobile || req.body?.id || '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 8 || digits.length > 15)
+    return res.status(400).json({ error: 'Enter a valid mobile number.' });
+
+  const u = findAccount(raw);
+  const key = 'o:' + (u ? u.id : digits);
   if (Date.now() - (otpAt.get(key) || 0) < 45000)
     return res.status(429).json({ error: 'A code was just sent. Please wait a moment before asking again.' });
   otpAt.set(key, Date.now());
 
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  db.prepare('UPDATE users SET login_code=?, login_at=? WHERE id=?').run(code, now(), u.id);
-  const to = String(u.whatsapp || u.phone || '');
-  const r = await sendCode(u, 'login', code, 'They are signing in.');
-  const mask = to.replace(/\D/g, '').slice(-10).replace(/^(\d{2})\d{6}(\d{2})$/, '$1******$2');
-  const maskMail = String(u.email || '').replace(/^(.).*(@.*)$/, '$1•••$2');
+  let r;
+  if (u) {
+    db.prepare('UPDATE users SET login_code=?, login_at=? WHERE id=?').run(code, now(), u.id);
+    r = await sendCode(u, 'login', code, 'They are signing in.');
+  } else {
+    /* nobody has this number yet — hold the code until they verify, then the
+       account is created for them */
+    db.prepare(`INSERT INTO otp_codes(mobile,code,created_at,tries) VALUES(?,?,?,0)
+      ON CONFLICT(mobile) DO UPDATE SET code=excluded.code, created_at=excluded.created_at, tries=0`)
+      .run(digits, code, now());
+    r = await sendCode({ id: 'new:' + digits, phone: digits, whatsapp: digits, name: '', company: '', email: '' },
+      'login', code, 'New number — they are signing in for the first time.');
+  }
+  const mask = digits.slice(-10).replace(/^(\d{2})\d{6}(\d{2})$/, '$1******$2');
+  const maskMail = u ? String(u.email || '').replace(/^(.).*(@.*)$/, '$1•••$2') : '';
   res.json({ ok: true, sent: r.ok, withAdmin: !r.ok, via: r.via || '',
     to: r.via === 'email' ? maskMail : mask });
 });
 
 app.post('/api/otp/login', (req, res) => {
-  const idRaw = String(req.body?.mobile || req.body?.id || '').trim();
+  const raw = String(req.body?.mobile || req.body?.id || '').trim();
+  const digits = raw.replace(/\D/g, '');
   const code = String(req.body?.code || '').trim();
   if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit code.' });
-  const u = findAccount(idRaw);
-  if (!u || !u.login_code) return res.status(400).json({ error: 'Ask for a code first.' });
-  const age = Date.now() - new Date(u.login_at || 0).getTime();
+
+  const u = findAccount(raw);
+
+  /* someone we already know */
+  if (u) {
+    if (!u.login_code) return res.status(400).json({ error: 'Ask for a code first.' });
+    const age = Date.now() - new Date(u.login_at || 0).getTime();
+    if (!(age >= 0 && age < OTP_WINDOW_MS)) {
+      db.prepare("UPDATE users SET login_code='' WHERE id=?").run(u.id);
+      return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
+    }
+    if (code !== String(u.login_code)) return res.status(400).json({ error: 'That code is not right. Please check and try again.' });
+    db.prepare("UPDATE users SET login_code='', login_at='', mobile_ok=1 WHERE id=?").run(u.id);
+    const token = crypto.randomBytes(24).toString('hex');
+    db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, u.id, 'user', now());
+    const fresh = db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
+    return res.json({ token, role: 'user', user: pubUser(fresh),
+      needsProfile: fresh.status === 'incomplete' });
+  }
+
+  /* a number we have never seen — check the held code, then start their account */
+  const row = db.prepare('SELECT * FROM otp_codes WHERE mobile=?').get(digits);
+  if (!row) return res.status(400).json({ error: 'Ask for a code first.' });
+  if ((row.tries || 0) >= 5) {
+    db.prepare('DELETE FROM otp_codes WHERE mobile=?').run(digits);
+    return res.status(429).json({ error: 'Too many wrong attempts. Please ask for a new code.' });
+  }
+  const age = Date.now() - new Date(row.created_at || 0).getTime();
   if (!(age >= 0 && age < OTP_WINDOW_MS)) {
-    db.prepare("UPDATE users SET login_code='' WHERE id=?").run(u.id);
+    db.prepare('DELETE FROM otp_codes WHERE mobile=?').run(digits);
     return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
   }
-  if (code !== String(u.login_code)) return res.status(400).json({ error: 'That code is not right. Please check and try again.' });
-  db.prepare("UPDATE users SET login_code='', login_at='', mobile_ok=1 WHERE id=?").run(u.id);
+  if (code !== String(row.code)) {
+    db.prepare('UPDATE otp_codes SET tries=tries+1 WHERE mobile=?').run(digits);
+    return res.status(400).json({ error: 'That code is not right. Please check and try again.' });
+  }
+
+  db.prepare('DELETE FROM otp_codes WHERE mobile=?').run(digits);
+  const id = uid('u');
+  const salt = crypto.randomBytes(8).toString('hex');
+  const ten = digits.slice(-10);
+  db.prepare(`INSERT INTO users(id,name,phone,email,pass_hash,salt,company,gstin,type,addr,city,state,pincode,
+      whatsapp,status,mobile_ok,email_ok,created_at)
+    VALUES(?,'',?,?,?,?,'',NULL,'Dealer','','','','',?,'incomplete',1,1,?)`)
+    .run(id, ten, id + '@pending.bluewave', hashPw(crypto.randomBytes(12).toString('hex'), salt), salt, ten, now());
   const token = crypto.randomBytes(24).toString('hex');
-  db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, u.id, 'user', now());
-  res.json({ token, role: 'user', user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)) });
+  db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, id, 'user', now());
+  res.json({ token, role: 'user', user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)),
+    needsProfile: true });
+});
+
+/* the details a first-time customer fills in after verifying their number */
+app.post('/api/me/complete', requireUser, (req, res) => {
+  const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
+  if (!u) return res.status(404).json({ error: 'Account not found.' });
+  if (u.status !== 'incomplete')
+    return res.status(400).json({ error: 'This account is already registered.' });
+
+  const b = req.body || {};
+  const f = {};
+  for (const k of ['name', 'email', 'company', 'gstin', 'type', 'addr', 'city', 'state', 'pincode'])
+    f[k] = String(b[k] || '').trim();
+  f.gstin = f.gstin.toUpperCase();
+  const phone = String(b.phone || u.phone || '').replace(/\D/g, '').slice(-10);
+  const waNum = String(b.whatsapp || '').replace(/\D/g, '').slice(-10) || phone;
+
+  if (!f.name || !f.company || !f.email || !f.gstin || !f.addr || !f.city || !f.state)
+    return res.status(400).json({ error: 'Please fill in every required field.' });
+  if (!/^\S+@\S+\.\S+$/.test(f.email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+  if (!/^[1-9]\d{5}$/.test(f.pincode)) return res.status(400).json({ error: 'Enter a valid 6-digit pincode.' });
+  if (!GSTIN_RE.test(f.gstin)) return res.status(400).json({ error: 'GSTIN format looks invalid. Expected 15 characters like 36ABCDE1234F1Z5.' });
+  if (f.email.toLowerCase() === String(getSetting('adminEmail')).toLowerCase())
+    return res.status(400).json({ error: 'This email is reserved.' });
+  if (db.prepare('SELECT 1 FROM users WHERE lower(email)=lower(?) AND id<>?').get(f.email, u.id))
+    return res.status(400).json({ error: 'An account with this email already exists.' });
+  if (db.prepare('SELECT 1 FROM users WHERE gstin=? AND id<>?').get(f.gstin, u.id))
+    return res.status(400).json({ error: 'This GSTIN is already registered — please contact us.' });
+
+  const type = ['Dealer', 'Distributor', 'Retailer', 'Contractor'].includes(f.type) ? f.type : 'Dealer';
+  let hash = u.pass_hash, salt = u.salt;
+  if (b.password) {
+    if (String(b.password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    salt = crypto.randomBytes(8).toString('hex');
+    hash = hashPw(String(b.password), salt);
+  }
+  db.prepare(`UPDATE users SET name=?, email=?, company=?, gstin=?, type=?, addr=?, city=?, state=?,
+      pincode=?, phone=?, whatsapp=?, pass_hash=?, salt=?, status='pending' WHERE id=?`)
+    .run(f.name, f.email, f.company, f.gstin, type, f.addr, f.city, f.state, f.pincode,
+      phone, waNum, hash, salt, u.id);
+
+  notifyAdmin('registration', 'New registration — ' + f.company,
+    f.name + ' (' + type + ') from ' + (f.city || '—') + ', mobile ' + phone +
+    '. Number already verified by OTP. Check the GSTIN and approve.');
+  res.json({ ok: true, user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)) });
 });
 
 /* ---------- forgotten password ----------
@@ -1406,8 +1503,9 @@ async function sendCode(user, purpose, code, extraNote) {
     .run('code:' + user.id, purpose.replace(/\s+/g, '_'), via || ss('smsProvider') || 'admin',
       via === 'email' ? user.email : to, text, r.ok ? 'sent' : r.status, now());
 
-  if (!r.ok) notifyAdmin('verify', purpose[0].toUpperCase() + purpose.slice(1) + ' code — ' + (user.company || user.name),
-    (user.name || '') + ' (' + to + ') needs their ' + purpose + ' code: ' + code + '.' +
+  if (!r.ok) notifyAdmin('verify', purpose[0].toUpperCase() + purpose.slice(1) + ' code — ' +
+      (user.company || user.name || ('+91 ' + String(to).replace(/\D/g, '').slice(-10))),
+    (user.name ? user.name + ' ' : '') + '(' + to + ') needs their ' + purpose + ' code: ' + code + '.' +
     (extraNote ? ' ' + extraNote : '') + ' Send it on WhatsApp.');
   return { ...r, via };
 }

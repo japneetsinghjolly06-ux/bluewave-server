@@ -630,15 +630,15 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
     </div>
   </div>
   <div id="pane-register" style="display:none">
-    <div class="mtitle">Create your account</div>
-    <div class="msub">Just a few details to get started. Your GSTIN is verified by our team before dealer pricing is unlocked (usually within 24 hours).</div>
+    <div class="mtitle" id="rg-title">Create your account</div>
+    <div class="msub" id="rg-sub">Just a few details to get started. Your GSTIN is verified by our team before dealer pricing is unlocked (usually within 24 hours).</div>
     <div class="frow">
       <div><label>Your full name <span class="req">*</span></label><input id="rg-name" placeholder="Full name"></div>
       <div><label>Mobile number <span class="req">*</span></label><input id="rg-phone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>
     </div>
     <div class="frow">
       <div><label>Email <span class="req">*</span></label><input id="rg-email" type="email" placeholder="you@business.com"></div>
-      <div><label>Password <span class="req">*</span></label><input id="rg-pass" type="password" placeholder="Min 6 characters"></div>
+      <div id="rg-passrow"><label>Password <span class="req">*</span></label><input id="rg-pass" type="password" placeholder="Min 6 characters"></div>
     </div>
     <label>WhatsApp number</label><input id="rg-whatsapp" inputmode="numeric" maxlength="10" placeholder="Leave blank if same as mobile">
     <label>Company name <span class="req">*</span></label><input id="rg-company" placeholder="e.g., Sharma Electricals & Traders">
@@ -653,9 +653,9 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
     </div>
     <label>Pincode <span class="req">*</span></label><input id="rg-pincode" inputmode="numeric" maxlength="6" placeholder="6-digit pincode">
     <div class="err" id="rg-err"></div>
-    <button class="wide" onclick="doRegister()">Create account</button>
+    <button class="wide" id="rg-btn" onclick="doRegister()">Create account</button>
     <div class="hint" style="text-align:center;margin-top:8px">By continuing, you agree to our terms and privacy policy.</div>
-    <div style="text-align:center;font-size:13.5px;margin-top:14px">
+    <div style="text-align:center;font-size:13.5px;margin-top:14px" id="rg-back">
       Already registered? <a href="javascript:authTab('login')" style="font-weight:700">Sign in</a>
     </div>
   </div>
@@ -706,7 +706,7 @@ function toast(msg,err){const t=$('toast');t.textContent=msg;t.className=err?'er
 function openModal(id){$(id).classList.add('on')}
 function closeModal(id){$(id).classList.remove('on')}
 const STATUS_LABEL={awaiting_payment:'Awaiting Payment',payment_submitted:'Payment Submitted',paid:'Paid — Online',confirmed:'Confirmed',shipped:'Shipped',delivered:'Delivered',cancelled:'Cancelled'};
-const USTATUS_LABEL={pending:'Pending Approval',approved:'Approved Dealer',rejected:'Rejected'};
+const USTATUS_LABEL={incomplete:'Details pending',pending:'Pending Approval',approved:'Approved Dealer',rejected:'Rejected'};
 function copyTxt(t){navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>toast('Copied: '+t)).catch(()=>{})}
 let cart=[];try{cart=JSON.parse(localStorage.getItem('bw_cart_v3'))||[]}catch(e){}
 function saveCart(){localStorage.setItem('bw_cart_v3',JSON.stringify(cart))}
@@ -1170,6 +1170,7 @@ function renderHome(){
   const cats=[...new Set(state.products.map(p=>p.cat))];
   const welcome=isAdmin()?`<div class="notice info">Logged in as <b>Admin</b> — open the Admin tab to manage approvals, orders and pricing.</div>`
     :u&&u.status==='approved'?`<div class="notice ok">Welcome back, <b>${esc(u.company)}</b> — dealer pricing is active.</div>`
+    :u&&u.status==='incomplete'?`<div class="notice warn">Almost there — <a href="javascript:openAuth('register')"><b>add your business details</b></a> to be approved for dealer pricing.</div>`
     :u&&u.status==='pending'?`<div class="notice warn">Your dealer account is pending approval — you can order at MRP meanwhile.</div>`:'';
   $('view-home').innerHTML=`
   ${offerBanner()}
@@ -1520,6 +1521,7 @@ function authTab(t){
   $('pane-login').style.display=t==='register'?'none':'block';
   $('pane-register').style.display=t==='register'?'block':'none';
   if(t!=='register'){fillCountries();loginMode(loginWay)}
+  else paintRegisterMode();
 }
 /* Dial codes for signing in from anywhere. India first, then the countries
    our dealers travel to and buy from most. The flag is the country's own
@@ -1795,6 +1797,7 @@ async function submitOtpPage(){
     }else{
       const d=await api('/otp/login','POST',{mobile:otpCtx.mobile,code});
       if(otpTick)clearInterval(otpTick);
+      if(d.needsProfile)return startProfileSetup(d);
       afterLogin(d);
     }
   }catch(e){
@@ -1815,6 +1818,32 @@ async function resendOtpPage(){
     toast(d.sent?(d.via==='email'?'Code emailed to you':'Code sent again'):'Our team will send it shortly');
     startOtpTimer(30);
   }catch(e){const err=$('otp-err');err.textContent=e.message;err.style.display='block'}
+}
+/* First time on this number: they are signed in already, we just need their
+   business details. Straight into the form, nothing to re-enter. */
+function startProfileSetup(d){
+  token=d.token;localStorage.setItem('bw_token',token);
+  state.role='user';state.user=d.user||null;
+  renderHeader();refreshNotifs(false);syncPush();nativeAuth();
+  openAuth('register');
+  const ph=$('rg-phone'),wa=$('rg-whatsapp');
+  const num=String((d.user&&(d.user.phone||d.user.whatsapp))||otpCtx.mobile||'').replace(/\D/g,'').slice(-10);
+  if(ph){ph.value=num;ph.readOnly=true;ph.style.background='var(--bg)'}
+  if(wa&&!wa.value)wa.value=num;
+  paintRegisterMode();
+  toast('Number verified — just your business details now');
+}
+function paintRegisterMode(){
+  const u=currentUser();
+  const setup=!!(u&&u.status==='incomplete');
+  const t=$('rg-title'),s=$('rg-sub'),b=$('rg-btn'),pw=$('rg-passrow'),back=$('rg-back');
+  if(t)t.textContent=setup?'Complete your registration':'Create your account';
+  if(s)s.textContent=setup
+    ?'Your mobile number is verified. Tell us about your business and our team will approve dealer pricing, usually within 24 hours.'
+    :'Just a few details to get started. Your GSTIN is verified by our team before dealer pricing is unlocked (usually within 24 hours).';
+  if(b)b.textContent=setup?'Submit for approval':'Create account';
+  if(pw)pw.style.display=setup?'none':'';
+  if(back)back.style.display=setup?'none':'';
 }
 function afterLogin(d){
   token=d.token;localStorage.setItem('bw_token',token);
@@ -1870,17 +1899,30 @@ async function doLogin(){
 }
 async function doRegister(){
   const err=$('rg-err');err.style.display='none';
+  const u=currentUser();
+  const setup=!!(u&&u.status==='incomplete');
+  const body={
+    name:$('rg-name').value.trim(),phone:$('rg-phone').value.trim(),email:$('rg-email').value.trim(),
+    company:$('rg-company').value.trim(),gstin:$('rg-gstin').value.trim(),
+    type:$('rg-type').value,addr:$('rg-addr').value.trim(),city:$('rg-city').value.trim(),
+    state:$('rg-state').value.trim(),pincode:$('rg-pincode').value.trim(),
+    whatsapp:$('rg-whatsapp').value.trim()
+  };
+  if(!setup)body.password=$('rg-pass').value;
   try{
-    const d=await api('/register','POST',{
-      name:$('rg-name').value.trim(),phone:$('rg-phone').value.trim(),email:$('rg-email').value.trim(),
-      password:$('rg-pass').value,company:$('rg-company').value.trim(),gstin:$('rg-gstin').value.trim(),
-      type:$('rg-type').value,addr:$('rg-addr').value.trim(),city:$('rg-city').value.trim(),state:$('rg-state').value.trim(),
-      pincode:$('rg-pincode').value.trim(),whatsapp:$('rg-whatsapp').value.trim()});
+    if(setup){
+      /* the number is already verified — this only fills in the business details */
+      const d=await api('/me/complete','POST',body);
+      state.user=d.user;
+      renderHeader();showView('profile');
+      toast('Registration submitted — our team will approve dealer pricing shortly');
+      return;
+    }
+    const d=await api('/register','POST',body);
     token=d.token;localStorage.setItem('bw_token',token);
     state.role='user';state.user=d.user;
     renderHeader();refreshNotifs(false);syncPush();nativeAuth();
     toast('Account created — our team will verify your GSTIN and approve dealer pricing.');
-    /* the code sent at sign-up confirms the number straight away: one SMS, not two */
     const num=$('rg-whatsapp').value.trim()||$('rg-phone').value.trim();
     openOtpPage({mode:'signup',mobile:num,shown:num,
       note:'To finish, enter the 6-digit code we just sent to <b>'+esc(num)+'</b>'});
@@ -1962,9 +2004,14 @@ function genModal(title,html){$('genBox').innerHTML=`<button class="mx" onclick=
 /* Customer-side verification. The code is issued at registration and passed on
    by the admin over WhatsApp or email, which proves the number/address is real. */
 function verifyPanel(){
+  const u=currentUser();
+  if(u&&u.status==='incomplete')return `<div class="cardbox" style="border:1px solid #f0dca8;background:#fdf8ec">
+    <h3>Finish your registration</h3>
+    <div class="hint" style="margin-bottom:10px">Your number is verified. Add your business details and GSTIN to be approved for dealer pricing.</div>
+    <button class="wide blue" onclick="openAuth('register')">Complete registration</button>
+  </div>`;
   /* The number is confirmed with the code sent at sign-up or sign-in, so there
      is no second prompt here — that would mean paying for another SMS. */
-  const u=currentUser();
   if(!u||u.mobileOk)return '';
   return `<div class="cardbox" style="border:1px solid #ffd9a0;background:#fffaf0">
     <h3>Confirm your mobile number</h3>
