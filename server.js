@@ -703,25 +703,46 @@ function findAccount(idRaw) {
   if (digits.length < 6) return null;
   const clean = "replace(replace(replace(replace(%c,' ',''),'-',''),'+',''),'(','')";
   const norm = f => clean.replace('%c', f);
-  /* Numbers can arrive with a country code (+91, +971, +1 …) or without, so we
-     match on the last ten digits first — that identifies an Indian mobile
-     whichever way it was typed — then fall back to the whole number for
-     shorter foreign ones. */
-  const tail = digits.slice(-10);
+  /* Numbers arrive in every shape: +971 50 123 4567, 0501234567, or the bare
+     national number. Resolve the country first where we can, and only fall
+     back to tail matching when we cannot. */
   let u = null;
-  if (tail.length === 10) {
-    u = db.prepare(`SELECT * FROM users WHERE substr(${norm('phone')}, -10)=?
-        OR substr(${norm('whatsapp')}, -10)=?`).get(tail, tail) || null;
+
+  /* Try the number's own country first. If it carries a dial code we serve —
+     +973 3600 1234 — we know both the zone and the national part, so we can
+     match precisely instead of guessing at a tail length. This has to come
+     first: an 8-digit Gulf number typed with its country code matches none of
+     the tail rules below, which is why it could never be found before. */
+  const cc = countryFromDigits(digits);
+  if (cc) {
+    const z = ZONES[cc];
+    const nat = nationalDigits(digits, z);
+    if (nat.length === z.phoneLen) {
+      u = db.prepare(`SELECT * FROM users WHERE (country=? OR country IS NULL OR country='')
+          AND (${norm('phone')}=? OR ${norm('whatsapp')}=?)`).get(z.code, nat, nat) || null;
+      /* the same national number could exist in another zone we serve */
+      if (!u) u = db.prepare(`SELECT * FROM users WHERE ${norm('phone')}=? OR ${norm('whatsapp')}=?`)
+        .get(nat, nat) || null;
+    }
   }
+
+  /* Typed without a country code, exactly as it is stored. */
   if (!u) {
     u = db.prepare(`SELECT * FROM users WHERE ${norm('phone')}=? OR ${norm('whatsapp')}=?`)
       .get(digits, digits) || null;
   }
-  if (!u && digits.length > 10) {
-    /* stored without the country code */
-    const short = digits.slice(-9);
-    u = db.prepare(`SELECT * FROM users WHERE substr(${norm('phone')}, -9)=?
-        OR substr(${norm('whatsapp')}, -9)=?`).get(short, short) || null;
+  /* Last resort: match on the tail. Ten digits identifies an Indian mobile
+     however it was typed; the shorter lengths cover the Gulf zones. Longest
+     first, so a more specific match always wins. */
+  if (!u) {
+    for (const len of [10, 9, 8]) {
+      if (digits.length < len) continue;
+      const tail = digits.slice(-len);
+      u = db.prepare(`SELECT * FROM users
+          WHERE (length(${norm('phone')})=${len}    AND substr(${norm('phone')},    -${len})=?)
+             OR (length(${norm('whatsapp')})=${len} AND substr(${norm('whatsapp')}, -${len})=?)`).get(tail, tail) || null;
+      if (u) break;
+    }
   }
   return u;
 }
@@ -1596,6 +1617,14 @@ const intlNumber = (phone, zone) => {
   for (const zz of Object.values(ZONES)) if (n.length === zz.dial.length + zz.phoneLen && n.startsWith(zz.dial)) return n;
   return n.length === 10 ? '91' + n : n;
 };
+/* The dial code of an already-international number, for gateways that want the
+ * country as a separate field. Defaults to India. */
+const dialOf = intl => {
+  const n = String(intl || '').replace(/\D/g, '');
+  const byLen = Object.values(ZONES).sort((a, b) => b.dial.length - a.dial.length);
+  for (const z of byLen) if (n.length === z.dial.length + z.phoneLen && n.startsWith(z.dial)) return z.dial;
+  return '91';
+};
 
 /* MSG91 has three endpoints and the right one depends on what you have set up:
  *   • OTP API      — best for one-time codes, needs a DLT-approved OTP template
@@ -1647,7 +1676,9 @@ async function smsMsg91(to, text, otp) {
     const r = await fetch('https://api.msg91.com/api/v2/sendsms', {
       method: 'POST',
       headers: { authkey: key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sender, route: ss('smsRoute'), country: '91', sms: [{ message: text, to: [mobile] }] }),
+      /* the country has to match the number, or MSG91 routes it as Indian and
+         the send is rejected for every Gulf dealer */
+      body: JSON.stringify({ sender, route: ss('smsRoute'), country: dialOf(mobile), sms: [{ message: text, to: [mobile] }] }),
       signal: AbortSignal.timeout(12000)
     });
     return reply(r, 'Send SMS');
@@ -1657,6 +1688,11 @@ async function smsMsg91(to, text, otp) {
 async function smsFast2Sms(to, text) {
   const key = getSetting('smsKey');
   if (!key) return { ok: false, status: 'Fast2SMS API key not saved', detail: 'Paste the API key in Settings and save.' };
+  /* Fast2SMS only delivers inside India. Saying so plainly beats a silent
+     failure — the code then falls through to the admin-WhatsApp path. */
+  if (dialOf(intlNumber(to)) !== '91')
+    return { ok: false, status: 'Fast2SMS delivers to Indian numbers only',
+             detail: 'This dealer is outside India. Use MSG91 or Twilio for the Gulf zones, or send the code on WhatsApp.' };
   const num = intlNumber(to).replace(/^91/, '');
   try {
     const r = await fetch('https://www.fast2sms.com/dev/bulkV2', {

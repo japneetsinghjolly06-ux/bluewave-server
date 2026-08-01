@@ -2105,6 +2105,15 @@ function onZoneChange(quiet){
   }else{const pc=$('rg-pincode');if(pc)pc.value=''}
 
   if(!quiet&&!currentUser())setGuestZone(z.code);
+  /* Point the sign-in dial-code picker at the same country, so a Gulf dealer
+     who registers on +971 is not sent back to +91 when they come to log in. */
+  try{
+    if(COUNTRIES.some(c=>c[0]===z.code)){
+      localStorage.setItem('bw_cc_iso',z.code);
+      localStorage.setItem('bw_cc',z.dial);
+      ccIso=z.code;ccDial=z.dial;ccLen=z.phoneLen;
+    }
+  }catch(e){}
 }
 
 async function doRegister(){
