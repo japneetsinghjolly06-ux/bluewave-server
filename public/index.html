@@ -709,9 +709,17 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   <div id="pane-register" style="display:none">
     <div class="mtitle" id="rg-title">Create your account</div>
     <div class="msub" id="rg-sub">Just a few details to get started. Your GSTIN is verified by our team before dealer pricing is unlocked (usually within 24 hours).</div>
+    <label>Country <span class="req">*</span></label>
+    <select id="rg-country" onchange="onZoneChange()"></select>
+    <div class="hint" id="rg-zonehint"></div>
     <div class="frow">
       <div><label>Your full name <span class="req">*</span></label><input id="rg-name" placeholder="Full name"></div>
-      <div><label>Mobile number <span class="req">*</span></label><input id="rg-phone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>
+      <div><label>Mobile number <span class="req">*</span></label>
+        <div style="display:flex;gap:7px;align-items:center">
+          <span id="rg-dial" style="font-weight:700;color:var(--navy);white-space:nowrap">+91</span>
+          <input id="rg-phone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile">
+        </div>
+      </div>
     </div>
     <div class="frow">
       <div><label>Email <span class="req">*</span></label><input id="rg-email" type="email" placeholder="you@business.com"></div>
@@ -719,16 +727,28 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
     </div>
     <label>WhatsApp number</label><input id="rg-whatsapp" inputmode="numeric" maxlength="10" placeholder="Leave blank if same as mobile">
     <label>Company name <span class="req">*</span></label><input id="rg-company" placeholder="e.g., Sharma Electricals & Traders">
-    <label>GSTIN <span class="req">*</span></label><input id="rg-gstin" placeholder="e.g., 36ABCDE1234F1Z5" maxlength="15" style="text-transform:uppercase;font-family:Consolas,monospace" oninput="checkGstin()">
+    <div id="rg-taxwrap">
+      <label id="rg-gstin-label">GSTIN <span class="req">*</span></label>
+      <input id="rg-gstin" placeholder="e.g., 36ABCDE1234F1Z5" maxlength="15" style="text-transform:uppercase;font-family:Consolas,monospace" oninput="checkGstin()">
+      <div class="hint" id="rg-gstin-hint"></div>
+    </div>
     <div id="gstin-info"></div>
+    <div id="rg-licwrap" style="display:none">
+      <label id="rg-lic-label">Trade licence number <span class="req">*</span></label>
+      <input id="rg-licence" placeholder="e.g. CN-1234567" maxlength="30" style="text-transform:uppercase;font-family:Consolas,monospace">
+      <div class="hint" id="rg-lic-hint"></div>
+    </div>
     <label>Business type <span class="req">*</span></label>
     <select id="rg-type"><option>Dealer</option><option>Distributor</option><option>Retailer</option><option>Contractor / Installer</option><option>Other</option></select>
     <label>Business address <span class="req">*</span></label><textarea id="rg-addr" rows="2" placeholder="Shop / office address"></textarea>
     <div class="frow">
       <div><label>City <span class="req">*</span></label><input id="rg-city" placeholder="City"></div>
-      <div><label>State <span class="req">*</span></label><input id="rg-state" placeholder="State"></div>
+      <div><label id="rg-region-label">State <span class="req">*</span></label><input id="rg-state" placeholder="State"></div>
     </div>
-    <label>Pincode <span class="req">*</span></label><input id="rg-pincode" inputmode="numeric" maxlength="6" placeholder="6-digit pincode">
+    <div id="rg-pcwrap">
+      <label id="rg-pc-label">Pincode <span class="req">*</span></label>
+      <input id="rg-pincode" inputmode="numeric" maxlength="10" placeholder="6-digit pincode">
+    </div>
     <div class="err" id="rg-err"></div>
     <button class="wide" id="rg-btn" onclick="doRegister()">Create account</button>
     <div class="hint" style="text-align:center;margin-top:8px">By continuing, you agree to our terms and privacy policy.</div>
@@ -747,7 +767,11 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
 <script>
 /* ============ API LAYER ============ */
 let token=localStorage.getItem('bw_token')||'';
-const state={products:[],role:null,user:null,payInfo:null,transports:[],offer:null,notifs:{unread:0,items:[]}};
+const state={products:[],role:null,user:null,payInfo:null,transports:[],offer:null,notifs:{unread:0,items:[]},
+  /* the zone whose currency and tax the screen is currently showing — set from
+     the server on every products/pay-info refresh, so it always matches the
+     prices in state.products */
+  zone:null,zones:[]};
 async function api(path,method='GET',body){
   const r=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
   let d={};try{d=await r.json()}catch(e){}
@@ -756,11 +780,18 @@ async function api(path,method='GET',body){
   return d;
 }
 async function refreshMe(){const d=await api('/me');state.role=d.role;state.user=d.user||null}
+/* A guest has no account yet, so they browse in whichever zone they picked on
+   the sign-up screen; a signed-in dealer always gets their own. */
+function guestZone(){try{return localStorage.getItem('bw_zone')||'IN'}catch(e){return 'IN'}}
+function setGuestZone(c){try{localStorage.setItem('bw_zone',c||'IN')}catch(e){}}
+const zoneQuery=()=>state.user?'':'?zone='+encodeURIComponent(guestZone());
+
 async function refreshProducts(){
-  const d=await api('/products');
+  const d=await api('/products'+zoneQuery());
   if(Array.isArray(d)){state.products=d;state.offer=null}
-  else{state.products=d.products||[];state.offer=d.offer||null}
+  else{state.products=d.products||[];state.offer=d.offer||null;if(d.zone)state.zone=d.zone}
 }
+async function refreshZones(){try{state.zones=await api('/zones')}catch(e){state.zones=[]}}
 function offerBanner(){
   const o=state.offer;
   if(!o||!o.percent)return '';
@@ -772,13 +803,29 @@ async function refreshTransports(){try{state.transports=await api('/transports')
 /* ============ HELPERS ============ */
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{maximumFractionDigits:2});
+/* Money in whichever currency the current zone quotes. Falls back to rupees so
+   the very first paint, before /pay-info has answered, still reads correctly
+   for the Indian dealers who are the majority. */
+const ZFALLBACK={code:'IN',currency:'INR',symbol:'₹',locale:'en-IN',decimals:2,taxLabel:'GST',taxPercent:18};
+const zone=()=>state.zone||ZFALLBACK;
+function fmtIn(n,z){z=z||zone();
+  const v=Number(n||0).toLocaleString(z.locale||'en-IN',{minimumFractionDigits:0,maximumFractionDigits:z.decimals!=null?z.decimals:2});
+  /* '₹1,299' reads naturally closed up; a three-letter code needs the space */
+  return z.symbol.length>1?z.symbol+' '+v:z.symbol+v;}
+const fmt=n=>fmtIn(n);
+/* An order is shown in the currency it was placed in, not today's zone. */
+const fmtOrder=(n,o)=>fmtIn(n,o&&o.currency?{symbol:o.symbol||o.currency,locale:o.locale||'en-IN',decimals:o.decimals!=null?o.decimals:2}:null);
 function currentUser(){return state.role==='user'?state.user:null}
 function isAdmin(){return state.role==='admin'}
 function isDealer(){const u=currentUser();return !!u&&u.status==='approved'}
 function priceFor(p){return p.dealer!==undefined?p.dealer:p.mrp}
-function gstPct(){return state.payInfo&&isFinite(state.payInfo.gstPercent)?state.payInfo.gstPercent:18}
-function inclGst(amount){const r=gstPct();return Math.round((amount-amount/(1+r/100))*100)/100}
+function gstPct(){const p=state.payInfo;
+  if(p&&p.taxPercent!=null&&isFinite(p.taxPercent))return p.taxPercent;
+  if(p&&isFinite(p.gstPercent))return p.gstPercent;
+  return zone().taxPercent!=null?zone().taxPercent:18}
+/* 'GST' in India, 'VAT' across the Gulf — an invoice has to name it correctly. */
+function taxLabel(){return (state.payInfo&&state.payInfo.taxLabel)||zone().taxLabel||'GST'}
+function inclGst(amount){const r=gstPct();if(!(r>0))return 0;return Math.round((amount-amount/(1+r/100))*100)/100}
 function toast(msg,err){const t=$('toast');t.textContent=msg;t.className=err?'err on':'on';clearTimeout(t._t);t._t=setTimeout(()=>t.className='',3400)}
 function openModal(id){$(id).classList.add('on')}
 function closeModal(id){$(id).classList.remove('on')}
@@ -823,6 +870,15 @@ let gstinReq=0;
 async function checkGstin(){
   const el=document.getElementById('rg-gstin'),out=document.getElementById('gstin-info');
   if(!el||!out)return;
+  /* The GSTIN lookup is an Indian government service — for every other zone the
+     number is simply format-checked, on the form and again on the server. */
+  const rz=regZone();
+  if(rz&&rz.code!=='IN'){
+    const v=el.value.trim();
+    out.innerHTML=(v&&rz.taxId&&!new RegExp(rz.taxId.re).test(rz.taxId.upper?v.toUpperCase():v))
+      ? '<div class="notice warn" style="margin:6px 0;padding:8px 12px">'+esc(rz.taxId.label)+' should be '+esc(rz.taxId.hint)+'.</div>' : '';
+    return;
+  }
   const g=el.value.toUpperCase().trim();
   if(g.length<15){out.innerHTML=g.length?'<div class="hint" style="margin:4px 0">'+(15-g.length)+' more characters…</div>':'';return}
   const L=gstinLocal(g);
@@ -958,7 +1014,7 @@ async function softRefresh(){
       refreshProducts(),
       refreshMe(),
       refreshTransports(),
-      api('/pay-info').then(d=>state.payInfo=d).catch(()=>{})
+      api('/pay-info'+zoneQuery()).then(d=>{state.payInfo=d;if(d.zone)state.zone=d.zone}).catch(()=>{})
     ]);
     await refreshNotifs(false);
     const REDRAW={home:renderHome,shop:renderShop,category:renderCategory,orders:renderOrdersView,
@@ -1297,7 +1353,7 @@ function railCard(p){
       <button class="wishbtn ${wish.has(p.id)?'on':''}" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist" aria-label="Save to wishlist">
       <svg viewBox="0 0 24 24" fill="${wish.has(p.id)?'currentColor':'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-7-9.4A4.1 4.1 0 0 1 12 7a4.1 4.1 0 0 1 7 3.6C19 15.4 12 20 12 20z"/></svg></button></div>
     <div class="pbody"><div class="pname" style="font-size:12.5px">${esc(p.name)}</div>
-      <div>${price}</div><div class="plabel">incl. GST</div>
+      <div>${price}</div><div class="plabel">incl. ${taxLabel()}</div>
       <div class="addrow"><button class="addbtn">View details ›</button></div></div></div>`;
 }
 
@@ -1329,8 +1385,8 @@ function renderShopGrid(){
     const hasDealer=p.dealer!==undefined;
     const save=hasDealer?Math.round((1-p.dealer/p.mrp)*100):0;
     const priceHtml=hasDealer
-      ?`<span class="mrp-strike">${fmt(p.mrp)}</span><span class="dealerprice">${fmt(p.dealer)}</span><span class="save">${save}% OFF</span><div class="plabel">Dealer price · per unit · incl. GST</div>`
-      :`<span class="mrp-only">${fmt(p.mrp)}</span><div class="plabel">MRP · per unit · incl. GST</div>`;
+      ?`<span class="mrp-strike">${fmt(p.mrp)}</span><span class="dealerprice">${fmt(p.dealer)}</span><span class="save">${save}% OFF</span><div class="plabel">Dealer price · per unit · incl. ${taxLabel()}</div>`
+      :`<span class="mrp-only">${fmt(p.mrp)}</span><div class="plabel">MRP · per unit · incl. ${taxLabel()}</div>`;
     const hasOpts=!!(p.options&&(p.options.packs||p.options.sizes));
     return `<div class="pcard"><div class="pimg" onclick="openProduct('${p.id}')" style="cursor:pointer">${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:boxArt(56,p.cat)}<button class="wishbtn ${wish.has(p.id)?'on':''}" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist" aria-label="Save to wishlist">
       <svg viewBox="0 0 24 24" fill="${wish.has(p.id)?'currentColor':'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-7-9.4A4.1 4.1 0 0 1 12 7a4.1 4.1 0 0 1 7 3.6C19 15.4 12 20 12 20z"/></svg></button></div><div class="pbody">
@@ -1382,8 +1438,8 @@ function ppPrice(pid){
   const p=state.products.find(x=>x.id===pid);if(!p||!$('pp-price'))return;
   const pk=ppSelPack(p);const add=pk?pk.add||0:0;
   $('pp-price').innerHTML=p.dealer!==undefined
-    ?`<span class="mrp-strike">${fmt(p.mrp+add)}</span><span class="dealerprice">${fmt(p.dealer+add)}</span> <span class="plabel">per pc · incl. GST${add?` · includes +₹${add} box packing`:''}</span>`
-    :`<span class="mrp-only">${fmt(p.mrp+add)}</span> <span class="plabel">MRP · per pc · incl. GST${add?` · includes +₹${add} box packing`:''}</span>`;
+    ?`<span class="mrp-strike">${fmt(p.mrp+add)}</span><span class="dealerprice">${fmt(p.dealer+add)}</span> <span class="plabel">per pc · incl. ${taxLabel()}${add?` · includes +${fmt(add)} box packing`:''}</span>`
+    :`<span class="mrp-only">${fmt(p.mrp+add)}</span> <span class="plabel">MRP · per pc · incl. ${taxLabel()}${add?` · includes +${fmt(add)} box packing`:''}</span>`;
 }
 function ppAdd(pid){
   const p=state.products.find(x=>x.id===pid);if(!p)return;
@@ -1431,8 +1487,8 @@ function renderCart(){
       <button class="rm" onclick="rmItemI(${i})" title="Remove"></button></div>`;}).join('');
   const sub=cartSubtotal(),gst=inclGst(sub);
   foot.innerHTML=`<div class="trow"><span>Pricing tier</span><b>${isDealer()?'Dealer (wholesale)':'MRP'}</b></div>
-    <div class="trow big"><span>Total</span><span>${fmt(sub)} <span class="gsttag">incl. GST</span></span></div>
-    <div class="trow"><span class="gsttag">Includes GST ${gstPct()}%</span><span class="gsttag">${fmt(gst)}</span></div>
+    <div class="trow big"><span>Total</span><span>${fmt(sub)} <span class="gsttag">incl. ${taxLabel()}</span></span></div>
+    <div class="trow"><span class="gsttag">Includes ${taxLabel()} ${gstPct()}%</span><span class="gsttag">${fmt(gst)}</span></div>
     <button class="wide" onclick="openCheckout()">Checkout</button>`;
 }
 
@@ -1458,8 +1514,8 @@ function openCheckout(){
     <div class="msub">Review your order and confirm. Pay online or by bank transfer next.</div>
     <div class="tblwrap" style="box-shadow:none;border:1px solid var(--line)"><table><thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="trow" style="margin-top:10px"><span>Taxable value</span><span>${fmt(Math.round((sub-gst)*100)/100)}</span></div>
-    <div class="trow"><span>GST ${gstPct()}% (included)</span><span>${fmt(gst)}</span></div>
-    <div class="trow big"><span>Order total (incl. GST)</span><span>${fmt(total)}</span></div>
+    <div class="trow"><span>${taxLabel()} ${gstPct()}% (included)</span><span>${fmt(gst)}</span></div>
+    <div class="trow big"><span>Order total (incl. ${taxLabel()})</span><span>${fmt(total)}</span></div>
     ${contact}
     <label>Dispatch through (transport)</label>
     <select id="co-transport">
@@ -1498,7 +1554,7 @@ function openPayment(o,fresh){
   const s=state.payInfo||{};
   const rzp=s.razorpay&&s.razorpay.enabled;
   const bank=(s.bankName||s.accountNo)?`<div class="row"><b>Bank transfer:</b> ${esc(s.bankName)} · A/c ${esc(s.accountNo)} · IFSC ${esc(s.ifsc)} <button class="copybtn" onclick="copyTxt('${esc(s.accountNo)}')">Copy A/c</button></div>`:'';
-  const gstLine=(o.gst?`<div class="trow"><span>Taxable value</span><span>${fmt(Math.round((o.total-o.gst)*100)/100)}</span></div><div class="trow"><span>GST ${o.gstPercent||gstPct()}% (included)</span><span>${fmt(o.gst)}</span></div><div class="trow big"><span>Total payable (incl. GST)</span><span>${fmt(o.total)}</span></div>`:'')
+  const gstLine=(o.gst?`<div class="trow"><span>Taxable value</span><span>${fmtOrder(Math.round((o.total-o.gst)*100)/100,o)}</span></div><div class="trow"><span>${o.taxLabel||taxLabel()} ${o.taxPercent!=null?o.taxPercent:gstPct()}% (included)</span><span>${fmtOrder(o.gst,o)}</span></div><div class="trow big"><span>Total payable (incl. ${o.taxLabel||taxLabel()})</span><span>${fmtOrder(o.total,o)}</span></div>`:'')
     +(o.transport&&!o.lrNumber?`<div class="trow" style="margin-bottom:8px"><span>Preferred transport</span><b>${esc(o.transport)}</b></div>`:'')
     +(o.dispatchMode==='local'&&o.vehicleNo?`<div class="notice ok" style="margin-bottom:10px"><b>Out for local delivery!</b>${o.dispatchedAt?' Dispatched '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}.<br>Vehicle: <b style="font-family:Consolas,monospace">${esc(o.vehicleNo)}</b>${o.driverName?'<br>Driver: <b>'+esc(o.driverName)+'</b>':''}${o.driverPhone?` · <a href="tel:${esc(o.driverPhone)}">${esc(o.driverPhone)}</a>`:''}<br><span style="font-size:12px">Your material is on the way within the city.</span></div>`
     :o.lrNumber?`<div class="notice ok" style="margin-bottom:10px"><b>Dispatched!</b> Sent via <b>${esc(o.dispatchTransport||o.transport||'transport')}</b>${o.dispatchedAt?' on '+new Date(o.dispatchedAt).toLocaleDateString('en-IN'):''}.<br>LR number: <b style="font-family:Consolas,monospace">${esc(o.lrNumber)}</b> <button class="copybtn" onclick="copyTxt('${esc(o.lrNumber)}')">Copy</button><br><span style="font-size:12px">Quote this LR number with the transporter to track and collect your material.</span></div>`:'');
@@ -1598,7 +1654,12 @@ function authTab(t){
   $('pane-login').style.display=t==='register'?'none':'block';
   $('pane-register').style.display=t==='register'?'block':'none';
   if(t!=='register'){fillCountries();loginMode(loginWay)}
-  else paintRegisterMode();
+  else{
+    /* the zone list drives which business fields the form asks for */
+    const paint=()=>{const u=currentUser();fillZoneSelect(u&&u.country?u.country:guestZone());paintRegisterMode()};
+    if(state.zones&&state.zones.length)paint();
+    else refreshZones().then(paint);
+  }
 }
 /* Dial codes for signing in from anywhere. India first, then the countries
    our dealers travel to and buy from most. The flag is the country's own
@@ -1915,12 +1976,23 @@ function paintRegisterMode(){
   const setup=!!(u&&u.status==='incomplete');
   const t=$('rg-title'),s=$('rg-sub'),b=$('rg-btn'),pw=$('rg-passrow'),back=$('rg-back');
   if(t)t.textContent=setup?'Complete your registration':'Create your account';
+  const z=regZone();
+  const papers=z&&z.taxId?z.taxId.label:'business details';
   if(s)s.textContent=setup
     ?'Your mobile number is verified. Tell us about your business and our team will approve dealer pricing, usually within 24 hours.'
-    :'Just a few details to get started. Your GSTIN is verified by our team before dealer pricing is unlocked (usually within 24 hours).';
+    :'Just a few details to get started. Your '+papers+' is verified by our team before dealer pricing is unlocked (usually within 24 hours).';
   if(b)b.textContent=setup?'Submit for approval':'Create account';
   if(pw)pw.style.display=setup?'none':'';
   if(back)back.style.display=setup?'none':'';
+  /* Coming back to finish a half-done signup: show what we already hold, and
+     lock the country to the one their verified number belongs to. */
+  if(setup&&u){
+    const put=(id,v)=>{const el=$(id);if(el&&!el.value&&v)el.value=v};
+    put('rg-name',u.name);put('rg-email',u.email&&u.email.includes('@pending.')?'':u.email);
+    put('rg-company',u.company);put('rg-gstin',u.gstin);put('rg-licence',u.licence);
+    put('rg-addr',u.addr);put('rg-city',u.city);put('rg-state',u.state);put('rg-pincode',u.pincode);
+    put('rg-phone',u.phone);
+  }
 }
 function afterLogin(d){
   token=d.token;localStorage.setItem('bw_token',token);
@@ -1974,17 +2046,91 @@ async function doLogin(){
     afterLogin(d);
   }catch(e){err.textContent=e.message;err.style.display='block'}
 }
+/* ---- country-driven registration ----
+   Every zone asks for a different set of business papers: India a GSTIN, the
+   UAE a VAT TRN plus a trade licence, Saudi a VAT number plus a CR. The rules
+   come from /api/zones so the form and the server can never disagree. */
+function regZone(){
+  const sel=$('rg-country');
+  const code=sel&&sel.value?sel.value:'IN';
+  return (state.zones||[]).find(z=>z.code===code)||state.zones[0]||null;
+}
+function fillZoneSelect(preferred){
+  const sel=$('rg-country');if(!sel||!state.zones.length)return;
+  const want=preferred||sel.value||guestZone()||'IN';
+  sel.innerHTML=state.zones.map(z=>`<option value="${z.code}">${esc(z.country)}</option>`).join('');
+  sel.value=state.zones.some(z=>z.code===want)?want:state.zones[0].code;
+  onZoneChange(true);
+}
+function onZoneChange(quiet){
+  const z=regZone();if(!z)return;
+  const set=(id,html)=>{const el=$(id);if(el)el.innerHTML=html};
+  const show=(id,on)=>{const el=$(id);if(el)el.style.display=on?'':'none'};
+  const req=' <span class="req">*</span>';
+
+  set('rg-zonehint',`Prices and invoices for ${esc(z.country)} are in <b>${esc(z.currency)}</b>`+
+    (z.taxPercent>0?` with <b>${z.taxPercent}% ${esc(z.taxLabel)}</b>.`:`. No ${esc(z.taxLabel)} applies yet.`));
+  const dial=$('rg-dial');if(dial)dial.textContent='+'+z.dial;
+  const ph=$('rg-phone');if(ph){ph.maxLength=z.phoneLen;ph.placeholder=z.phoneLen+'-digit mobile'}
+  const wa=$('rg-whatsapp');if(wa)wa.maxLength=z.phoneLen;
+
+  /* tax number */
+  show('rg-taxwrap',!!z.taxId);
+  if(z.taxId){
+    set('rg-gstin-label',esc(z.taxId.label)+(z.taxId.required?req:' <span class="hint">(optional)</span>'));
+    set('rg-gstin-hint',esc(z.taxId.hint));
+    const g=$('rg-gstin');
+    if(g){g.placeholder=z.taxId.placeholder||'';g.style.textTransform=z.taxId.upper?'uppercase':'none';g.maxLength=z.code==='IN'?15:24}
+  }
+  /* the GSTIN lookup panel is an Indian service only */
+  const gi=$('gstin-info');if(gi&&z.code!=='IN')gi.innerHTML='';
+
+  /* trade licence / CR */
+  show('rg-licwrap',!!z.licence);
+  if(z.licence){
+    set('rg-lic-label',esc(z.licence.label)+(z.licence.required?req:' <span class="hint">(optional)</span>'));
+    set('rg-lic-hint',esc(z.licence.hint));
+    const l=$('rg-licence');
+    if(l){l.placeholder=z.licence.placeholder||'';l.style.textTransform=z.licence.upper?'uppercase':'none'}
+  }
+  /* State / Emirate / Governorate */
+  set('rg-region-label',esc(z.regionLabel)+req);
+  const st=$('rg-state');if(st)st.placeholder=z.regionLabel;
+
+  /* postcode, where the country uses one */
+  show('rg-pcwrap',!!z.postcode);
+  if(z.postcode){
+    set('rg-pc-label',esc(z.postcode.label)+(z.postcode.required?req:' <span class="hint">(optional)</span>'));
+    const pc=$('rg-pincode');if(pc)pc.placeholder=z.postcode.hint;
+  }else{const pc=$('rg-pincode');if(pc)pc.value=''}
+
+  if(!quiet&&!currentUser())setGuestZone(z.code);
+}
+
 async function doRegister(){
   const err=$('rg-err');err.style.display='none';
   const u=currentUser();
   const setup=!!(u&&u.status==='incomplete');
+  const z=regZone();
   const body={
+    country:z?z.code:'IN',
     name:$('rg-name').value.trim(),phone:$('rg-phone').value.trim(),email:$('rg-email').value.trim(),
     company:$('rg-company').value.trim(),gstin:$('rg-gstin').value.trim(),
+    licence:$('rg-licence')?$('rg-licence').value.trim():'',
     type:$('rg-type').value,addr:$('rg-addr').value.trim(),city:$('rg-city').value.trim(),
     state:$('rg-state').value.trim(),pincode:$('rg-pincode').value.trim(),
     whatsapp:$('rg-whatsapp').value.trim()
   };
+  /* caught here as well as on the server so the dealer gets the message
+     without a round trip */
+  if(z){
+    if(z.taxId&&z.taxId.required&&!body.gstin){err.textContent='Enter your '+z.taxId.label+'.';err.style.display='block';return}
+    if(z.taxId&&body.gstin&&!new RegExp(z.taxId.re).test(z.taxId.upper?body.gstin.toUpperCase():body.gstin)){
+      err.textContent=z.taxId.label+' should be '+z.taxId.hint+'.';err.style.display='block';return}
+    if(z.licence&&z.licence.required&&!body.licence){err.textContent='Enter your '+z.licence.label+'.';err.style.display='block';return}
+    if(body.phone.replace(/\D/g,'').length!==z.phoneLen){
+      err.textContent='Enter your '+z.phoneLen+'-digit mobile number, without the +'+z.dial+'.';err.style.display='block';return}
+  }
   if(!setup)body.password=$('rg-pass').value;
   try{
     if(setup){
@@ -1999,7 +2145,7 @@ async function doRegister(){
     token=d.token;localStorage.setItem('bw_token',token);
     state.role='user';state.user=d.user;
     renderHeader();refreshNotifs(false);syncPush();nativeAuth();
-    toast('Account created — our team will verify your GSTIN and approve dealer pricing.');
+    toast('Account created — our team will verify your '+((z&&z.taxId)?z.taxId.label:'business details')+' and approve dealer pricing.');
     const num=$('rg-whatsapp').value.trim()||$('rg-phone').value.trim();
     openOtpPage({mode:'signup',mobile:num,shown:num,
       note:'To finish, enter the 6-digit code we just sent to <b>'+esc(num)+'</b>'});
@@ -2205,7 +2351,7 @@ function pfWish(){
 function wishAdd(pid){const ex=cart.find(c=>c.pid===pid);if(ex)ex.qty+=1;else cart.push({pid,qty:1});saveCart();renderNav();toast('Added to cart')}
 function pfPolicy(){
   genModal('Policy',`<div class="msub">Our policies at a glance.</div>
-    <div class="regdetail"><b>Orders &amp; pricing</b><br>All prices are inclusive of GST. Dealer pricing applies to approved business accounts only. MOQ may apply for wholesale rates.</div>
+    <div class="regdetail"><b>Orders &amp; pricing</b><br>All prices are inclusive of the tax shown for your country. Dealer pricing applies to approved business accounts only. MOQ may apply for wholesale rates.</div>
     <div class="regdetail"><b>Payments</b><br>Pay online, by UPI/bank transfer, or on credit if your account has an approved credit facility. Orders are processed after payment confirmation (or credit confirmation).</div>
     <div class="regdetail"><b>Dispatch &amp; delivery</b><br>Material is dispatched via your preferred transport where possible. The LR number is shared in the app for tracking. Damage in transit must be reported within 48 hours of delivery.</div>`);
 }
@@ -2258,7 +2404,7 @@ async function renderAdmin(tab){
   let ov={users:0,pending:0,orders:0,paySubmitted:0,revenue:0};
   try{ov=await api('/admin/overview')}catch(e){toast(e.message,1)}
   let credOverdue=0;try{credOverdue=(await api('/admin/credit')).overdue}catch(e){}
-  const tabs=[['regs','Registrations',ov.pending],['credit','Credit',credOverdue],['pricing','Pricing',0],['offers','Offers',0],['logistics','Logistics',0],['settings','Settings',0]];
+  const tabs=[['regs','Registrations',ov.pending],['credit','Credit',credOverdue],['pricing','Pricing',0],['zones','Zones',0],['offers','Offers',0],['logistics','Logistics',0],['settings','Settings',0]];
   v.innerHTML=`<div class="pf-head" style="justify-content:space-between;padding:6px 2px 12px">
       <h2 style="font-size:19px">Admin panel</h2>
       <button class="smallbtn gr-btn" onclick="logout()">Logout</button>
@@ -2274,12 +2420,93 @@ async function renderAdmin(tab){
   try{
     if(adminTab==='regs')await renderRegs();
     if(adminTab==='pricing')await renderPricing();
+    if(adminTab==='zones')await renderZones();
     if(adminTab==='credit')await renderCredit();
     if(adminTab==='offers')await renderOffers();
     if(adminTab==='logistics')await renderLogistics();
     if(adminTab==='settings')await renderSettings();
   }catch(e){$('adminBody').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
 }
+/* ---- Admin: zones ----
+   Product prices are held once, in rupees. Each zone carries the rate they are
+   converted at and the tax charged on top, so opening a new market is a matter
+   of setting two numbers rather than re-entering the whole catalogue. */
+async function renderZones(){
+  const zs=await api('/admin/zones');
+  const body=$('adminBody');
+  const sample=(state.products&&state.products.length)?null:null;
+  body.innerHTML=`
+    <div class="cardbox">
+      <h3>Zones, currencies and tax</h3>
+      <div class="hint" style="margin-bottom:12px">
+        Every product price is stored in <b>₹ INR</b>. The rate below is how much of the local
+        currency one rupee buys — raise it and prices in that country go up. Existing orders keep
+        the rate they were placed at, so nothing already ordered changes.
+      </div>
+      <div style="overflow-x:auto">
+      <table class="otable" id="zoneTable">
+        <thead><tr>
+          <th style="text-align:left">Country</th><th>Currency</th>
+          <th>Rate per ₹1</th><th>Tax %</th><th>Dealers</th><th>Open</th>
+        </tr></thead>
+        <tbody>${zs.map(z=>`
+          <tr data-code="${z.code}">
+            <td style="text-align:left"><b>${esc(z.country)}</b><br><span class="oitems">${esc(z.taxLabel)} · +${esc(z.dial)}</span></td>
+            <td><b>${esc(z.currency)}</b></td>
+            <td><input class="z-fx" type="number" step="0.00001" min="0" value="${z.fx}" style="width:104px;text-align:right"></td>
+            <td><input class="z-tax" type="number" step="0.5" min="0" max="100" value="${z.taxPercent}" style="width:74px;text-align:right"></td>
+            <td>${z.dealers}${z.pending?`<br><span class="oitems">${z.pending} pending</span>`:''}</td>
+            <td>${z.code==='IN'
+                 ? '<span class="oitems">home</span>'
+                 : `<input class="z-on" type="checkbox" ${z.enabled?'checked':''} style="width:auto">`}</td>
+          </tr>`).join('')}</tbody>
+      </table></div>
+      <div class="hint" style="margin-top:10px">
+        India is the base currency, so its rate is fixed at 1 and it cannot be closed.
+        Turning a country off hides it from the sign-up form; dealers already registered there keep their accounts.
+      </div>
+      <button class="wide blue" style="max-width:260px;margin-top:14px" onclick="saveZones()">Save zones</button>
+    </div>
+    <div class="cardbox">
+      <h3>What a dealer sees</h3>
+      <div id="zonePreview" class="hint"></div>
+    </div>`;
+  paintZonePreview(zs);
+  body.querySelectorAll('.z-fx,.z-tax').forEach(i=>i.addEventListener('input',()=>paintZonePreview(zs)));
+}
+/* A worked example, so the rate is not an abstract number. */
+function paintZonePreview(zs){
+  const el=$('zonePreview');if(!el)return;
+  const base=1299;
+  const rows=[...document.querySelectorAll('#zoneTable tbody tr')].map(tr=>{
+    const code=tr.dataset.code, z=zs.find(x=>x.code===code)||{};
+    const fx=parseFloat(tr.querySelector('.z-fx').value);
+    const tax=parseFloat(tr.querySelector('.z-tax').value);
+    if(!isFinite(fx)||fx<=0)return `<div>${esc(z.country)} — enter a valid rate</div>`;
+    const p=(base*fx).toFixed(z.decimals!=null?z.decimals:2);
+    const t=isFinite(tax)&&tax>0?` · includes ${tax}% ${esc(z.taxLabel)}`:` · no ${esc(z.taxLabel)}`;
+    return `<div style="padding:3px 0">A ₹${base.toLocaleString('en-IN')} product shows as <b>${esc(z.currency)} ${p}</b> in ${esc(z.country)}${t}</div>`;
+  });
+  el.innerHTML=rows.join('');
+}
+async function saveZones(){
+  const zones=[...document.querySelectorAll('#zoneTable tbody tr')].map(tr=>({
+    code:tr.dataset.code,
+    fx:parseFloat(tr.querySelector('.z-fx').value),
+    taxPercent:parseFloat(tr.querySelector('.z-tax').value),
+    enabled:tr.querySelector('.z-on')?tr.querySelector('.z-on').checked:true
+  }));
+  const bad=zones.find(z=>!isFinite(z.fx)||z.fx<=0||!isFinite(z.taxPercent)||z.taxPercent<0||z.taxPercent>100);
+  if(bad){toast('Check the rate and tax for '+bad.code,1);return}
+  try{
+    await api('/admin/zones','POST',{zones});
+    toast('Zones saved — new orders use these rates');
+    await refreshZones();
+    if(state.payInfo)state.payInfo=await api('/pay-info'+zoneQuery());
+    renderAdmin('zones');
+  }catch(e){toast(e.message,1)}
+}
+
 async function renderRegs(){
   const users=await api('/admin/users');
   regCache=users;
@@ -2522,7 +2749,7 @@ function orderCard(o){
       </tbody></table>
       <div class="ototals">
         <div><span>Taxable value</span><span>${fmt(taxable)}</span></div>
-        ${o.gst?`<div><span>GST ${o.gstPercent||18}% (included)</span><span>${fmt(o.gst)}</span></div>`:''}
+        ${o.gst?`<div><span>${o.taxLabel||'GST'} ${o.taxPercent!=null?o.taxPercent:(o.gstPercent||18)}% (included)</span><span>${fmtOrder(o.gst,o)}</span></div>`:''}
         <div class="big"><span>Order total (incl. GST)</span><span>${fmt(o.total)}</span></div>
       </div>
     </div>
@@ -2611,10 +2838,10 @@ function printSlip(o){
       ${o.items.map((i,n)=>{
         const parts=String(i.name).split(' — ');const nm=parts.shift();const extra=parts.join(' — ');
         return `<tr><td>${n+1}</td><td>${esc(nm)}${extra?'<br><span class="pr-sub">'+esc(extra)+'</span>':''}</td>
-        <td class="r"><b>${i.qty}</b></td><td class="r">${fmt(i.rate)}</td><td class="r">${fmt(i.rate*i.qty)}</td></tr>`}).join('')}
-      <tr><td colspan="3"></td><td class="r">Taxable</td><td class="r">${fmt(taxable)}</td></tr>
-      ${o.gst?`<tr><td colspan="3"></td><td class="r">GST ${o.gstPercent||18}%</td><td class="r">${fmt(o.gst)}</td></tr>`:''}
-      <tr class="pr-total"><td colspan="3"></td><td class="r">TOTAL (incl. GST)</td><td class="r">${fmt(o.total)}</td></tr>
+        <td class="r"><b>${i.qty}</b></td><td class="r">${fmtOrder(i.rate,o)}</td><td class="r">${fmtOrder(i.rate*i.qty,o)}</td></tr>`}).join('')}
+      <tr><td colspan="3"></td><td class="r">Taxable</td><td class="r">${fmtOrder(taxable,o)}</td></tr>
+      ${o.gst?`<tr><td colspan="3"></td><td class="r">${o.taxLabel||'GST'} ${o.taxPercent!=null?o.taxPercent:(o.gstPercent||18)}%</td><td class="r">${fmtOrder(o.gst,o)}</td></tr>`:''}
+      <tr class="pr-total"><td colspan="3"></td><td class="r">TOTAL (incl. ${o.taxLabel||'GST'})</td><td class="r">${fmtOrder(o.total,o)}</td></tr>
     </tbody></table>
     ${o.notes?`<p><b>Order notes:</b> ${esc(o.notes)}</p>`:''}
     <p><b>Payment:</b> ${esc(o.payRef)||'—'}${o.creditDue&&!o.creditSettled?' · Credit due '+new Date(o.creditDue).toLocaleDateString('en-IN'):''}</p>
@@ -2706,7 +2933,7 @@ function myOrderCard(o){
       </tbody></table>
       <div class="ototals">
         <div><span>Taxable value</span><span>${fmt(taxable)}</span></div>
-        ${o.gst?`<div><span>GST ${o.gstPercent||18}% (included)</span><span>${fmt(o.gst)}</span></div>`:''}
+        ${o.gst?`<div><span>${o.taxLabel||'GST'} ${o.taxPercent!=null?o.taxPercent:(o.gstPercent||18)}% (included)</span><span>${fmtOrder(o.gst,o)}</span></div>`:''}
         <div class="big"><span>Order total (incl. GST)</span><span>${fmt(o.total)}</span></div>
       </div>
     </div>
@@ -3341,7 +3568,7 @@ async function saveSettings(quiet){
       ...($('st-gstkey').value.trim()?{gstApiKey:$('st-gstkey').value.trim()}:{}),
       ...($('st-apass').value?{adminPassword:$('st-apass').value}:{})
     });
-    state.payInfo=await api('/pay-info');
+    state.payInfo=await api('/pay-info'+zoneQuery());if(state.payInfo&&state.payInfo.zone)state.zone=state.payInfo.zone;
     if(!quiet)toast('Settings saved');
   }catch(e){toast(e.message,1)}
 }
@@ -3380,7 +3607,7 @@ if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch
 /* ============ INIT ============ */
 (async function init(){
   try{
-    await Promise.all([refreshProducts(),refreshMe(),refreshTransports(),api('/pay-info').then(d=>state.payInfo=d)]);
+    await Promise.all([refreshProducts(),refreshMe(),refreshTransports(),api('/pay-info'+zoneQuery()).then(d=>{state.payInfo=d;if(d.zone)state.zone=d.zone}),refreshZones()]);
   }catch(e){toast('Could not reach the server — check your connection.',1)}
   renderHeader();
   loadSeen();

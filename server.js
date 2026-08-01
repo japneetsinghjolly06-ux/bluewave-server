@@ -140,6 +140,27 @@ try { db.exec("ALTER TABLE orders ADD COLUMN gst REAL DEFAULT 0"); } catch (e) {
 try { db.exec("ALTER TABLE orders ADD COLUMN credit_due TEXT DEFAULT ''"); } catch (e) { /* column exists */ }
 try { db.exec("ALTER TABLE orders ADD COLUMN credit_settled INTEGER DEFAULT 0"); } catch (e) { /* column exists */ }
 try { db.exec("ALTER TABLE users ADD COLUMN pincode TEXT DEFAULT ''"); } catch (e) { /* column exists */ }
+
+/* ---------- multi-zone / multi-currency ----------
+ * Existing dealers were all Indian, so country defaults to IN and their GSTIN
+ * stays exactly where it was — the gstin column now holds whatever tax number
+ * the dealer's country uses. Nothing is rewritten or moved.
+ */
+try { db.exec("ALTER TABLE users ADD COLUMN country TEXT DEFAULT 'IN'"); } catch (e) { /* column exists */ }
+try { db.exec("ALTER TABLE users ADD COLUMN licence_no TEXT DEFAULT ''"); } catch (e) { /* column exists */ }
+try { db.exec("UPDATE users SET country='IN' WHERE country IS NULL OR country=''"); } catch (e) { /* no rows */ }
+
+/* An order remembers the currency, rate and tax it was placed at, so an old
+ * order never changes value when the admin updates today's exchange rate. */
+try { db.exec("ALTER TABLE orders ADD COLUMN country TEXT DEFAULT 'IN'"); } catch (e) { /* column exists */ }
+try { db.exec("ALTER TABLE orders ADD COLUMN currency TEXT DEFAULT 'INR'"); } catch (e) { /* column exists */ }
+try { db.exec("ALTER TABLE orders ADD COLUMN fx_rate REAL DEFAULT 1"); } catch (e) { /* column exists */ }
+try { db.exec("ALTER TABLE orders ADD COLUMN tax_percent REAL DEFAULT -1"); } catch (e) { /* column exists */ }
+try { db.exec("ALTER TABLE orders ADD COLUMN tax_label TEXT DEFAULT 'GST'"); } catch (e) { /* column exists */ }
+
+/* Per-zone exchange rate and tax rate, editable by the admin. */
+db.exec(`CREATE TABLE IF NOT EXISTS zones(
+  code TEXT PRIMARY KEY, fx REAL, tax_percent REAL, enabled INTEGER DEFAULT 1, updated_at TEXT)`);
 try { db.exec("ALTER TABLE users ADD COLUMN whatsapp TEXT DEFAULT ''"); } catch (e) { /* column exists */ }
 /* in-app notifications: user_id 'admin' means the admin panel */
 db.exec(`CREATE TABLE IF NOT EXISTS notifications(
@@ -193,6 +214,207 @@ const getSetting = k => { const r = db.prepare('SELECT value FROM settings WHERE
 const gstPercent = () => { const v = parseFloat(getSetting('gstPercent')); return isFinite(v) && v >= 0 ? v : 18; };
 const setSetting = (k, v) => db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, String(v));
 
+/* ==========================================================================
+   ZONES — one definition per country we sell into.
+   This is the single source of truth for the registration form, the tax shown
+   on an order, and the currency prices are quoted in. The same table is sent
+   to the browser by /api/zones, so the form and the server can never disagree
+   about what a valid tax number looks like.
+
+   fx        starting rate: how much of the local currency 1 INR buys.
+             Product prices are held in INR and converted with this. The admin
+             sets the real rate in Admin -> Zones; these are only seeds.
+   taxPercent  standard rate as at August 2026. Qatar and Kuwait have not
+             introduced VAT (Kuwait has ruled it out before 2028, Qatar is
+             expected to follow its e-invoicing law), so they sit at 0 and the
+             admin can switch them on the day it lands.
+   Licence formats are deliberately lenient — turning away a real dealer over
+   a format guess is worse than the admin eyeballing the number at approval.
+   ========================================================================== */
+const ZONES = {
+  IN: {
+    code: 'IN', country: 'India', dial: '91', phoneLen: 10,
+    currency: 'INR', symbol: '₹', locale: 'en-IN', decimals: 2, fx: 1,
+    taxLabel: 'GST', taxPercent: 18,
+    taxId: { label: 'GSTIN', placeholder: '36ABCDE1234F1Z5', hint: '15 characters, e.g. 36ABCDE1234F1Z5',
+             re: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$', upper: true, required: true },
+    licence: null,
+    regionLabel: 'State',
+    postcode: { label: 'Pincode', re: '^[1-9][0-9]{5}$', hint: '6-digit pincode', required: true }
+  },
+  AE: {
+    code: 'AE', country: 'United Arab Emirates', dial: '971', phoneLen: 9,
+    currency: 'AED', symbol: 'AED', locale: 'en-AE', decimals: 2, fx: 0.0384,
+    taxLabel: 'VAT', taxPercent: 5,
+    taxId: { label: 'VAT TRN', placeholder: '100123456700003', hint: '15-digit Tax Registration Number',
+             re: '^[0-9]{15}$', upper: false, required: true },
+    licence: { label: 'Trade licence number', placeholder: 'e.g. CN-1234567', hint: 'as printed on your DED trade licence',
+               re: '^[A-Za-z0-9][A-Za-z0-9\\-\\/ ]{2,29}$', upper: true, required: true },
+    regionLabel: 'Emirate',
+    postcode: null
+  },
+  SA: {
+    code: 'SA', country: 'Saudi Arabia', dial: '966', phoneLen: 9,
+    currency: 'SAR', symbol: 'SAR', locale: 'en-SA', decimals: 2, fx: 0.0392,
+    taxLabel: 'VAT', taxPercent: 15,
+    taxId: { label: 'VAT registration number', placeholder: '300123456700003', hint: '15 digits, starts and ends with 3',
+             re: '^3[0-9]{13}3$', upper: false, required: true },
+    licence: { label: 'Commercial Registration (CR) number', placeholder: '1010123456', hint: '10-digit CR number',
+               re: '^[0-9]{10}$', upper: false, required: true },
+    regionLabel: 'Region',
+    postcode: { label: 'Postal code', re: '^[0-9]{5}$', hint: '5-digit postal code', required: false }
+  },
+  OM: {
+    code: 'OM', country: 'Oman', dial: '968', phoneLen: 8,
+    currency: 'OMR', symbol: 'OMR', locale: 'en-OM', decimals: 3, fx: 0.00402,
+    taxLabel: 'VAT', taxPercent: 5,
+    taxId: { label: 'VAT identification number', placeholder: 'OM1100000000', hint: 'OM followed by 10 digits',
+             re: '^OM[0-9]{10}$', upper: true, required: true },
+    licence: { label: 'Commercial Registration (CR) number', placeholder: '1234567', hint: '7 to 10 digits',
+               re: '^[0-9]{7,10}$', upper: false, required: true },
+    regionLabel: 'Governorate',
+    postcode: { label: 'Postal code', re: '^[0-9]{3}$', hint: '3-digit postal code', required: false }
+  },
+  QA: {
+    code: 'QA', country: 'Qatar', dial: '974', phoneLen: 8,
+    currency: 'QAR', symbol: 'QAR', locale: 'en-QA', decimals: 2, fx: 0.0380,
+    taxLabel: 'VAT', taxPercent: 0,
+    taxId: { label: 'Tax Identification Number (TIN)', placeholder: '5012345678', hint: 'your Dhareeba TIN — leave blank if not registered',
+             re: '^[0-9]{8,12}$', upper: false, required: false },
+    licence: { label: 'Commercial Registration (CR) number', placeholder: '123456', hint: '6 to 10 digits',
+               re: '^[0-9]{6,10}$', upper: false, required: true },
+    regionLabel: 'Municipality',
+    postcode: null
+  },
+  KW: {
+    code: 'KW', country: 'Kuwait', dial: '965', phoneLen: 8,
+    currency: 'KWD', symbol: 'KWD', locale: 'en-KW', decimals: 3, fx: 0.00320,
+    taxLabel: 'VAT', taxPercent: 0,
+    taxId: { label: 'Tax card number', placeholder: 'optional', hint: 'Kuwait has no VAT yet — leave blank if you have no tax card',
+             re: '^[A-Za-z0-9\\-\\/]{4,20}$', upper: true, required: false },
+    licence: { label: 'Commercial Licence number', placeholder: '123456', hint: '4 to 12 digits',
+               re: '^[0-9]{4,12}$', upper: false, required: true },
+    regionLabel: 'Governorate',
+    postcode: null
+  },
+  BH: {
+    code: 'BH', country: 'Bahrain', dial: '973', phoneLen: 8,
+    currency: 'BHD', symbol: 'BHD', locale: 'en-BH', decimals: 3, fx: 0.00393,
+    taxLabel: 'VAT', taxPercent: 10,
+    taxId: { label: 'VAT account number', placeholder: '200012345600002', hint: '15-digit VAT account number',
+             re: '^[0-9]{15}$', upper: false, required: true },
+    licence: { label: 'Commercial Registration (CR) number', placeholder: '12345-1', hint: 'CR number as issued by MOIC',
+               re: '^[0-9]{4,8}(-[0-9]{1,3})?$', upper: false, required: true },
+    regionLabel: 'Governorate',
+    postcode: null
+  }
+};
+const DEFAULT_ZONE = 'IN';
+const zoneOf = c => ZONES[String(c || '').toUpperCase()] || null;
+
+/* Seed the editable half of each zone once, then leave it to the admin. */
+for (const z of Object.values(ZONES)) {
+  db.prepare('INSERT OR IGNORE INTO zones(code,fx,tax_percent,enabled,updated_at) VALUES(?,?,?,1,?)')
+    .run(z.code, z.fx, z.taxPercent, now());
+}
+
+/* The live settings for a zone: admin values if present, definition as fallback. */
+function zoneLive(code) {
+  const z = zoneOf(code) || ZONES[DEFAULT_ZONE];
+  const r = db.prepare('SELECT * FROM zones WHERE code=?').get(z.code);
+  const fx = r && isFinite(r.fx) && r.fx > 0 ? r.fx : z.fx;
+  /* India keeps using the existing global GST setting so the admin's current
+     screen carries on working exactly as before. */
+  const tax = z.code === 'IN' ? gstPercent()
+            : (r && isFinite(r.tax_percent) && r.tax_percent >= 0 ? r.tax_percent : z.taxPercent);
+  return { ...z, fx, taxPercent: tax, enabled: r ? !!r.enabled : true };
+}
+const zoneOfUser = u => zoneLive(u && u.country ? u.country : DEFAULT_ZONE);
+
+/* INR -> the zone's currency, rounded to that currency's minor unit.
+ * Dinar currencies (OMR, KWD, BHD) are quoted to 3 decimals, not 2. */
+function toZone(amountInr, z) {
+  const n = Number(amountInr || 0) * (z.fx || 1);
+  const p = Math.pow(10, z.decimals);
+  return Math.round(n * p) / p;
+}
+/* What the client sends back is already in zone currency; this brings it home. */
+function fromZone(amountLocal, z) {
+  const n = Number(amountLocal || 0) / (z.fx || 1);
+  return Math.round(n * 100) / 100;
+}
+/* Validates the country-specific half of a registration. Returns an error
+ * message for the dealer, or null when everything checks out. Used by both
+ * /api/register and /api/me/complete so the two can never drift apart. */
+function zoneFieldError(f, z) {
+  const tid = z.taxId, lic = z.licence, pc = z.postcode;
+
+  if (tid) {
+    const v = (f.gstin || '').trim();
+    if (!v && tid.required) return 'Enter your ' + tid.label + '.';
+    if (v && !new RegExp(tid.re).test(v))
+      return tid.label + ' format looks invalid. Expected ' + tid.hint + '.';
+  } else if ((f.gstin || '').trim()) {
+    return 'A tax number is not used for ' + z.country + ' — please leave it blank.';
+  }
+
+  if (lic) {
+    const v = (f.licence || '').trim();
+    if (!v && lic.required) return 'Enter your ' + lic.label + '.';
+    if (v && !new RegExp(lic.re).test(v))
+      return lic.label + ' format looks invalid. Expected ' + lic.hint + '.';
+  }
+
+  if (pc) {
+    const v = (f.pincode || '').trim();
+    if (!v && pc.required) return 'Enter your ' + pc.label.toLowerCase() + '.';
+    if (v && !new RegExp(pc.re).test(v))
+      return 'Enter a valid ' + pc.hint + '.';
+  }
+
+  if (nationalDigits(f.phone, z).length !== z.phoneLen)
+    return 'Enter a valid ' + z.phoneLen + '-digit ' + z.country + ' mobile number (without the +' + z.dial + ').';
+
+  return null;
+}
+/* Works out the zone from a dialled number, longest dial code first so 971
+ * (UAE) is not mistaken for 97. Falls back to India, which is where every
+ * existing dealer is. */
+function countryFromDigits(digits) {
+  const d = String(digits || '').replace(/\D/g, '');
+  const byLen = Object.values(ZONES).sort((a, b) => b.dial.length - a.dial.length);
+  for (const z of byLen) {
+    if (d.startsWith(z.dial) && d.length === z.dial.length + z.phoneLen) return z.code;
+  }
+  for (const z of byLen) if (d.startsWith(z.dial)) return z.code;
+  return DEFAULT_ZONE;
+}
+/* Strips the dial code off a number, leaving the national digits we store.
+ * Deliberately does NOT trim a number down to length: an Indian 10-digit mobile
+ * typed into a UAE registration must come back as 10 digits so the caller can
+ * reject it, rather than being silently cut to a valid-looking 9. */
+function nationalDigits(digits, z) {
+  let d = String(digits || '').replace(/\D/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.length === z.dial.length + z.phoneLen && d.startsWith(z.dial)) return d.slice(z.dial.length);
+  if (d.length === z.phoneLen + 1 && d.startsWith('0')) return d.slice(1);
+  return d;
+}
+
+/* Tax numbers are compared in one canonical case so the same GSTIN typed in
+ * lower case cannot slip past the duplicate check. */
+const normTaxId = (v, z) => z.taxId && z.taxId.upper ? String(v || '').trim().toUpperCase() : String(v || '').trim();
+const normLicence = (v, z) => z.licence && z.licence.upper ? String(v || '').trim().toUpperCase() : String(v || '').trim();
+
+/* Public shape of a zone — safe to hand to the browser. */
+const pubZone = z => ({
+  code: z.code, country: z.country, dial: z.dial, phoneLen: z.phoneLen,
+  currency: z.currency, symbol: z.symbol, locale: z.locale, decimals: z.decimals,
+  fx: z.fx, taxLabel: z.taxLabel, taxPercent: z.taxPercent,
+  taxId: z.taxId, licence: z.licence, regionLabel: z.regionLabel,
+  postcode: z.postcode, enabled: z.enabled !== false
+});
+
 /* ---------- seed ---------- */
 if (!getSetting('seeded')) {
   const seed = [
@@ -235,7 +457,7 @@ function auth(req, res, next) {
 const requireAdmin = (req, res, next) => req.role === 'admin' ? next() : res.status(403).json({ error: 'Admin only' });
 const requireUser = (req, res, next) => (req.role === 'user' && req.user) ? next() : res.status(401).json({ error: 'Login required' });
 const isDealer = req => req.role === 'user' && req.user && req.user.status === 'approved';
-const pubUser = u => u && ({ id: u.id, name: u.name, phone: u.phone, email: u.email, company: u.company, gstin: u.gstin, type: u.type, addr: u.addr, city: u.city, state: u.state, pincode: u.pincode || '', whatsapp: u.whatsapp || u.phone || '', status: u.status, note: u.note, terms: u.terms || 'advance', creditDays: u.credit_days || 0, discount: u.discount || 0,
+const pubUser = u => u && ({ country: u.country || DEFAULT_ZONE, licence: u.licence_no || '', id: u.id, name: u.name, phone: u.phone, email: u.email, company: u.company, gstin: u.gstin, type: u.type, addr: u.addr, city: u.city, state: u.state, pincode: u.pincode || '', whatsapp: u.whatsapp || u.phone || '', status: u.status, note: u.note, terms: u.terms || 'advance', creditDays: u.credit_days || 0, discount: u.discount || 0,
   mobileOk: !!u.mobile_ok, createdAt: u.created_at });
 
 /* price this dealer pays for a product: their custom rate if set, else the standard dealer rate */
@@ -279,7 +501,13 @@ function notify(userId, kind, title, body, orderId) {
   try { pushNotify(userId, title, body, kind); } catch (e) { /* push is best-effort */ }
 }
 const notifyAdmin = (kind, title, body, orderId) => notify('admin', kind, title, body, orderId);
-const fmtMoney = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+/* Money for admin notifications and reminder texts. Pass the zone the amount is
+ * in; without one it formats as rupees, which is what every pre-zone amount is. */
+const fmtMoney = (n, z) => {
+  const zz = z || ZONES[DEFAULT_ZONE];
+  return zz.symbol + (zz.symbol.length > 1 ? ' ' : '') +
+    Number(n || 0).toLocaleString(zz.locale, { minimumFractionDigits: 0, maximumFractionDigits: zz.decimals });
+};
 const pubNotif = n => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, orderId: n.order_id || '', createdAt: n.created_at, read: !!n.read_at });
 
 const app = express();
@@ -292,31 +520,83 @@ app.get('/api/products', (req, res) => {
   const dealer = isDealer(req);
   const offer = dealer ? liveOffer() : null;
   const rows = db.prepare('SELECT * FROM products WHERE active=1 ORDER BY sort').all();
+  /* Prices live in INR. A signed-in dealer sees them in their own currency; a
+     guest sees the zone they picked, falling back to India. */
+  const z = req.user ? zoneOfUser(req.user) : zoneLive(req.query.zone || DEFAULT_ZONE);
+  const c = v => toZone(v, z);
   res.json({
+    zone: pubZone(z),
     offer: dealer ? pubOffer(offer) : null,
     products: rows.map(p => ({
-      id: p.id, name: p.name, cat: p.cat, emoji: p.emoji, image: p.image || '', mrp: p.mrp, moq: p.moq,
+      id: p.id, name: p.name, cat: p.cat, emoji: p.emoji, image: p.image || '', mrp: c(p.mrp), moq: p.moq,
       descr: p.descr || '', packing: p.packing || '',
-      options: p.options ? JSON.parse(p.options) : null,
+      options: p.options ? scaleOptions(p.options, z) : null,
       ...(dealer ? {
-        dealer: rateFor(req.user, p, offer),
-        listDealer: (customPrice(req.user.id, p.id) !== null ? customPrice(req.user.id, p.id) : p.dealer)
+        dealer: c(rateFor(req.user, p, offer)),
+        listDealer: c(customPrice(req.user.id, p.id) !== null ? customPrice(req.user.id, p.id) : p.dealer)
       } : {})
     }))
   });
 });
 
+/* Pack options carry a per-piece surcharge in INR ("+₹4 per set"), so it has to
+ * travel through the same conversion as the price it is added to. */
+function scaleOptions(json, z) {
+  let o; try { o = JSON.parse(json); } catch (e) { return null; }
+  if (o && Array.isArray(o.packs)) o.packs = o.packs.map(pk => ({ ...pk, add: toZone(pk.add || 0, z) }));
+  return o;
+}
+
 const rzpKeys = () => ({ id: getSetting('rzpKeyId') || '', secret: getSetting('rzpKeySecret') || '' });
 const rzpEnabled = () => { const k = rzpKeys(); return !!(k.id && k.secret); };
 
 app.get('/api/pay-info', (req, res) => {
+  const z = req.user ? zoneOfUser(req.user) : zoneLive(req.query.zone || DEFAULT_ZONE);
   res.json({
     payeeName: getSetting('payeeName'),
     bankName: getSetting('bankName'), accountNo: getSetting('accountNo'),
-    ifsc: getSetting('ifsc'), whatsapp: getSetting('whatsapp'), gstPercent: gstPercent(),
-    razorpay: { enabled: rzpEnabled(), keyId: rzpEnabled() ? rzpKeys().id : '' },
+    ifsc: getSetting('ifsc'), whatsapp: getSetting('whatsapp'),
+    /* gstPercent stays for older app builds; taxPercent/taxLabel are the
+       zone-aware pair the current client reads. */
+    gstPercent: z.taxPercent, taxPercent: z.taxPercent, taxLabel: z.taxLabel,
+    zone: pubZone(z),
+    /* Razorpay settles in INR only, so it is offered to Indian dealers alone. */
+    razorpay: { enabled: rzpEnabled() && z.code === 'IN', keyId: (rzpEnabled() && z.code === 'IN') ? rzpKeys().id : '' },
     smsProvider: ss('smsProvider') || '', mailReady: mailReady()
   });
+});
+
+/* The zone table, for the registration form and the admin screen. */
+app.get('/api/zones', (req, res) => {
+  res.json(Object.keys(ZONES).map(c => pubZone(zoneLive(c))).filter(z => z.enabled));
+});
+
+/* ---------- admin: zones ---------- */
+app.get('/api/admin/zones', requireAdmin, (req, res) => {
+  res.json(Object.keys(ZONES).map(c => {
+    const z = zoneLive(c);
+    const n = db.prepare("SELECT COUNT(*) n FROM users WHERE country=? AND status='approved'").get(c).n;
+    const pend = db.prepare("SELECT COUNT(*) n FROM users WHERE country=? AND status IN ('pending','incomplete')").get(c).n;
+    return { ...pubZone(z), dealers: n, pending: pend, baseFx: ZONES[c].fx, baseTax: ZONES[c].taxPercent };
+  }));
+});
+
+app.post('/api/admin/zones', requireAdmin, (req, res) => {
+  const rows = Array.isArray(req.body?.zones) ? req.body.zones : [];
+  const upd = db.prepare('UPDATE zones SET fx=?, tax_percent=?, enabled=?, updated_at=? WHERE code=?');
+  for (const r of rows) {
+    const z = zoneOf(r.code);
+    if (!z) continue;
+    const fx = parseFloat(r.fx);
+    const tax = parseFloat(r.taxPercent);
+    if (!isFinite(fx) || fx <= 0) return res.status(400).json({ error: 'Enter a positive exchange rate for ' + z.country + '.' });
+    if (!isFinite(tax) || tax < 0 || tax > 100) return res.status(400).json({ error: 'Enter a tax rate between 0 and 100 for ' + z.country + '.' });
+    /* India is never switched off — it is the home market and the base currency. */
+    const en = z.code === 'IN' ? 1 : (r.enabled ? 1 : 0);
+    upd.run(fx, tax, en, now(), z.code);
+    if (z.code === 'IN') setSetting('gstPercent', tax);
+  }
+  res.json({ ok: true, zones: Object.keys(ZONES).map(c => pubZone(zoneLive(c))) });
 });
 
 /* ---------- GSTIN verification ---------- */
@@ -365,29 +645,45 @@ app.get('/api/transports', (req, res) => {
 app.post('/api/register', (req, res) => {
   const b = req.body || {};
   const f = {};
-  for (const k of ['name', 'phone', 'email', 'password', 'company', 'gstin', 'type', 'addr', 'city', 'state', 'pincode'])
+  for (const k of ['name', 'phone', 'email', 'password', 'company', 'gstin', 'type', 'addr', 'city', 'state', 'licence'])
     f[k] = String(b[k] || '').trim();
+  f.pincode = String(b.pincode || '').trim();
+
+  const z = zoneLive(b.country);
+  if (!zoneOf(b.country)) return res.status(400).json({ error: 'Choose your country.' });
+  if (!z.enabled) return res.status(400).json({ error: 'Registration for ' + z.country + ' is not open yet. Please contact us.' });
+  f.country = z.code;
+  f.gstin = normTaxId(f.gstin, z);
+  f.licence = normLicence(f.licence, z);
+
   const waNum = String(b.whatsapp || '').trim() || f.phone;
-  f.gstin = f.gstin.toUpperCase();
-  if (Object.entries(f).some(([k, v]) => !v)) return res.status(400).json({ error: 'Please fill all required fields.' });
-  if (!/^\d{10}$/.test(f.phone.replace(/\D/g, '').slice(-10))) return res.status(400).json({ error: 'Enter a valid 10-digit phone number.' });
-  if (!/^[1-9]\d{5}$/.test(f.pincode)) return res.status(400).json({ error: 'Enter a valid 6-digit pincode.' });
-  if (!/^\d{10}$/.test(waNum.replace(/\D/g, '').slice(-10))) return res.status(400).json({ error: 'Enter a valid 10-digit WhatsApp number.' });
+  /* Everything except the country-specific fields, which are checked below. */
+  for (const k of ['name', 'phone', 'email', 'password', 'company', 'type', 'addr', 'city', 'state'])
+    if (!f[k]) return res.status(400).json({ error: 'Please fill all required fields.' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) return res.status(400).json({ error: 'Enter a valid email address.' });
   if (f.password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-  if (!GSTIN_RE.test(f.gstin)) return res.status(400).json({ error: 'GSTIN format looks invalid. Expected 15 characters like 36ABCDE1234F1Z5.' });
+
+  const zErr = zoneFieldError(f, z);
+  if (zErr) return res.status(400).json({ error: zErr });
+  const waNat = nationalDigits(waNum, z);
+  if (waNat.length !== z.phoneLen) return res.status(400).json({ error: 'Enter a valid ' + z.phoneLen + '-digit WhatsApp number (without the +' + z.dial + ').' });
+
   if (f.email.toLowerCase() === String(getSetting('adminEmail')).toLowerCase()) return res.status(400).json({ error: 'This email is reserved.' });
   if (db.prepare('SELECT 1 FROM users WHERE email=?').get(f.email)) return res.status(400).json({ error: 'An account with this email already exists — try logging in.' });
-  if (db.prepare('SELECT 1 FROM users WHERE gstin=?').get(f.gstin)) return res.status(400).json({ error: 'This GSTIN is already registered — try logging in or contact support.' });
+  /* Tax numbers are only unique within a country, and some zones allow a blank
+     one, so an empty value must never collide with another blank. */
+  if (f.gstin && db.prepare('SELECT 1 FROM users WHERE gstin=? AND country=?').get(f.gstin, f.country))
+    return res.status(400).json({ error: 'This ' + z.taxId.label + ' is already registered — try logging in or contact support.' });
   const salt = crypto.randomBytes(8).toString('hex');
   const id = uid('u');
   const mCode = String(Math.floor(100000 + Math.random() * 900000));
-  db.prepare(`INSERT INTO users(id,name,phone,email,pass_hash,salt,company,gstin,type,addr,city,state,pincode,whatsapp,status,mobile_code,email_ok,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,1,?)`)
-    .run(id, f.name, f.phone, f.email, hashPw(f.password, salt), salt, f.company, f.gstin, f.type, f.addr, f.city, f.state, f.pincode, waNum.replace(/\D/g, '').slice(-10), mCode, now());
+  const phoneNat = nationalDigits(f.phone, z);
+  db.prepare(`INSERT INTO users(id,name,phone,email,pass_hash,salt,company,gstin,type,addr,city,state,pincode,whatsapp,status,mobile_code,email_ok,created_at,country,licence_no)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,1,?,?,?)`)
+    .run(id, f.name, phoneNat, f.email, hashPw(f.password, salt), salt, f.company, f.gstin, f.type, f.addr, f.city, f.state, f.pincode, waNat, mCode, now(), f.country, f.licence);
   notifyAdmin('registration', 'New registration — ' + f.company,
-    f.name + ' (' + f.type + ') from ' + (f.city || '—') + ', mobile ' + f.phone +
-    '. Verify the GSTIN and approve the account.');
+    f.name + ' (' + f.type + ') from ' + (f.city || '—') + ', ' + z.country + ', mobile +' + z.dial + ' ' + phoneNat +
+    '. Verify the ' + (z.taxId ? z.taxId.label : 'business details') + ' and approve the account.');
   /* the verification code goes straight to their mobile */
   sendCode(db.prepare('SELECT * FROM users WHERE id=?').get(id), 'verification', mCode,
     'They have just registered.').catch(() => {});
@@ -595,11 +891,14 @@ app.post('/api/otp/login', (req, res) => {
   db.prepare('DELETE FROM otp_codes WHERE mobile=?').run(digits);
   const id = uid('u');
   const salt = crypto.randomBytes(8).toString('hex');
-  const ten = digits.slice(-10);
+  /* The dial code they verified on tells us which country they are in, so the
+     details form that follows already shows the right tax fields. */
+  const cc = countryFromDigits(digits);
+  const ten = nationalDigits(digits, ZONES[cc]);
   db.prepare(`INSERT INTO users(id,name,phone,email,pass_hash,salt,company,gstin,type,addr,city,state,pincode,
-      whatsapp,status,mobile_ok,email_ok,created_at)
-    VALUES(?,'',?,?,?,?,'',NULL,'Dealer','','','','',?,'incomplete',1,1,?)`)
-    .run(id, ten, id + '@pending.bluewave', hashPw(crypto.randomBytes(12).toString('hex'), salt), salt, ten, now());
+      whatsapp,status,mobile_ok,email_ok,created_at,country,licence_no)
+    VALUES(?,'',?,?,?,?,'',NULL,'Dealer','','','','',?,'incomplete',1,1,?,?,'')`)
+    .run(id, ten, id + '@pending.bluewave', hashPw(crypto.randomBytes(12).toString('hex'), salt), salt, ten, now(), cc);
   const token = crypto.randomBytes(24).toString('hex');
   db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, id, 'user', now());
   res.json({ token, role: 'user', user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)),
@@ -615,23 +914,32 @@ app.post('/api/me/complete', requireUser, (req, res) => {
 
   const b = req.body || {};
   const f = {};
-  for (const k of ['name', 'email', 'company', 'gstin', 'type', 'addr', 'city', 'state', 'pincode'])
+  for (const k of ['name', 'email', 'company', 'gstin', 'type', 'addr', 'city', 'state', 'licence'])
     f[k] = String(b[k] || '').trim();
-  f.gstin = f.gstin.toUpperCase();
-  const phone = String(b.phone || u.phone || '').replace(/\D/g, '').slice(-10);
-  const waNum = String(b.whatsapp || '').replace(/\D/g, '').slice(-10) || phone;
+  f.pincode = String(b.pincode || '').trim();
 
-  if (!f.name || !f.company || !f.email || !f.gstin || !f.addr || !f.city || !f.state)
+  /* They may correct the country the OTP guessed — e.g. an Indian mobile on a
+     UAE trade licence — so the posted value wins when it is a zone we serve. */
+  const z = zoneLive(b.country || u.country);
+  if (!z.enabled) return res.status(400).json({ error: 'Registration for ' + z.country + ' is not open yet. Please contact us.' });
+  f.country = z.code;
+  f.gstin = normTaxId(f.gstin, z);
+  f.licence = normLicence(f.licence, z);
+  const phone = nationalDigits(String(b.phone || u.phone || ''), z);
+  const waNum = nationalDigits(String(b.whatsapp || ''), z) || phone;
+  f.phone = phone;
+
+  if (!f.name || !f.company || !f.email || !f.addr || !f.city || !f.state)
     return res.status(400).json({ error: 'Please fill in every required field.' });
   if (!/^\S+@\S+\.\S+$/.test(f.email)) return res.status(400).json({ error: 'Enter a valid email address.' });
-  if (!/^[1-9]\d{5}$/.test(f.pincode)) return res.status(400).json({ error: 'Enter a valid 6-digit pincode.' });
-  if (!GSTIN_RE.test(f.gstin)) return res.status(400).json({ error: 'GSTIN format looks invalid. Expected 15 characters like 36ABCDE1234F1Z5.' });
+  const zErr = zoneFieldError(f, z);
+  if (zErr) return res.status(400).json({ error: zErr });
   if (f.email.toLowerCase() === String(getSetting('adminEmail')).toLowerCase())
     return res.status(400).json({ error: 'This email is reserved.' });
   if (db.prepare('SELECT 1 FROM users WHERE lower(email)=lower(?) AND id<>?').get(f.email, u.id))
     return res.status(400).json({ error: 'An account with this email already exists.' });
-  if (db.prepare('SELECT 1 FROM users WHERE gstin=? AND id<>?').get(f.gstin, u.id))
-    return res.status(400).json({ error: 'This GSTIN is already registered — please contact us.' });
+  if (f.gstin && db.prepare('SELECT 1 FROM users WHERE gstin=? AND country=? AND id<>?').get(f.gstin, f.country, u.id))
+    return res.status(400).json({ error: 'This ' + z.taxId.label + ' is already registered — please contact us.' });
 
   const type = ['Dealer', 'Distributor', 'Retailer', 'Contractor'].includes(f.type) ? f.type : 'Dealer';
   let hash = u.pass_hash, salt = u.salt;
@@ -641,13 +949,13 @@ app.post('/api/me/complete', requireUser, (req, res) => {
     hash = hashPw(String(b.password), salt);
   }
   db.prepare(`UPDATE users SET name=?, email=?, company=?, gstin=?, type=?, addr=?, city=?, state=?,
-      pincode=?, phone=?, whatsapp=?, pass_hash=?, salt=?, status='pending' WHERE id=?`)
+      pincode=?, phone=?, whatsapp=?, pass_hash=?, salt=?, country=?, licence_no=?, status='pending' WHERE id=?`)
     .run(f.name, f.email, f.company, f.gstin, type, f.addr, f.city, f.state, f.pincode,
-      phone, waNum, hash, salt, u.id);
+      phone, waNum, hash, salt, f.country, f.licence, u.id);
 
   notifyAdmin('registration', 'New registration — ' + f.company,
-    f.name + ' (' + type + ') from ' + (f.city || '—') + ', mobile ' + phone +
-    '. Number already verified by OTP. Check the GSTIN and approve.');
+    f.name + ' (' + type + ') from ' + (f.city || '—') + ', ' + z.country + ', mobile +' + z.dial + ' ' + phone +
+    '. Number already verified by OTP. Check the ' + (z.taxId ? z.taxId.label : 'business details') + ' and approve.');
   res.json({ ok: true, user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)) });
 });
 
@@ -760,12 +1068,16 @@ app.put('/api/me', requireUser, (req, res) => {
   const u = req.user;
   const f = {};
   for (const k of ['addr', 'city', 'state', 'phone', 'pincode', 'whatsapp']) f[k] = b[k] !== undefined ? String(b[k]).trim() : (u[k] || '');
-  if (!f.addr || !f.city || !f.state) return res.status(400).json({ error: 'Address, city and state are required.' });
-  if (!/^\d{10}$/.test(f.phone.replace(/\D/g, '').slice(-10))) return res.status(400).json({ error: 'Enter a valid 10-digit phone number.' });
-  if (f.pincode && !/^[1-9]\d{5}$/.test(f.pincode)) return res.status(400).json({ error: 'Enter a valid 6-digit pincode.' });
-  if (f.whatsapp && !/^\d{10}$/.test(f.whatsapp.replace(/\D/g, '').slice(-10))) return res.status(400).json({ error: 'Enter a valid 10-digit WhatsApp number.' });
+  const z = zoneOfUser(u);
+  if (!f.addr || !f.city || !f.state) return res.status(400).json({ error: 'Address, city and ' + z.regionLabel.toLowerCase() + ' are required.' });
+  if (nationalDigits(f.phone, z).length !== z.phoneLen)
+    return res.status(400).json({ error: 'Enter a valid ' + z.phoneLen + '-digit phone number.' });
+  if (f.pincode && z.postcode && !new RegExp(z.postcode.re).test(f.pincode))
+    return res.status(400).json({ error: 'Enter a valid ' + z.postcode.hint + '.' });
+  if (f.whatsapp && nationalDigits(f.whatsapp, z).length !== z.phoneLen)
+    return res.status(400).json({ error: 'Enter a valid ' + z.phoneLen + '-digit WhatsApp number.' });
   db.prepare('UPDATE users SET addr=?, city=?, state=?, phone=?, pincode=?, whatsapp=? WHERE id=?')
-    .run(f.addr, f.city, f.state, f.phone, f.pincode, (f.whatsapp || f.phone).replace(/\D/g, '').slice(-10), u.id);
+    .run(f.addr, f.city, f.state, nationalDigits(f.phone, z), f.pincode, nationalDigits(f.whatsapp || f.phone, z), u.id);
   res.json({ ok: true, user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)) });
 });
 
@@ -800,18 +1112,22 @@ app.post('/api/orders', (req, res) => {
     if (!contact.name || !contact.phone) return res.status(400).json({ error: 'Name and phone are required.' });
   }
   const dealer = isDealer(req);
+  /* The order is written in the dealer's own currency — that is the figure they
+     agreed to and the one their invoice has to show. */
+  const z = req.user ? zoneOfUser(req.user) : zoneLive(b.zone || DEFAULT_ZONE);
   const lines = [];
   for (const it of items) {
     const p = db.prepare('SELECT * FROM products WHERE id=? AND active=1').get(String(it.pid));
     const qty = Math.floor(Number(it.qty));
     if (!p || !qty || qty < 1) return res.status(400).json({ error: 'Invalid item in cart.' });
-    let rate = dealer ? rateFor(req.user, p) : p.mrp;
+    let rate = toZone(dealer ? rateFor(req.user, p) : p.mrp, z);
     let label = p.name;
     const opts = p.options ? JSON.parse(p.options) : null;
     if (opts && opts.packs) {
       const pk = opts.packs.find(x => x.id === String(it.pack || 'gunny')) || opts.packs[0];
-      rate += pk.add || 0;
-      label += ' — ' + pk.label + (pk.add ? ' (+₹' + pk.add + '/pc)' : '');
+      const add = toZone(pk.add || 0, z);
+      rate = Math.round((rate + add) * Math.pow(10, z.decimals)) / Math.pow(10, z.decimals);
+      label += ' — ' + pk.label + (add ? ' (+' + z.symbol + add + '/pc)' : '');
     }
     if (opts && opts.sizes) {
       const sz = String(it.size || '');
@@ -820,23 +1136,39 @@ app.post('/api/orders', (req, res) => {
     }
     lines.push({ pid: p.id, name: label, qty, rate });
   }
-  /* Prices are GST-inclusive: total = listed price; gst = tax portion included within it */
+  /* Prices are tax-inclusive: total = listed price; tax = the portion within it.
+     A zone with no VAT yet (Qatar, Kuwait) simply books zero. */
   const subtotal = lines.reduce((s, l) => s + l.rate * l.qty, 0);
-  const r = gstPercent();
-  const gst = Math.round((subtotal - subtotal / (1 + r / 100)) * 100) / 100;
+  const r = z.taxPercent;
+  const gst = r > 0 ? Math.round((subtotal - subtotal / (1 + r / 100)) * 100) / 100 : 0;
   const total = subtotal;
   const transport = String(b.transport || '').trim().slice(0, 80);
   const id = nextOrderId();
-  db.prepare(`INSERT INTO orders(id,user_id,contact_json,addr,notes,items_json,subtotal,gst,total,tier,status,transport,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,'awaiting_payment',?,?)`)
-    .run(id, req.user ? req.user.id : null, JSON.stringify(contact), addr, String(b.notes || '').trim(), JSON.stringify(lines), subtotal, gst, total, dealer ? 'dealer' : 'mrp', transport, now());
+  db.prepare(`INSERT INTO orders(id,user_id,contact_json,addr,notes,items_json,subtotal,gst,total,tier,status,transport,created_at,country,currency,fx_rate,tax_percent,tax_label)
+    VALUES(?,?,?,?,?,?,?,?,?,?,'awaiting_payment',?,?,?,?,?,?,?)`)
+    .run(id, req.user ? req.user.id : null, JSON.stringify(contact), addr, String(b.notes || '').trim(), JSON.stringify(lines), subtotal, gst, total, dealer ? 'dealer' : 'mrp', transport, now(),
+      z.code, z.currency, z.fx, r, z.taxLabel);
   res.json({ order: orderOut(db.prepare('SELECT * FROM orders WHERE id=?').get(id)) });
 });
+
+/* Orders placed before multi-zone have no snapshot, so they read as Indian
+ * rupees at the global GST rate — exactly what they were. */
+const orderZone = o => {
+  const z = zoneLive(o.country || DEFAULT_ZONE);
+  /* Careful: isFinite(null) is true and null >= 0 is true, so a NULL column
+     would sail through a naive check and come back out as null. */
+  const tax = (o.tax_percent !== null && o.tax_percent !== undefined
+               && isFinite(o.tax_percent) && o.tax_percent >= 0) ? o.tax_percent : gstPercent();
+  return { ...z, currency: o.currency || z.currency, taxPercent: tax, taxLabel: o.tax_label || z.taxLabel };
+};
 
 const orderOut = o => ({
   id: o.id, userId: o.user_id, contact: JSON.parse(o.contact_json), addr: o.addr, notes: o.notes,
   items: JSON.parse(o.items_json), subtotal: o.subtotal, gst: o.gst, total: o.total,
-  gstPercent: gstPercent(), tier: o.tier, status: o.status, payRef: o.pay_ref,
+  country: o.country || DEFAULT_ZONE, currency: orderZone(o).currency, symbol: orderZone(o).symbol,
+  decimals: orderZone(o).decimals, locale: orderZone(o).locale,
+  taxPercent: orderZone(o).taxPercent, taxLabel: orderZone(o).taxLabel, fxRate: o.fx_rate || 1,
+  gstPercent: orderZone(o).taxPercent, tier: o.tier, status: o.status, payRef: o.pay_ref,
   transport: o.transport || '', lrNumber: o.lr_number || '', dispatchTransport: o.dispatch_transport || '',
   dispatchMode: o.dispatch_mode || '', vehicleNo: o.vehicle_no || '', driverName: o.driver_name || '', driverPhone: o.driver_phone || '',
   dispatchedAt: o.dispatched_at || '', creditDue: o.credit_due || '', creditSettled: !!o.credit_settled,
@@ -866,7 +1198,7 @@ app.post('/api/orders/:id/payment', (req, res) => {
   db.prepare("UPDATE orders SET pay_ref=?, status='payment_submitted' WHERE id=?").run(ref, o.id);
   const who = (() => { try { return JSON.parse(o.contact_json || '{}'); } catch (e) { return {}; } })();
   notifyAdmin('order', 'New order ' + o.id,
-    (who.company || who.name || 'Customer') + ' — ' + fmtMoney(o.total) + ', payment reference ' + ref + '. Confirm and dispatch.', o.id);
+    (who.company || who.name || 'Customer') + ' — ' + fmtMoney(o.total, orderZone(o)) + ', payment reference ' + ref + '. Confirm and dispatch.', o.id);
   if (o.user_id) notify(o.user_id, 'order', 'Order ' + o.id + ' received',
     'We have your payment details and are checking them. You will get an update when the order is confirmed.', o.id);
   res.json({ ok: true, order: orderOut(db.prepare('SELECT * FROM orders WHERE id=?').get(o.id)) });
@@ -1147,23 +1479,35 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
   const type = ['Dealer', 'Distributor', 'Retailer', 'Contractor'].includes(b.type) ? b.type : u.type;
   const addr = v('addr'), city = v('city'), state = v('state'), pincode = v('pincode');
 
+  const uz = zoneLive(b.country || u.country);
   if (!name || !company) return res.status(400).json({ error: 'Name and company are required.' });
-  if (!/^[6-9]\d{9}$/.test(phone.replace(/\D/g, '').slice(-10)))
-    return res.status(400).json({ error: 'Enter a valid 10-digit mobile number.' });
+  if (nationalDigits(phone, uz).length !== uz.phoneLen)
+    return res.status(400).json({ error: 'Enter a valid ' + uz.phoneLen + '-digit ' + uz.country + ' mobile number.' });
   if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
-  const gi = gstinParse(gstin);
-  if (!gi.valid) return res.status(400).json({ error: 'GSTIN format is not valid.' });
-  if (pincode && !/^\d{6}$/.test(pincode)) return res.status(400).json({ error: 'Pincode must be 6 digits.' });
+  /* India runs the full GSTIN checksum; other zones use their own format rule. */
+  let gi = {};
+  if (uz.code === 'IN') {
+    gi = gstinParse(gstin);
+    if (!gi.valid) return res.status(400).json({ error: 'GSTIN format is not valid.' });
+  } else if (uz.taxId) {
+    const tv = normTaxId(gstin, uz);
+    if (!tv && uz.taxId.required) return res.status(400).json({ error: 'Enter the ' + uz.taxId.label + '.' });
+    if (tv && !new RegExp(uz.taxId.re).test(tv))
+      return res.status(400).json({ error: uz.taxId.label + ' format is not valid. Expected ' + uz.taxId.hint + '.' });
+  }
+  if (pincode && uz.postcode && !new RegExp(uz.postcode.re).test(pincode))
+    return res.status(400).json({ error: uz.postcode.label + ' must be a valid ' + uz.postcode.hint + '.' });
 
   const dupE = db.prepare('SELECT id FROM users WHERE lower(email)=lower(?) AND id<>?').get(email, u.id);
   if (dupE) return res.status(409).json({ error: 'Another account already uses that email.' });
-  const dupG = db.prepare('SELECT id FROM users WHERE gstin=? AND id<>?').get(gstin, u.id);
-  if (dupG) return res.status(409).json({ error: 'Another account already uses that GSTIN.' });
+  const dupG = gstin ? db.prepare('SELECT id FROM users WHERE gstin=? AND country=? AND id<>?').get(gstin, uz.code, u.id) : null;
+  if (dupG) return res.status(409).json({ error: 'Another account already uses that ' + (uz.taxId ? uz.taxId.label : 'tax number') + '.' });
 
+  const licence = b.licence === undefined ? (u.licence_no || '') : normLicence(b.licence, uz);
   db.prepare(`UPDATE users SET name=?, company=?, phone=?, whatsapp=?, email=?, gstin=?, type=?,
-    addr=?, city=?, state=?, pincode=? WHERE id=?`)
-    .run(name, company, phone, whatsapp || phone, email, gstin, type, addr, city,
-      state || gi.stateName || '', pincode, u.id);
+    addr=?, city=?, state=?, pincode=?, country=?, licence_no=? WHERE id=?`)
+    .run(name, company, nationalDigits(phone, uz), nationalDigits(whatsapp || phone, uz), email, gstin, type, addr, city,
+      state || gi.stateName || '', pincode, uz.code, licence, u.id);
   res.json({ ok: true, user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)) });
 });
 
@@ -1217,14 +1561,14 @@ function reminderText(o, u, dueDays) {
   return String(rs('remTemplate'))
     .replace(/{name}/g, (u && (u.company || u.name)) || o.contact_name || 'Customer')
     .replace(/{order}/g, o.id)
-    .replace(/{amount}/g, '₹' + Number(o.total).toLocaleString('en-IN'))
+    .replace(/{amount}/g, fmtMoney(o.total, orderZone(o)))
     .replace(/{date}/g, new Date(o.created_at).toLocaleDateString('en-IN'))
     .replace(/{due}/g, due)
     .replace(/{dueDate}/g, o.credit_due ? new Date(o.credit_due).toLocaleDateString('en-IN') : '')
     ;
 }
-const waLink = (phone, text) =>
-  'https://wa.me/' + String(phone || '').replace(/\D/g, '').replace(/^0+/, '').replace(/^(?!91)/, '91') +
+const waLink = (phone, text, zone) =>
+  'https://wa.me/' + intlNumber(phone, zone) +
   '?text=' + encodeURIComponent(text);
 
 /* =================== SMS GATEWAY ===================
@@ -1240,8 +1584,16 @@ const waLink = (phone, text) =>
  * ==================================================== */
 const SMS_DEFAULTS = { smsProvider: '', smsSender: 'HPMPMF', smsRoute: '4' };
 const ss = k => { const v = getSetting(k); return v === null || v === '' || v === undefined ? SMS_DEFAULTS[k] : v; };
-const intlNumber = phone => {
+/* Turns a stored national number into the international form the SMS and
+ * WhatsApp gateways expect. Safe to call twice — a number that already carries
+ * its dial code is returned untouched. Defaults to India when no zone is given,
+ * which is how every number in the database looked before multi-zone. */
+const intlNumber = (phone, zone) => {
   const n = String(phone || '').replace(/\D/g, '').replace(/^0+/, '');
+  const z = zone || ZONES[DEFAULT_ZONE];
+  if (n.length === z.phoneLen) return z.dial + n;
+  /* already international for some zone we serve */
+  for (const zz of Object.values(ZONES)) if (n.length === zz.dial.length + zz.phoneLen && n.startsWith(zz.dial)) return n;
   return n.length === 10 ? '91' + n : n;
 };
 
@@ -1485,7 +1837,10 @@ async function deliver({ phone, email, name, subject, text, mailText, otp }) {
  *  Order: SMS gateway → email → tell the admin. Something always reaches
  *  someone, so a dealer is never stuck. */
 async function sendCode(user, purpose, code, extraNote) {
-  const to = String(user.whatsapp || user.phone || '');
+  /* Sent in international form so a Gulf dealer's code reaches them — the
+     gateways cannot guess the country from a bare national number. */
+  const uz = zoneOfUser(user);
+  const to = intlNumber(String(user.whatsapp || user.phone || ''), uz);
   const text = 'Blue Wave ' + purpose + ' code: ' + code +
     '. Valid for 10 minutes. Do not share it with anyone. HPMP Manufacturers Pvt Ltd.';
   const r = await deliver({
@@ -1504,7 +1859,7 @@ async function sendCode(user, purpose, code, extraNote) {
       via === 'email' ? user.email : to, text, r.ok ? 'sent' : r.status, now());
 
   if (!r.ok) notifyAdmin('verify', purpose[0].toUpperCase() + purpose.slice(1) + ' code — ' +
-      (user.company || user.name || ('+91 ' + String(to).replace(/\D/g, '').slice(-10))),
+      (user.company || user.name || ('+' + String(to).replace(/\D/g, ''))),
     (user.name ? user.name + ' ' : '') + '(' + to + ') needs their ' + purpose + ' code: ' + code + '.' +
     (extraNote ? ' ' + extraNote : '') + ' Send it on WhatsApp.');
   return { ...r, via };
@@ -1596,7 +1951,7 @@ app.get('/api/admin/credit', requireAdmin, (req, res) => {
       dueDays: r.dueDays, creditDays: (r.user && r.user.credit_days) || 0,
       status: r.order.status,
       lastReminder: last ? { kind: last.kind, status: last.status, at: last.sent_at } : null,
-      waLink: waLink(r.phone, reminderText({ ...r.order, contact_name: r.contact.name }, r.user, r.dueDays)),
+      waLink: waLink(r.phone, reminderText({ ...r.order, contact_name: r.contact.name }, r.user, r.dueDays), zoneOfUser(r.user)),
       message: reminderText({ ...r.order, contact_name: r.contact.name }, r.user, r.dueDays)
     };
   });
