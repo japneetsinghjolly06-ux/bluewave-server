@@ -4,7 +4,8 @@
   "description": "Blue Wave B2B ordering app - HPMP Manufacturers Pvt Ltd",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test/run.js"
   },
   "engines": {
     "node": ">=22.5"

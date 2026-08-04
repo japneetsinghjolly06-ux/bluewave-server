@@ -134,6 +134,10 @@ db.prepare('SELECT id,name,options,packing FROM products').all().forEach(p => {
     db.prepare('UPDATE products SET packing=? WHERE id=?').run(m.packing, p.id);
   }
 });
+/* Orders placed without an account used to be readable by anyone who could
+ * guess the number — and the numbers run in sequence, so guessing was counting.
+ * A guest order now carries a secret handed only to the person who placed it. */
+try { db.exec("ALTER TABLE orders ADD COLUMN guest_token TEXT DEFAULT ''"); } catch (e) { /* column exists */ }
 try { db.exec("ALTER TABLE orders ADD COLUMN rzp_order_id TEXT DEFAULT ''"); } catch (e) { /* column exists */ }
 try { db.exec("ALTER TABLE orders ADD COLUMN subtotal REAL DEFAULT 0"); } catch (e) { /* column exists */ }
 try { db.exec("ALTER TABLE orders ADD COLUMN gst REAL DEFAULT 0"); } catch (e) { /* column exists */ }
@@ -197,6 +201,17 @@ try { db.exec("ALTER TABLE users ADD COLUMN reset_at TEXT DEFAULT ''"); } catch 
 /* one-time code for signing in with a mobile number */
 try { db.exec("ALTER TABLE users ADD COLUMN login_code TEXT DEFAULT ''"); } catch (e) { /* exists */ }
 try { db.exec("ALTER TABLE users ADD COLUMN login_at TEXT DEFAULT ''"); } catch (e) { /* exists */ }
+/* Wrong guesses against a live code. Without these a six-digit code is only a
+ * million tries away from anyone's account, and nothing was counting. */
+try { db.exec('ALTER TABLE users ADD COLUMN login_tries INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
+try { db.exec('ALTER TABLE users ADD COLUMN reset_tries INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
+try { db.exec('ALTER TABLE users ADD COLUMN verify_tries INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
+
+/* Rate limits live in the database, not in a Map: free hosting restarts the
+ * process constantly, and an in-memory counter resets with it — which is the
+ * same as having no limit at all. */
+db.exec(`CREATE TABLE IF NOT EXISTS rate_limits(
+  bucket TEXT PRIMARY KEY, hits INTEGER DEFAULT 0, first_at INTEGER, until INTEGER DEFAULT 0)`);
 
 /* per-dealer custom price list (blank row = dealer uses the standard dealer price) */
 db.exec(`CREATE TABLE IF NOT EXISTS dealer_prices(
@@ -209,6 +224,65 @@ db.exec(`CREATE TABLE IF NOT EXISTS reminders(
 const uid = p => p + crypto.randomBytes(5).toString('hex');
 const now = () => new Date().toISOString();
 const hashPw = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
+/* Compares two hex digests without leaking, through timing, how far along they
+ * first differed. */
+function safeEqual(a, b) {
+  const x = Buffer.from(String(a || ''), 'utf8'), y = Buffer.from(String(b || ''), 'utf8');
+  if (x.length !== y.length) return false;
+  return crypto.timingSafeEqual(x, y);
+}
+const checkPw = (pw, salt, hash) => !!salt && !!hash && safeEqual(hashPw(String(pw || ''), salt), hash);
+/* One-time codes are credentials, so they come from the CSPRNG. Math.random()
+ * is seeded predictably and its internal state can be recovered from a handful
+ * of outputs — fine for picking a placeholder, not for guarding an account. */
+const otpCode = () => String(crypto.randomInt(100000, 1000000));
+
+/* ---------- rate limiting ----------
+ * One shared counter, keyed by whatever makes sense for the route (an account
+ * id, a phone number, a client address). Returns null when the call may go
+ * ahead, or the number of seconds left to wait. */
+function rateLimit(bucket, max, windowMs, blockMs) {
+  const t = Date.now();
+  const row = db.prepare('SELECT * FROM rate_limits WHERE bucket=?').get(bucket);
+  if (row && row.until > t) return Math.ceil((row.until - t) / 1000);
+  if (!row || (t - row.first_at) > windowMs || row.until) {
+    db.prepare(`INSERT INTO rate_limits(bucket,hits,first_at,until) VALUES(?,1,?,0)
+      ON CONFLICT(bucket) DO UPDATE SET hits=1, first_at=excluded.first_at, until=0`).run(bucket, t);
+    return null;
+  }
+  const hits = row.hits + 1;
+  if (hits > max) {
+    db.prepare('UPDATE rate_limits SET hits=?, until=? WHERE bucket=?').run(hits, t + blockMs, bucket);
+    return Math.ceil(blockMs / 1000);
+  }
+  db.prepare('UPDATE rate_limits SET hits=? WHERE bucket=?').run(hits, bucket);
+  return null;
+}
+const clearLimit = bucket => db.prepare('DELETE FROM rate_limits WHERE bucket=?').run(bucket);
+/* Behind Railway/Render the socket address is the proxy's, so the forwarded
+ * header is what identifies the caller. Only the first hop is trusted. */
+const clientIp = req => String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+  || req.socket.remoteAddress || 'unknown';
+const waitMsg = secs => 'Too many attempts. Please wait ' +
+  (secs > 90 ? Math.ceil(secs / 60) + ' minutes' : secs + ' seconds') + ' and try again.';
+
+/* How long a signed-in session stays valid. A token that never expires is a
+ * permanent key to the account if a phone is lost or a backup is extracted. */
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const newSession = (userId, role) => {
+  const token = crypto.randomBytes(32).toString('hex');
+  db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)')
+    .run(token, userId, role, now());
+  return token;
+};
+function purgeSessions() {
+  const cutoff = new Date(Date.now() - SESSION_TTL_MS).toISOString();
+  db.prepare('DELETE FROM sessions WHERE created_at < ?').run(cutoff);
+  db.prepare('DELETE FROM rate_limits WHERE until < ? AND first_at < ?')
+    .run(Date.now(), Date.now() - 24 * 60 * 60 * 1000);
+  db.prepare("DELETE FROM otp_codes WHERE created_at < ?")
+    .run(new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+}
 const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const getSetting = k => { const r = db.prepare('SELECT value FROM settings WHERE key=?').get(k); return r ? r.value : null; };
 const gstPercent = () => { const v = parseFloat(getSetting('gstPercent')); return isFinite(v) && v >= 0 ? v : 18; };
@@ -244,6 +318,7 @@ const ZONES = {
   },
   AE: {
     code: 'AE', country: 'United Arab Emirates', dial: '971', phoneLen: 9,
+    altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'AED', symbol: 'AED', locale: 'en-AE', decimals: 2, fx: 0.0384,
     taxLabel: 'VAT', taxPercent: 5,
     taxId: { label: 'VAT TRN', placeholder: '100123456700003', hint: '15-digit Tax Registration Number',
@@ -255,6 +330,7 @@ const ZONES = {
   },
   SA: {
     code: 'SA', country: 'Saudi Arabia', dial: '966', phoneLen: 9,
+    altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'SAR', symbol: 'SAR', locale: 'en-SA', decimals: 2, fx: 0.0392,
     taxLabel: 'VAT', taxPercent: 15,
     taxId: { label: 'VAT registration number', placeholder: '300123456700003', hint: '15 digits, starts and ends with 3',
@@ -266,6 +342,7 @@ const ZONES = {
   },
   OM: {
     code: 'OM', country: 'Oman', dial: '968', phoneLen: 8,
+    altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'OMR', symbol: 'OMR', locale: 'en-OM', decimals: 3, fx: 0.00402,
     taxLabel: 'VAT', taxPercent: 5,
     taxId: { label: 'VAT identification number', placeholder: 'OM1100000000', hint: 'OM followed by 10 digits',
@@ -277,6 +354,7 @@ const ZONES = {
   },
   QA: {
     code: 'QA', country: 'Qatar', dial: '974', phoneLen: 8,
+    altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'QAR', symbol: 'QAR', locale: 'en-QA', decimals: 2, fx: 0.0380,
     taxLabel: 'VAT', taxPercent: 0,
     taxId: { label: 'Tax Identification Number (TIN)', placeholder: '5012345678', hint: 'your Dhareeba TIN — leave blank if not registered',
@@ -288,6 +366,7 @@ const ZONES = {
   },
   KW: {
     code: 'KW', country: 'Kuwait', dial: '965', phoneLen: 8,
+    altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'KWD', symbol: 'KWD', locale: 'en-KW', decimals: 3, fx: 0.00320,
     taxLabel: 'VAT', taxPercent: 0,
     taxId: { label: 'Tax card number', placeholder: 'optional', hint: 'Kuwait has no VAT yet — leave blank if you have no tax card',
@@ -299,6 +378,7 @@ const ZONES = {
   },
   BH: {
     code: 'BH', country: 'Bahrain', dial: '973', phoneLen: 8,
+    altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'BHD', symbol: 'BHD', locale: 'en-BH', decimals: 3, fx: 0.00393,
     taxLabel: 'VAT', taxPercent: 10,
     taxId: { label: 'VAT account number', placeholder: '200012345600002', hint: '15-digit VAT account number',
@@ -307,6 +387,26 @@ const ZONES = {
                re: '^[0-9]{4,8}(-[0-9]{1,3})?$', upper: false, required: true },
     regionLabel: 'Governorate',
     postcode: null
+  },
+  US: {
+    code: 'US', country: 'United States', dial: '1', phoneLen: 10,
+    currency: 'USD', symbol: '$', locale: 'en-US', decimals: 2, fx: 0.01048,
+    /* There is no federal sales tax. It is charged by state and county, on the
+     * destination, and a manufacturer exporting from India generally has no
+     * nexus obliging it to collect — the importer settles duty and use tax at
+     * their end. So this sits at 0, like Qatar and Kuwait, and the admin can
+     * switch it on for a state if that ever changes. */
+    taxLabel: 'Sales tax', taxPercent: 0,
+    taxId: { label: 'Federal EIN', placeholder: '12-3456789', hint: '9-digit EIN, e.g. 12-3456789 — leave blank if you trade as a sole proprietor',
+             re: '^[0-9]{2}-?[0-9]{7}$', upper: false, required: false },
+    /* Business registration is a state matter and the formats vary wildly, so
+     * this is checked loosely and read properly by the admin at approval —
+     * turning away a real distributor over a format guess costs more than a
+     * minute of checking. */
+    licence: { label: 'Resale certificate / State tax ID', placeholder: 'e.g. TX-12345678', hint: 'the reseller permit or state tax registration for your business',
+               re: '^[A-Za-z0-9][A-Za-z0-9\\-\\/ ]{2,29}$', upper: true, required: true },
+    regionLabel: 'State',
+    postcode: { label: 'ZIP code', re: '^[0-9]{5}(-[0-9]{4})?$', hint: '5-digit ZIP, e.g. 75201', required: true }
   }
 };
 const DEFAULT_ZONE = 'IN';
@@ -317,6 +417,19 @@ for (const z of Object.values(ZONES)) {
   db.prepare('INSERT OR IGNORE INTO zones(code,fx,tax_percent,enabled,updated_at) VALUES(?,?,?,1,?)')
     .run(z.code, z.fx, z.taxPercent, now());
 }
+/* Whether this zone follows the daily live rate, the raw mid-market rate it
+ * came from, and where it came from — kept apart from `fx` so the admin can
+ * always see what was quoted versus what the market was doing. */
+try { db.exec('ALTER TABLE zones ADD COLUMN fx_auto INTEGER DEFAULT 1'); } catch (e) { /* column exists */ }
+try { db.exec('ALTER TABLE zones ADD COLUMN fx_base REAL'); } catch (e) { /* column exists */ }
+try { db.exec("ALTER TABLE zones ADD COLUMN fx_source TEXT DEFAULT ''"); } catch (e) { /* column exists */ }
+try { db.exec("ALTER TABLE zones ADD COLUMN fx_checked_at TEXT DEFAULT ''"); } catch (e) { /* column exists */ }
+/* Every rate change, automatic or by hand. The rupee moves daily and prices
+ * move with it, so "why was this order priced at that rate" needs an answer. */
+db.exec(`CREATE TABLE IF NOT EXISTS fx_history(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, base REAL, rate REAL,
+  previous REAL, source TEXT, note TEXT DEFAULT '', at TEXT)`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_fx_hist ON fx_history(code, id)');
 
 /* The live settings for a zone: admin values if present, definition as fallback. */
 function zoneLive(code) {
@@ -327,9 +440,52 @@ function zoneLive(code) {
      screen carries on working exactly as before. */
   const tax = z.code === 'IN' ? gstPercent()
             : (r && isFinite(r.tax_percent) && r.tax_percent >= 0 ? r.tax_percent : z.taxPercent);
-  return { ...z, fx, taxPercent: tax, enabled: r ? !!r.enabled : true };
+  return { ...z, fx, taxPercent: tax, enabled: r ? !!r.enabled : true,
+    /* India is the base currency — there is nothing to convert, so it is never
+       "on automatic" no matter what the column says. */
+    fxAuto: z.code === DEFAULT_ZONE ? false : !(r && r.fx_auto === 0),
+    fxBase: r && isFinite(r.fx_base) ? r.fx_base : null,
+    fxSource: (r && r.fx_source) || '',
+    fxUpdatedAt: (r && r.updated_at) || '',
+    fxCheckedAt: (r && r.fx_checked_at) || '' };
 }
 const zoneOfUser = u => zoneLive(u && u.country ? u.country : DEFAULT_ZONE);
+
+/* ---------- quoting a zone in a second currency ----------
+ * Every Gulf currency is pegged to the dollar and a great deal of the region's
+ * import business is invoiced in dollars, so a dealer there is offered both:
+ * their own currency, or USD.
+ *
+ * What changes is only how the money is written — the currency, its symbol, how
+ * many decimals it takes and the rate used to convert from rupees. What does
+ * NOT change is the tax: VAT is owed because of where the dealer is, not
+ * because of the currency on the invoice. A Dubai dealer paying in dollars
+ * still owes 5% UAE VAT, and it stays inside the price either way.
+ */
+/* The choice on offer is a property of the country, so it is always worked out
+ * from the zone's OWN currency — never from whichever one is currently being
+ * quoted. Reading it off the quoted zone returns ['USD','USD'] the moment a
+ * dealer switches to dollars, which paints a toggle with two identical buttons
+ * and no way back to dirhams. */
+const zoneCurrencies = z => {
+  const base = z.baseCurrency || z.currency;
+  return z.altCurrency && z.altCurrency !== base ? [base, z.altCurrency] : [base];
+};
+function quoteIn(z, code) {
+  const want = String(code || '').toUpperCase();
+  if (!want || want === z.currency || !zoneCurrencies(z).includes(want)) return z;
+  /* the alternate currency's rate is the one kept for its own zone, so a dollar
+     quote here and a dollar quote to a US dealer can never disagree */
+  const src = Object.values(ZONES).find(x => x.currency === want);
+  if (!src) return z;
+  const live = zoneLive(src.code);
+  return { ...z, baseCurrency: z.baseCurrency || z.currency,
+    currency: live.currency, symbol: live.symbol, decimals: live.decimals,
+    locale: live.locale, fx: live.fx, quotedIn: want };
+}
+/* The zone a request should be priced in: where the customer is, written in
+ * whichever of the offered currencies they picked. */
+const quoteZone = (z, req) => quoteIn(z, (req.query && req.query.currency) || (req.body && req.body.currency));
 
 /* INR -> the zone's currency, rounded to that currency's minor unit.
  * Dinar currencies (OMR, KWD, BHD) are quoted to 3 decimals, not 2. */
@@ -386,7 +542,11 @@ function countryFromDigits(digits) {
   for (const z of byLen) {
     if (d.startsWith(z.dial) && d.length === z.dial.length + z.phoneLen) return z.code;
   }
-  for (const z of byLen) if (d.startsWith(z.dial)) return z.code;
+  /* Loose prefix match, for a number whose length we cannot account for. A
+     one-digit dial code carries almost no information — '1' is the prefix of
+     any number that happens to begin with a 1 — so the United States is only
+     ever matched on the exact-length rule above, never guessed at here. */
+  for (const z of byLen) if (z.dial.length > 1 && d.startsWith(z.dial)) return z.code;
   return DEFAULT_ZONE;
 }
 /* Strips the dial code off a number, leaving the national digits we store.
@@ -412,8 +572,206 @@ const pubZone = z => ({
   currency: z.currency, symbol: z.symbol, locale: z.locale, decimals: z.decimals,
   fx: z.fx, taxLabel: z.taxLabel, taxPercent: z.taxPercent,
   taxId: z.taxId, licence: z.licence, regionLabel: z.regionLabel,
-  postcode: z.postcode, enabled: z.enabled !== false
+  postcode: z.postcode, enabled: z.enabled !== false,
+  fxAuto: z.fxAuto !== false, fxUpdatedAt: z.fxUpdatedAt || '', fxSource: z.fxSource || '',
+  /* what this dealer may be quoted in, and which of them they are seeing */
+  currencies: zoneCurrencies(z), quotedIn: z.quotedIn || z.currency
 });
+
+/* ==========================================================================
+   DAILY EXCHANGE RATES
+
+   Product prices are held in rupees and converted when a Gulf dealer looks at
+   them. Left to a number typed in by hand, that conversion drifts away from
+   reality — a rate six months stale is a discount or a price rise nobody
+   decided to give. So the mid-market rate is fetched once a day and applied.
+
+   Three things make that safe to do automatically:
+
+     margin  the rate quoted to dealers is deliberately a little worse than
+             mid-market, because the money has to come back through a bank that
+             takes its cut. Set in Admin -> Zones; 0 quotes at mid-market.
+     guard   a new rate more than N% away from the current one is NOT applied.
+             A garbled response or a provider glitch would otherwise reprice the
+             whole catalogue in one go. The admin is told and can accept it.
+     pinning any zone can be taken off automatic and held at a fixed rate.
+
+   Orders already store the rate they were placed at, so nothing that has
+   already happened changes value when today's rate lands.
+   ========================================================================== */
+const FX_DEFAULTS = { fxAuto: '1', fxMargin: '1.5', fxGuard: '10', fxHour: '7' };
+const fs_ = k => { const v = getSetting(k); return v === null || v === undefined || v === '' ? FX_DEFAULTS[k] : v; };
+const fxMargin = () => { const v = parseFloat(fs_('fxMargin')); return isFinite(v) && v >= 0 && v <= 25 ? v : 0; };
+const fxGuard = () => { const v = parseFloat(fs_('fxGuard')); return isFinite(v) && v > 0 && v <= 100 ? v : 10; };
+const fxAutoOn = () => fs_('fxAuto') !== '0';
+
+/* Two independent free sources, tried in order. Neither needs an API key, and
+ * both quote per 1 INR. If the first is down the second keeps prices current
+ * rather than freezing them at yesterday's number. */
+const FX_SOURCES = [
+  {
+    name: 'exchangerate-api',
+    url: 'https://open.er-api.com/v6/latest/INR',
+    parse: d => (d && d.result === 'success' && d.rates) ? d.rates : null
+  },
+  {
+    name: 'currency-api',
+    url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/inr.json',
+    /* this one keys everything in lower case */
+    parse: d => {
+      const r = d && d.inr;
+      if (!r) return null;
+      const out = {};
+      for (const k of Object.keys(r)) out[k.toUpperCase()] = r[k];
+      return out;
+    }
+  }
+];
+
+async function fetchRates() {
+  const tried = [];
+  for (const src of FX_SOURCES) {
+    try {
+      const r = await fetch(src.url, { signal: AbortSignal.timeout(15000) });
+      if (!r.ok) { tried.push(src.name + ' HTTP ' + r.status); continue; }
+      const rates = src.parse(await r.json());
+      if (!rates) { tried.push(src.name + ' sent no rates'); continue; }
+      /* a source that does not carry the currencies we sell in is no use */
+      const need = Object.values(ZONES).filter(z => z.code !== DEFAULT_ZONE).map(z => z.currency);
+      const missing = need.filter(c => !isFinite(rates[c]) || rates[c] <= 0);
+      if (missing.length) { tried.push(src.name + ' missing ' + missing.join(',')); continue; }
+      return { ok: true, rates, source: src.name };
+    } catch (e) {
+      tried.push(src.name + ' ' + (e.name === 'TimeoutError' ? 'timed out' : e.message));
+    }
+  }
+  return { ok: false, status: tried.join('; ') || 'no source answered' };
+}
+
+/* Applies one zone's new rate, or explains why it did not. */
+function applyRate(zoneDef, live, source, opts) {
+  const o = opts || {};
+  const row = db.prepare('SELECT * FROM zones WHERE code=?').get(zoneDef.code);
+  const current = row && isFinite(row.fx) && row.fx > 0 ? row.fx : zoneDef.fx;
+  /* fx is "local currency per 1 INR", so quoting a little MORE local currency
+     is what covers the bank spread — hence plus, not minus.
+     Rounded to 8 decimals: binary floating point otherwise leaves a tail like
+     0.039075469999999994, which is the number the admin then sees in the box.
+     Eight places is far finer than any currency here needs. */
+  const rate = Math.round(live * (1 + fxMargin() / 100) * 1e8) / 1e8;
+  const moved = Math.abs(rate - current) / current * 100;
+
+  if (!o.force && moved > fxGuard()) {
+    return { code: zoneDef.code, skipped: 'guard', movedPercent: +moved.toFixed(2),
+             current, proposed: rate, base: live };
+  }
+  if (moved < 0.01) return { code: zoneDef.code, skipped: 'unchanged', current };
+
+  db.prepare(`UPDATE zones SET fx=?, fx_base=?, fx_source=?, fx_checked_at=?, updated_at=? WHERE code=?`)
+    .run(rate, live, source, now(), now(), zoneDef.code);
+  db.prepare('INSERT INTO fx_history(code,base,rate,previous,source,note,at) VALUES(?,?,?,?,?,?,?)')
+    .run(zoneDef.code, live, rate, current, source, o.note || '', now());
+  return { code: zoneDef.code, updated: true, from: current, to: rate, base: live,
+           movedPercent: +moved.toFixed(2) };
+}
+
+/**
+ * Fetches today's rates and applies them to every zone still on automatic.
+ * Never throws.
+ *
+ *   manual  run even when automatic updating is switched off — the admin
+ *           pressing "Update now" is asking for this one check, not turning
+ *           the feature back on.
+ *   accept  apply a move the guard would otherwise hold back. This is a
+ *           separate decision from running the check, so that pressing
+ *           "Update now" can never silently push through a rate the admin
+ *           has not seen.
+ */
+async function refreshRates(opts) {
+  const o = opts || {};
+  if (!o.manual && !fxAutoOn()) return { skipped: 'switched_off' };
+
+  const r = await fetchRates();
+  if (!r.ok) {
+    setSetting('fxLastRun', now());
+    setSetting('fxLastStatus', 'failed: ' + r.status);
+    /* Prices carry on at the last known rate — stale is far better than zero.
+       The admin is told, but at most once a day: a rate service that stays down
+       would otherwise post a notification every hour, and a bell that cries
+       every hour is a bell nobody reads. Pressing "Update now" always reports
+       back directly, so this only governs the unattended runs. */
+    const lastTold = getSetting('fxFailNotifiedAt');
+    const quiet = lastTold && (Date.now() - new Date(lastTold).getTime()) < 24 * 60 * 60 * 1000;
+    if (!o.manual && !quiet) {
+      setSetting('fxFailNotifiedAt', now());
+      notifyAdmin('zone', 'Exchange rates could not be updated',
+        'Today\'s rate check did not get through (' + r.status + '). Dealer prices are still ' +
+        'using the last rate we had, so nothing is broken — but if this keeps happening, check ' +
+        'the rates by hand in Admin → Zones.');
+    }
+    return { ok: false, status: r.status };
+  }
+  setSetting('fxFailNotifiedAt', '');   // back in touch — a later outage is news again
+
+  const results = [];
+  const held = [];
+  for (const z of Object.values(ZONES)) {
+    if (z.code === DEFAULT_ZONE) continue;              // the rupee is the base
+    const row = db.prepare('SELECT * FROM zones WHERE code=?').get(z.code);
+    if (row && row.fx_auto === 0) { results.push({ code: z.code, skipped: 'pinned' }); continue; }
+    const live = r.rates[z.currency];
+    const out = applyRate(z, live, r.source, { force: o.accept, note: o.note || (o.manual ? 'manual' : 'daily') });
+    /* even when nothing moved, record that we looked */
+    db.prepare('UPDATE zones SET fx_checked_at=? WHERE code=?').run(now(), z.code);
+    if (out.skipped === 'guard') held.push(out);
+    results.push(out);
+  }
+
+  setSetting('fxLastRun', now());
+  setSetting('fxLastStatus', 'ok via ' + r.source);
+  setSetting('fxLastSource', r.source);
+
+  if (held.length) {
+    notifyAdmin('zone', 'Exchange rate moved further than expected',
+      held.map(h => h.code + ': ' + h.current.toFixed(6) + ' → ' + h.proposed.toFixed(6) +
+        ' (' + h.movedPercent + '%)').join('; ') +
+      '. That is a bigger jump than the ' + fxGuard() + '% safety limit allows, so prices were left ' +
+      'as they are. Open Admin → Zones and press Update now to accept it, or set the rate by hand.');
+  }
+  const changed = results.filter(x => x.updated);
+  if (changed.length) console.log('Exchange rates updated via ' + r.source + ': ' +
+    changed.map(c => c.code + ' ' + c.to.toFixed(6)).join(', '));
+  return {
+    ok: true, source: r.source, results, updated: changed.length,
+    /* what the guard stopped, with the country names spelled out so the admin
+       screen can ask a plain question rather than showing zone codes */
+    held: held.map(h => ({ ...h, country: ZONES[h.code].country, currency: ZONES[h.code].currency }))
+  };
+}
+
+/* Runs once a day. Checked hourly rather than timed exactly, because free
+ * hosting restarts the process whenever it likes and a once-a-day timer would
+ * simply never fire. */
+function fxDue() {
+  const last = getSetting('fxLastOk');
+  if (!last) return true;
+  return Date.now() - new Date(last).getTime() > 20 * 60 * 60 * 1000;
+}
+async function fxTick() {
+  if (!fxAutoOn() || !fxDue()) return;
+  const r = await refreshRates({});
+  if (r && r.ok) setSetting('fxLastOk', now());
+}
+
+/* The passwords the app has ever shipped with. Nobody may set one of these, and
+ * the admin panel keeps saying so until the live one is changed. */
+const DEFAULT_ADMIN_PASSWORDS = new Set(['Admin@123', 'admin123', 'Admin123', 'password']);
+const usingDefaultAdminPassword = () => {
+  const salt = getSetting('adminSalt'), hash = getSetting('adminHash');
+  if (!salt || !hash) return false;
+  for (const pw of DEFAULT_ADMIN_PASSWORDS) if (safeEqual(hashPw(pw, salt), hash)) return true;
+  return false;
+};
 
 /* ---------- seed ---------- */
 if (!getSetting('seeded')) {
@@ -429,7 +787,7 @@ if (!getSetting('seeded')) {
   ];
   const ins = db.prepare('INSERT INTO products(id,name,cat,emoji,mrp,dealer,moq,active,sort) VALUES(?,?,?,?,?,?,50,1,?)');
   seed.forEach((s, i) => ins.run(uid('p'), s[0], s[1], s[2], s[3], s[4], i));
-  const adminSalt = crypto.randomBytes(8).toString('hex');
+  const adminSalt = crypto.randomBytes(16).toString('hex');
   setSetting('adminEmail', process.env.ADMIN_EMAIL || 'admin@hpmpmanufacturerspvtltd.com');
   setSetting('adminSalt', adminSalt);
   setSetting('adminHash', hashPw(process.env.ADMIN_PASSWORD || 'Admin@123', adminSalt));
@@ -447,9 +805,16 @@ function auth(req, res, next) {
   if (tok) {
     const s = db.prepare('SELECT * FROM sessions WHERE token=?').get(tok);
     if (s) {
-      req.role = s.role;
-      req.user = s.role === 'user' ? db.prepare('SELECT * FROM users WHERE id=?').get(s.user_id) : null;
-      req.token = tok;
+      /* An expired token is dropped here rather than left to linger, so a
+         stolen one stops working on its own. */
+      if (Date.now() - new Date(s.created_at || 0).getTime() > SESSION_TTL_MS) {
+        db.prepare('DELETE FROM sessions WHERE token=?').run(tok);
+      } else {
+        const u = s.role === 'user' ? db.prepare('SELECT * FROM users WHERE id=?').get(s.user_id) : null;
+        /* the account was deleted while the session was still open */
+        if (s.role === 'user' && !u) db.prepare('DELETE FROM sessions WHERE token=?').run(tok);
+        else { req.role = s.role; req.user = u; req.token = tok; }
+      }
     }
   }
   next();
@@ -505,14 +870,51 @@ const notifyAdmin = (kind, title, body, orderId) => notify('admin', kind, title,
  * in; without one it formats as rupees, which is what every pre-zone amount is. */
 const fmtMoney = (n, z) => {
   const zz = z || ZONES[DEFAULT_ZONE];
+  /* Round numbers read better plain; anything with a fractional part is written
+     out in full, so a total never reaches the admin as "$829.2". */
+  const frac = Math.abs(Number(n || 0) % 1) > 1e-9;
   return zz.symbol + (zz.symbol.length > 1 ? ' ' : '') +
-    Number(n || 0).toLocaleString(zz.locale, { minimumFractionDigits: 0, maximumFractionDigits: zz.decimals });
+    Number(n || 0).toLocaleString(zz.locale,
+      { minimumFractionDigits: frac ? zz.decimals : 0, maximumFractionDigits: zz.decimals });
 };
 const pubNotif = n => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, orderId: n.order_id || '', createdAt: n.created_at, read: !!n.read_at });
 
 const app = express();
+/* Railway and Render both sit behind a proxy, so the forwarded header is what
+ * carries the caller's real address into the rate limiters. */
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
 app.use(express.json({ limit: '3mb' }));
-const verifyAdminPw = pw => hashPw(String(pw || ''), getSetting('adminSalt')) === getSetting('adminHash');
+
+/* Malformed JSON reaches the error handler as a SyntaxError; without this it
+ * comes back as a stack trace in an HTML page. */
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Malformed request.' });
+  if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'That file is too large — keep product photos under 3 MB.' });
+  next(err);
+});
+
+app.use((req, res, next) => {
+  /* The app is same-origin and self-contained apart from Razorpay's checkout
+     script, so the policy can be tight. */
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: blob:; " +
+    "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com; " +
+    "frame-src https://api.razorpay.com https://checkout.razorpay.com; " +
+    "object-src 'none'; base-uri 'self'; form-action 'self'");
+  /* Nothing the API returns should ever be cached by a proxy — several
+     responses are specific to the signed-in dealer. */
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
+const verifyAdminPw = pw => checkPw(pw, getSetting('adminSalt'), getSetting('adminHash'));
 app.use(auth);
 
 /* ---------- public API ---------- */
@@ -521,9 +923,15 @@ app.get('/api/products', (req, res) => {
   const offer = dealer ? liveOffer() : null;
   const rows = db.prepare('SELECT * FROM products WHERE active=1 ORDER BY sort').all();
   /* Prices live in INR. A signed-in dealer sees them in their own currency; a
-     guest sees the zone they picked, falling back to India. */
-  const z = req.user ? zoneOfUser(req.user) : zoneLive(req.query.zone || DEFAULT_ZONE);
+     guest sees the zone they picked, falling back to India. Either may ask for
+     the zone's alternate currency instead — USD, across the Gulf. */
+  const z = quoteZone(req.user ? zoneOfUser(req.user) : zoneLive(req.query.zone || DEFAULT_ZONE), req);
   const c = v => toZone(v, z);
+  /* One lookup for this dealer's whole custom price list, instead of two queries
+     per product per request. */
+  const custom = {};
+  if (dealer) db.prepare('SELECT product_id, price FROM dealer_prices WHERE user_id=?')
+    .all(req.user.id).forEach(r => { if (isFinite(r.price)) custom[r.product_id] = r.price; });
   res.json({
     zone: pubZone(z),
     offer: dealer ? pubOffer(offer) : null,
@@ -533,7 +941,7 @@ app.get('/api/products', (req, res) => {
       options: p.options ? scaleOptions(p.options, z) : null,
       ...(dealer ? {
         dealer: c(rateFor(req.user, p, offer)),
-        listDealer: c(customPrice(req.user.id, p.id) !== null ? customPrice(req.user.id, p.id) : p.dealer)
+        listDealer: c(custom[p.id] !== undefined ? custom[p.id] : p.dealer)
       } : {})
     }))
   });
@@ -551,7 +959,7 @@ const rzpKeys = () => ({ id: getSetting('rzpKeyId') || '', secret: getSetting('r
 const rzpEnabled = () => { const k = rzpKeys(); return !!(k.id && k.secret); };
 
 app.get('/api/pay-info', (req, res) => {
-  const z = req.user ? zoneOfUser(req.user) : zoneLive(req.query.zone || DEFAULT_ZONE);
+  const z = quoteZone(req.user ? zoneOfUser(req.user) : zoneLive(req.query.zone || DEFAULT_ZONE), req);
   res.json({
     payeeName: getSetting('payeeName'),
     bankName: getSetting('bankName'), accountNo: getSetting('accountNo'),
@@ -572,18 +980,70 @@ app.get('/api/zones', (req, res) => {
 });
 
 /* ---------- admin: zones ---------- */
+const fxStatus = () => ({
+  auto: fxAutoOn(), margin: fxMargin(), guard: fxGuard(),
+  lastRun: getSetting('fxLastRun') || '', lastOk: getSetting('fxLastOk') || '',
+  lastStatus: getSetting('fxLastStatus') || 'not run yet',
+  source: getSetting('fxLastSource') || ''
+});
+
 app.get('/api/admin/zones', requireAdmin, (req, res) => {
-  res.json(Object.keys(ZONES).map(c => {
-    const z = zoneLive(c);
-    const n = db.prepare("SELECT COUNT(*) n FROM users WHERE country=? AND status='approved'").get(c).n;
-    const pend = db.prepare("SELECT COUNT(*) n FROM users WHERE country=? AND status IN ('pending','incomplete')").get(c).n;
-    return { ...pubZone(z), dealers: n, pending: pend, baseFx: ZONES[c].fx, baseTax: ZONES[c].taxPercent };
-  }));
+  res.json({
+    fx: fxStatus(),
+    zones: Object.keys(ZONES).map(c => {
+      const z = zoneLive(c);
+      const n = db.prepare("SELECT COUNT(*) n FROM users WHERE country=? AND status='approved'").get(c).n;
+      const pend = db.prepare("SELECT COUNT(*) n FROM users WHERE country=? AND status IN ('pending','incomplete')").get(c).n;
+      return { ...pubZone(z), dealers: n, pending: pend, baseFx: ZONES[c].fx, baseTax: ZONES[c].taxPercent,
+        fxBase: z.fxBase, fxCheckedAt: z.fxCheckedAt };
+    })
+  });
+});
+
+/* The last few rate changes per zone, so "why was that order priced like that"
+ * has an answer. */
+app.get('/api/admin/fx/history', requireAdmin, (req, res) => {
+  const code = String(req.query.code || '').toUpperCase();
+  const rows = code && zoneOf(code)
+    ? db.prepare('SELECT * FROM fx_history WHERE code=? ORDER BY id DESC LIMIT 40').all(code)
+    : db.prepare('SELECT * FROM fx_history ORDER BY id DESC LIMIT 60').all();
+  res.json(rows.map(r => ({ code: r.code, base: r.base, rate: r.rate, previous: r.previous,
+    source: r.source, note: r.note || '', at: r.at })));
+});
+
+/* "Update now" — checks the market straight away rather than waiting for
+ * tomorrow. The safety guard still applies: anything that moved too far comes
+ * back in `held` for the admin to look at, and only a second call with
+ * `accept` puts it through. */
+app.post('/api/admin/fx/refresh', requireAdmin, async (req, res) => {
+  const accept = !!req.body?.accept;
+  const r = await refreshRates({ manual: true, accept, note: accept ? 'accepted by admin' : 'manual' });
+  if (r && r.ok) setSetting('fxLastOk', now());
+  res.json({ ...r, fx: fxStatus(), zones: Object.keys(ZONES).map(c => pubZone(zoneLive(c))) });
+});
+
+app.put('/api/admin/fx', requireAdmin, (req, res) => {
+  const b = req.body || {};
+  if (b.auto !== undefined) setSetting('fxAuto', b.auto ? '1' : '0');
+  if (b.margin !== undefined) {
+    const m = parseFloat(b.margin);
+    if (!isFinite(m) || m < 0 || m > 25)
+      return res.status(400).json({ error: 'The margin must be between 0 and 25 percent.' });
+    setSetting('fxMargin', m);
+  }
+  if (b.guard !== undefined) {
+    const g = parseFloat(b.guard);
+    if (!isFinite(g) || g <= 0 || g > 100)
+      return res.status(400).json({ error: 'The safety limit must be between 1 and 100 percent.' });
+    setSetting('fxGuard', g);
+  }
+  res.json({ ok: true, fx: fxStatus() });
 });
 
 app.post('/api/admin/zones', requireAdmin, (req, res) => {
   const rows = Array.isArray(req.body?.zones) ? req.body.zones : [];
-  const upd = db.prepare('UPDATE zones SET fx=?, tax_percent=?, enabled=?, updated_at=? WHERE code=?');
+  const upd = db.prepare('UPDATE zones SET fx=?, tax_percent=?, enabled=?, fx_auto=?, updated_at=? WHERE code=?');
+  const notes = [];
   for (const r of rows) {
     const z = zoneOf(r.code);
     if (!z) continue;
@@ -593,10 +1053,25 @@ app.post('/api/admin/zones', requireAdmin, (req, res) => {
     if (!isFinite(tax) || tax < 0 || tax > 100) return res.status(400).json({ error: 'Enter a tax rate between 0 and 100 for ' + z.country + '.' });
     /* India is never switched off — it is the home market and the base currency. */
     const en = z.code === 'IN' ? 1 : (r.enabled ? 1 : 0);
-    upd.run(fx, tax, en, now(), z.code);
+
+    const cur = db.prepare('SELECT * FROM zones WHERE code=?').get(z.code);
+    const wasAuto = !(cur && cur.fx_auto === 0);
+    let auto = r.fxAuto === undefined ? wasAuto : !!r.fxAuto;
+    /* Typing a rate by hand while the zone is on automatic is a contradiction:
+       tomorrow's update would wipe it out and the admin would think the app had
+       ignored them. Editing the number pins the zone, and we say so. */
+    const edited = cur && Math.abs(fx - cur.fx) / cur.fx > 0.0001;
+    if (edited && auto && r.fxAuto === undefined) {
+      auto = false;
+      notes.push(z.country + ' is now held at the rate you typed — it will not follow the daily rate until you switch it back to automatic.');
+    }
+    if (edited) db.prepare('INSERT INTO fx_history(code,base,rate,previous,source,note,at) VALUES(?,?,?,?,?,?,?)')
+      .run(z.code, null, fx, cur ? cur.fx : null, 'admin', 'set by hand', now());
+
+    upd.run(fx, tax, en, z.code === DEFAULT_ZONE ? 0 : (auto ? 1 : 0), now(), z.code);
     if (z.code === 'IN') setSetting('gstPercent', tax);
   }
-  res.json({ ok: true, zones: Object.keys(ZONES).map(c => pubZone(zoneLive(c))) });
+  res.json({ ok: true, notes, fx: fxStatus(), zones: Object.keys(ZONES).map(c => pubZone(zoneLive(c))) });
 });
 
 /* ---------- GSTIN verification ---------- */
@@ -620,7 +1095,11 @@ app.get('/api/gstin/:g', async (req, res) => {
   info.verified = false;
   if (!info.valid) return res.json(info);
   const key = getSetting('gstApiKey');
-  if (key) {
+  /* The offline checksum is free and stays open — the form needs it while
+     someone is typing. The paid lookup behind it does not: left unmetered,
+     anyone could empty the AppyFlow balance from a loop. */
+  const wait = rateLimit('gstin:' + clientIp(req), 30, 60 * 60 * 1000, 60 * 60 * 1000);
+  if (key && !wait) {
     try {
       const r = await fetch('https://appyflow.in/api/verifyGST?gstNo=' + info.gstin + '&key_secret=' + encodeURIComponent(key), { signal: AbortSignal.timeout(8000) });
       const d = await r.json();
@@ -674,9 +1153,9 @@ app.post('/api/register', (req, res) => {
      one, so an empty value must never collide with another blank. */
   if (f.gstin && db.prepare('SELECT 1 FROM users WHERE gstin=? AND country=?').get(f.gstin, f.country))
     return res.status(400).json({ error: 'This ' + z.taxId.label + ' is already registered — try logging in or contact support.' });
-  const salt = crypto.randomBytes(8).toString('hex');
+  const salt = crypto.randomBytes(16).toString('hex');
   const id = uid('u');
-  const mCode = String(Math.floor(100000 + Math.random() * 900000));
+  const mCode = otpCode();
   const phoneNat = nationalDigits(f.phone, z);
   db.prepare(`INSERT INTO users(id,name,phone,email,pass_hash,salt,company,gstin,type,addr,city,state,pincode,whatsapp,status,mobile_code,email_ok,created_at,country,licence_no)
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,1,?,?,?)`)
@@ -687,8 +1166,7 @@ app.post('/api/register', (req, res) => {
   /* the verification code goes straight to their mobile */
   sendCode(db.prepare('SELECT * FROM users WHERE id=?').get(id), 'verification', mCode,
     'They have just registered.').catch(() => {});
-  const token = crypto.randomBytes(24).toString('hex');
-  db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, id, 'user', now());
+  const token = newSession(id, 'user');
   res.json({ token, role: 'user', user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)) });
 });
 
@@ -750,19 +1228,35 @@ function findAccount(idRaw) {
 app.post('/api/login', (req, res) => {
   const email = String(req.body?.email || req.body?.id || '').trim();
   const password = String(req.body?.password || '');
+  /* Two buckets: one stops a single account being ground through a word list,
+     the other stops one machine working across many accounts. A real dealer
+     mistyping their password never comes close to either, and a successful
+     sign-in clears both.
+
+     The account bucket does mean someone who knows a dealer's email can keep
+     that dealer out for fifteen minutes by guessing at it. That is the accepted
+     trade — the alternative is unlimited guessing — and it is why the limit sits
+     at ten rather than the three or four you might otherwise pick. */
+  const idKey = 'login:' + email.toLowerCase();
+  const ipKey = 'loginip:' + clientIp(req);
+  for (const key of [idKey, ipKey]) {
+    const wait = rateLimit(key, key === idKey ? 10 : 40, 15 * 60 * 1000, 15 * 60 * 1000);
+    if (wait) return res.status(429).json({ error: waitMsg(wait) });
+  }
+
   if (email.toLowerCase() === String(getSetting('adminEmail')).toLowerCase()) {
-    if (hashPw(password, getSetting('adminSalt')) === getSetting('adminHash')) {
-      const token = crypto.randomBytes(24).toString('hex');
-      db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,NULL,?,?)').run(token, 'admin', now());
+    if (checkPw(password, getSetting('adminSalt'), getSetting('adminHash'))) {
+      clearLimit(idKey); clearLimit(ipKey);
+      const token = newSession(null, 'admin');
       return res.json({ token, role: 'admin' });
     }
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
   const u = findAccount(email);
-  if (!u || hashPw(password, u.salt) !== u.pass_hash)
+  if (!u || !checkPw(password, u.salt, u.pass_hash))
     return res.status(401).json({ error: 'Those details did not match an account. Check the email or mobile number and password.' });
-  const token = crypto.randomBytes(24).toString('hex');
-  db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, u.id, 'user', now());
+  clearLimit(idKey); clearLimit(ipKey);
+  const token = newSession(u.id, 'user');
   res.json({ token, role: 'user', user: pubUser(u) });
 });
 
@@ -770,13 +1264,24 @@ app.post('/api/login', (req, res) => {
  * No SMS/email gateway is needed: the admin sees each pending code in the
  * Registrations tab and sends it to the customer on WhatsApp (one tap) or by
  * email. The customer types it back in, which proves the number is theirs. */
+/* Five wrong guesses burns the code, everywhere a code is checked. Six digits
+ * is only a million combinations — without a counter that is a short afternoon
+ * of scripted requests, not a secret. */
+const MAX_CODE_TRIES = 5;
 app.post('/api/verify', requireUser, (req, res) => {
   const code = String(req.body?.code || '').trim();
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
   if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit code.' });
   if (!u.mobile_code) return res.status(400).json({ error: 'No code was issued. Ask us to resend it.' });
-  if (code !== String(u.mobile_code)) return res.status(400).json({ error: 'That code does not match. Please check and try again.' });
-  db.prepare('UPDATE users SET mobile_ok=1, email_ok=1 WHERE id=?').run(u.id);
+  if ((u.verify_tries || 0) >= MAX_CODE_TRIES) {
+    db.prepare("UPDATE users SET mobile_code='', verify_tries=0 WHERE id=?").run(u.id);
+    return res.status(429).json({ error: 'Too many wrong attempts. Please ask for a new code.' });
+  }
+  if (!safeEqual(code, String(u.mobile_code))) {
+    db.prepare('UPDATE users SET verify_tries=verify_tries+1 WHERE id=?').run(u.id);
+    return res.status(400).json({ error: 'That code does not match. Please check and try again.' });
+  }
+  db.prepare('UPDATE users SET mobile_ok=1, email_ok=1, verify_tries=0 WHERE id=?').run(u.id);
   const after = db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
   notifyAdmin('registration', 'Mobile number verified',
     after.company + ' has verified their WhatsApp number. Ready for your approval.');
@@ -784,21 +1289,16 @@ app.post('/api/verify', requireUser, (req, res) => {
 });
 
 /* customer taps "resend" — same code, sent again over the gateway */
-const resendAt = new Map();
 app.post('/api/verify/resend', requireUser, async (req, res) => {
-  const kind = 'mobile';
-  const key = req.user.id + ':' + kind;
-  const last = resendAt.get(key) || 0;
-  if (Date.now() - last < 60000)
-    return res.status(429).json({ error: 'Please wait a minute before asking for another code.' });
+  const wait = rateLimit('resend:' + req.user.id, 1, 60000, 60000);
+  if (wait) return res.status(429).json({ error: 'Please wait a minute before asking for another code.' });
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
   if (u.mobile_ok) return res.status(400).json({ error: 'Already verified.' });
   let code = u.mobile_code;
   if (!code) {
-    code = String(Math.floor(100000 + Math.random() * 900000));
-    db.prepare('UPDATE users SET mobile_code=? WHERE id=?').run(code, u.id);
+    code = otpCode();
+    db.prepare("UPDATE users SET mobile_code=?, verify_tries=0 WHERE id=?").run(code, u.id);
   }
-  resendAt.set(key, Date.now());
   const r = await sendCode(db.prepare('SELECT * FROM users WHERE id=?').get(u.id), 'verification', code,
     'They asked for it again.');
   res.json({ ok: true, sent: r.ok, withAdmin: !r.ok, via: r.via || '' });
@@ -818,7 +1318,7 @@ app.post('/api/admin/users/:id/recode', requireAdmin, (req, res) => {
   const kind = 'mobile';
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
   if (!u) return res.status(404).json({ error: 'User not found.' });
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = otpCode();
   db.prepare('UPDATE users SET mobile_code=?, mobile_ok=0 WHERE id=?').run(code, u.id);
   notify(u.id, 'verify', 'New verification code issued',
     'A fresh verification code is on its way to your mobile. Enter it on your profile screen.');
@@ -832,7 +1332,6 @@ app.post('/api/admin/users/:id/recode', requireAdmin, (req, res) => {
  * and send it over whichever channel is configured. With no gateway set up the
  * code lands in the admin panel and the team passes it on, exactly like the
  * verification codes. */
-const otpAt = new Map();
 const OTP_WINDOW_MS = 10 * 60 * 1000;
 
 app.post('/api/otp/request', async (req, res) => {
@@ -842,15 +1341,16 @@ app.post('/api/otp/request', async (req, res) => {
     return res.status(400).json({ error: 'Enter a valid mobile number.' });
 
   const u = findAccount(raw);
-  const key = 'o:' + (u ? u.id : digits);
-  if (Date.now() - (otpAt.get(key) || 0) < 45000)
-    return res.status(429).json({ error: 'A code was just sent. Please wait a moment before asking again.' });
-  otpAt.set(key, Date.now());
+  /* 45 seconds between codes for one number, and a ceiling on how many a single
+     machine can trigger — every code sent costs money at the gateway. */
+  const wait = rateLimit('otp:' + (u ? u.id : digits), 1, 45000, 45000)
+    || rateLimit('otpip:' + clientIp(req), 20, 60 * 60 * 1000, 30 * 60 * 1000);
+  if (wait) return res.status(429).json({ error: 'A code was just sent. Please wait a moment before asking again.' });
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = otpCode();
   let r;
   if (u) {
-    db.prepare('UPDATE users SET login_code=?, login_at=? WHERE id=?').run(code, now(), u.id);
+    db.prepare('UPDATE users SET login_code=?, login_at=?, login_tries=0 WHERE id=?').run(code, now(), u.id);
     r = await sendCode(u, 'login', code, 'They are signing in.');
   } else {
     /* nobody has this number yet — hold the code until they verify, then the
@@ -873,6 +1373,11 @@ app.post('/api/otp/login', (req, res) => {
   const code = String(req.body?.code || '').trim();
   if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit code.' });
 
+  /* A guess costs something whether or not the number belongs to anyone, so the
+     address is capped before either branch is reached. */
+  const ipWait = rateLimit('otploginip:' + clientIp(req), 40, 60 * 60 * 1000, 30 * 60 * 1000);
+  if (ipWait) return res.status(429).json({ error: waitMsg(ipWait) });
+
   const u = findAccount(raw);
 
   /* someone we already know */
@@ -880,13 +1385,22 @@ app.post('/api/otp/login', (req, res) => {
     if (!u.login_code) return res.status(400).json({ error: 'Ask for a code first.' });
     const age = Date.now() - new Date(u.login_at || 0).getTime();
     if (!(age >= 0 && age < OTP_WINDOW_MS)) {
-      db.prepare("UPDATE users SET login_code='' WHERE id=?").run(u.id);
+      db.prepare("UPDATE users SET login_code='', login_tries=0 WHERE id=?").run(u.id);
       return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
     }
-    if (code !== String(u.login_code)) return res.status(400).json({ error: 'That code is not right. Please check and try again.' });
-    db.prepare("UPDATE users SET login_code='', login_at='', mobile_ok=1 WHERE id=?").run(u.id);
-    const token = crypto.randomBytes(24).toString('hex');
-    db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, u.id, 'user', now());
+    /* This is the counter that was missing: the new-number branch below has
+       always had one, so an unregistered number was better protected than a
+       real dealer's account. */
+    if ((u.login_tries || 0) >= MAX_CODE_TRIES) {
+      db.prepare("UPDATE users SET login_code='', login_at='', login_tries=0 WHERE id=?").run(u.id);
+      return res.status(429).json({ error: 'Too many wrong attempts. Please ask for a new code.' });
+    }
+    if (!safeEqual(code, String(u.login_code))) {
+      db.prepare('UPDATE users SET login_tries=login_tries+1 WHERE id=?').run(u.id);
+      return res.status(400).json({ error: 'That code is not right. Please check and try again.' });
+    }
+    db.prepare("UPDATE users SET login_code='', login_at='', login_tries=0, mobile_ok=1 WHERE id=?").run(u.id);
+    const token = newSession(u.id, 'user');
     const fresh = db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
     return res.json({ token, role: 'user', user: pubUser(fresh),
       needsProfile: fresh.status === 'incomplete' });
@@ -895,7 +1409,7 @@ app.post('/api/otp/login', (req, res) => {
   /* a number we have never seen — check the held code, then start their account */
   const row = db.prepare('SELECT * FROM otp_codes WHERE mobile=?').get(digits);
   if (!row) return res.status(400).json({ error: 'Ask for a code first.' });
-  if ((row.tries || 0) >= 5) {
+  if ((row.tries || 0) >= MAX_CODE_TRIES) {
     db.prepare('DELETE FROM otp_codes WHERE mobile=?').run(digits);
     return res.status(429).json({ error: 'Too many wrong attempts. Please ask for a new code.' });
   }
@@ -904,14 +1418,14 @@ app.post('/api/otp/login', (req, res) => {
     db.prepare('DELETE FROM otp_codes WHERE mobile=?').run(digits);
     return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
   }
-  if (code !== String(row.code)) {
+  if (!safeEqual(code, String(row.code))) {
     db.prepare('UPDATE otp_codes SET tries=tries+1 WHERE mobile=?').run(digits);
     return res.status(400).json({ error: 'That code is not right. Please check and try again.' });
   }
 
   db.prepare('DELETE FROM otp_codes WHERE mobile=?').run(digits);
   const id = uid('u');
-  const salt = crypto.randomBytes(8).toString('hex');
+  const salt = crypto.randomBytes(16).toString('hex');
   /* The dial code they verified on tells us which country they are in, so the
      details form that follows already shows the right tax fields. */
   const cc = countryFromDigits(digits);
@@ -920,8 +1434,7 @@ app.post('/api/otp/login', (req, res) => {
       whatsapp,status,mobile_ok,email_ok,created_at,country,licence_no)
     VALUES(?,'',?,?,?,?,'',NULL,'Dealer','','','','',?,'incomplete',1,1,?,?,'')`)
     .run(id, ten, id + '@pending.bluewave', hashPw(crypto.randomBytes(12).toString('hex'), salt), salt, ten, now(), cc);
-  const token = crypto.randomBytes(24).toString('hex');
-  db.prepare('INSERT INTO sessions(token,user_id,role,created_at) VALUES(?,?,?,?)').run(token, id, 'user', now());
+  const token = newSession(id, 'user');
   res.json({ token, role: 'user', user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)),
     needsProfile: true });
 });
@@ -966,7 +1479,7 @@ app.post('/api/me/complete', requireUser, (req, res) => {
   let hash = u.pass_hash, salt = u.salt;
   if (b.password) {
     if (String(b.password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-    salt = crypto.randomBytes(8).toString('hex');
+    salt = crypto.randomBytes(16).toString('hex');
     hash = hashPw(String(b.password), salt);
   }
   db.prepare(`UPDATE users SET name=?, email=?, company=?, gstin=?, type=?, addr=?, city=?, state=?,
@@ -983,21 +1496,20 @@ app.post('/api/me/complete', requireUser, (req, res) => {
 /* ---------- forgotten password ----------
  * Back now that codes actually reach the customer: a 6-digit code by SMS, good
  * for 30 minutes, then they set a new password. */
-const forgotAt = new Map();
 const RESET_WINDOW_MS = 30 * 60 * 1000;
 
 app.post('/api/forgot', async (req, res) => {
   const idRaw = String(req.body?.id || req.body?.mobile || '').trim();
   if (!idRaw) return res.status(400).json({ error: 'Enter your registered email or mobile number.' });
+  const ipWait = rateLimit('forgotip:' + clientIp(req), 20, 60 * 60 * 1000, 30 * 60 * 1000);
+  if (ipWait) return res.status(429).json({ error: waitMsg(ipWait) });
   const u = findAccount(idRaw);
   const generic = { ok: true, sent: false, hint: 'If that account is registered, a code is on its way.' };
   if (!u) return res.json(generic);
-  const key = 'f:' + u.id;
-  if (Date.now() - (forgotAt.get(key) || 0) < 45000)
+  if (rateLimit('forgot:' + u.id, 1, 45000, 45000))
     return res.status(429).json({ error: 'A code was just sent. Please wait a moment before asking again.' });
-  forgotAt.set(key, Date.now());
-  const code = String(Math.floor(100000 + Math.random() * 900000));
-  db.prepare('UPDATE users SET reset_code=?, reset_at=? WHERE id=?').run(code, now(), u.id);
+  const code = otpCode();
+  db.prepare('UPDATE users SET reset_code=?, reset_at=?, reset_tries=0 WHERE id=?').run(code, now(), u.id);
   const r = await sendCode(u, 'password reset', code, 'They asked to reset their password.');
   const to = String(u.whatsapp || u.phone || '').replace(/\D/g, '').slice(-10);
   const maskMail = String(u.email || '').replace(/^(.).*(@.*)$/, '$1•••$2');
@@ -1010,16 +1522,27 @@ app.post('/api/reset', (req, res) => {
   const password = String(req.body?.password || '');
   if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit code.' });
   if (password.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+  const ipWait = rateLimit('resetip:' + clientIp(req), 40, 60 * 60 * 1000, 30 * 60 * 1000);
+  if (ipWait) return res.status(429).json({ error: waitMsg(ipWait) });
   const u = findAccount(String(req.body?.id || req.body?.mobile || ''));
   if (!u || !u.reset_code) return res.status(400).json({ error: 'No reset is pending for that account. Ask for a new code.' });
   const age = Date.now() - new Date(u.reset_at || 0).getTime();
   if (!(age >= 0 && age < RESET_WINDOW_MS)) {
-    db.prepare("UPDATE users SET reset_code='' WHERE id=?").run(u.id);
+    db.prepare("UPDATE users SET reset_code='', reset_tries=0 WHERE id=?").run(u.id);
     return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
   }
-  if (code !== String(u.reset_code)) return res.status(400).json({ error: 'That code does not match. Please check and try again.' });
-  const salt = crypto.randomBytes(8).toString('hex');
-  db.prepare("UPDATE users SET pass_hash=?, salt=?, reset_code='', reset_at='' WHERE id=?")
+  /* A reset code hands over the whole account, so it gets the same five-guess
+     ceiling as every other code. */
+  if ((u.reset_tries || 0) >= MAX_CODE_TRIES) {
+    db.prepare("UPDATE users SET reset_code='', reset_at='', reset_tries=0 WHERE id=?").run(u.id);
+    return res.status(429).json({ error: 'Too many wrong attempts. Please ask for a new code.' });
+  }
+  if (!safeEqual(code, String(u.reset_code))) {
+    db.prepare('UPDATE users SET reset_tries=reset_tries+1 WHERE id=?').run(u.id);
+    return res.status(400).json({ error: 'That code does not match. Please check and try again.' });
+  }
+  const salt = crypto.randomBytes(16).toString('hex');
+  db.prepare("UPDATE users SET pass_hash=?, salt=?, reset_code='', reset_at='', reset_tries=0 WHERE id=?")
     .run(hashPw(password, salt), salt, u.id);
   db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);
   notify(u.id, 'verify', 'Password changed', 'Your password was reset. Sign in with the new one.');
@@ -1075,11 +1598,11 @@ app.post('/api/logout', (req, res) => {
 
 app.post('/api/me/password', requireUser, (req, res) => {
   const u = req.user;
-  if (hashPw(String(req.body?.current || ''), u.salt) !== u.pass_hash)
+  if (!checkPw(req.body?.current, u.salt, u.pass_hash))
     return res.status(400).json({ error: 'Current password is incorrect.' });
   const np = String(req.body?.newPassword || '');
   if (np.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters.' });
-  const salt = crypto.randomBytes(8).toString('hex');
+  const salt = crypto.randomBytes(16).toString('hex');
   db.prepare('UPDATE users SET pass_hash=?, salt=? WHERE id=?').run(hashPw(np, salt), salt, u.id);
   res.json({ ok: true });
 });
@@ -1133,9 +1656,11 @@ app.post('/api/orders', (req, res) => {
     if (!contact.name || !contact.phone) return res.status(400).json({ error: 'Name and phone are required.' });
   }
   const dealer = isDealer(req);
-  /* The order is written in the dealer's own currency — that is the figure they
-     agreed to and the one their invoice has to show. */
-  const z = req.user ? zoneOfUser(req.user) : zoneLive(b.zone || DEFAULT_ZONE);
+  /* The order is written in the currency the dealer was quoted in — that is the
+     figure they agreed to and the one their invoice has to show. Across the
+     Gulf that is either the local currency or dollars, whichever they were
+     looking at when they placed it. */
+  const z = quoteZone(req.user ? zoneOfUser(req.user) : zoneLive(b.zone || DEFAULT_ZONE), req);
   const lines = [];
   for (const it of items) {
     const p = db.prepare('SELECT * FROM products WHERE id=? AND active=1').get(String(it.pid));
@@ -1165,11 +1690,16 @@ app.post('/api/orders', (req, res) => {
   const total = subtotal;
   const transport = String(b.transport || '').trim().slice(0, 80);
   const id = nextOrderId();
-  db.prepare(`INSERT INTO orders(id,user_id,contact_json,addr,notes,items_json,subtotal,gst,total,tier,status,transport,created_at,country,currency,fx_rate,tax_percent,tax_label)
-    VALUES(?,?,?,?,?,?,?,?,?,?,'awaiting_payment',?,?,?,?,?,?,?)`)
+  /* Signed-in orders are protected by the account; a guest order gets its own
+     secret instead, returned once, to whoever placed it. */
+  const guestToken = req.user ? '' : crypto.randomBytes(24).toString('hex');
+  db.prepare(`INSERT INTO orders(id,user_id,contact_json,addr,notes,items_json,subtotal,gst,total,tier,status,transport,created_at,country,currency,fx_rate,tax_percent,tax_label,guest_token)
+    VALUES(?,?,?,?,?,?,?,?,?,?,'awaiting_payment',?,?,?,?,?,?,?,?)`)
     .run(id, req.user ? req.user.id : null, JSON.stringify(contact), addr, String(b.notes || '').trim(), JSON.stringify(lines), subtotal, gst, total, dealer ? 'dealer' : 'mrp', transport, now(),
-      z.code, z.currency, z.fx, r, z.taxLabel);
-  res.json({ order: orderOut(db.prepare('SELECT * FROM orders WHERE id=?').get(id)) });
+      z.code, z.currency, z.fx, r, z.taxLabel, guestToken);
+  const out = orderOut(db.prepare('SELECT * FROM orders WHERE id=?').get(id));
+  if (guestToken) out.accessToken = guestToken;
+  res.json({ order: out });
 });
 
 /* Orders placed before multi-zone have no snapshot, so they read as Indian
@@ -1180,39 +1710,71 @@ const orderZone = o => {
      would sail through a naive check and come back out as null. */
   const tax = (o.tax_percent !== null && o.tax_percent !== undefined
                && isFinite(o.tax_percent) && o.tax_percent >= 0) ? o.tax_percent : gstPercent();
-  return { ...z, currency: o.currency || z.currency, taxPercent: tax, taxLabel: o.tax_label || z.taxLabel };
+  /* An order placed in the zone's alternate currency has to be *shown* in that
+     currency as well — symbol, decimal places and number formatting all follow
+     the money, not the country. Taking only the currency code from the order
+     and the rest from the zone is how a dollar total ends up printed as
+     "AED 13.82" on the dealer's own invoice. */
+  const cur = o.currency || z.currency;
+  const disp = cur === z.currency ? z : (Object.values(ZONES).find(x => x.currency === cur) || z);
+  return { ...z, currency: cur, symbol: disp.symbol, decimals: disp.decimals, locale: disp.locale,
+    taxPercent: tax, taxLabel: o.tax_label || z.taxLabel };
 };
 
-const orderOut = o => ({
-  id: o.id, userId: o.user_id, contact: JSON.parse(o.contact_json), addr: o.addr, notes: o.notes,
-  items: JSON.parse(o.items_json), subtotal: o.subtotal, gst: o.gst, total: o.total,
-  country: o.country || DEFAULT_ZONE, currency: orderZone(o).currency, symbol: orderZone(o).symbol,
-  decimals: orderZone(o).decimals, locale: orderZone(o).locale,
-  taxPercent: orderZone(o).taxPercent, taxLabel: orderZone(o).taxLabel, fxRate: o.fx_rate || 1,
-  gstPercent: orderZone(o).taxPercent, tier: o.tier, status: o.status, payRef: o.pay_ref,
-  transport: o.transport || '', lrNumber: o.lr_number || '', dispatchTransport: o.dispatch_transport || '',
-  dispatchMode: o.dispatch_mode || '', vehicleNo: o.vehicle_no || '', driverName: o.driver_name || '', driverPhone: o.driver_phone || '',
-  dispatchedAt: o.dispatched_at || '', creditDue: o.credit_due || '', creditSettled: !!o.credit_settled,
-  createdAt: o.created_at
-});
+/* Each of these used to be recomputed six times per order, and every call went
+ * back to SQLite for the zone and the GST setting. Once is enough. */
+const orderOut = o => {
+  const z = orderZone(o);
+  return {
+    id: o.id, userId: o.user_id, contact: JSON.parse(o.contact_json), addr: o.addr, notes: o.notes,
+    items: JSON.parse(o.items_json), subtotal: o.subtotal, gst: o.gst, total: o.total,
+    country: o.country || DEFAULT_ZONE, currency: z.currency, symbol: z.symbol,
+    decimals: z.decimals, locale: z.locale,
+    taxPercent: z.taxPercent, taxLabel: z.taxLabel, fxRate: o.fx_rate || 1,
+    gstPercent: z.taxPercent, tier: o.tier, status: o.status, payRef: o.pay_ref,
+    transport: o.transport || '', lrNumber: o.lr_number || '', dispatchTransport: o.dispatch_transport || '',
+    dispatchMode: o.dispatch_mode || '', vehicleNo: o.vehicle_no || '', driverName: o.driver_name || '', driverPhone: o.driver_phone || '',
+    dispatchedAt: o.dispatched_at || '', creditDue: o.credit_due || '', creditSettled: !!o.credit_settled,
+    createdAt: o.created_at
+  };
+};
+
+/* Who may see or act on an order.
+ *   admin                      — always
+ *   the dealer who placed it   — their own only
+ *   a guest                    — only with the secret handed back at checkout
+ * The old rule read `if (o.user_id && ...)`, which skipped the check entirely
+ * for guest orders because theirs is NULL. Order numbers run in sequence, so
+ * that made every guest's name, phone, address and basket public. */
+function mayAccessOrder(req, o) {
+  if (req.role === 'admin') return true;
+  if (o.user_id) return !!(req.user && req.user.id === o.user_id);
+  const supplied = String(req.get('X-Order-Token') || req.query.t || req.body?.orderToken || '');
+  return !!o.guest_token && safeEqual(supplied, o.guest_token);
+}
+/* Loads the order and checks access in one step; returns null once it has
+ * answered the request itself. Deliberately answers 404 either way, so the
+ * endpoint cannot be used to confirm which order numbers exist. */
+function orderFor(req, res) {
+  const o = db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);
+  if (!o || !mayAccessOrder(req, o)) {
+    res.status(404).json({ error: 'Order not found.' });
+    return null;
+  }
+  return o;
+}
 
 app.get('/api/my/orders', requireUser, (req, res) => {
   res.json(db.prepare('SELECT * FROM orders WHERE user_id=? ORDER BY created_at DESC').all(req.user.id).map(orderOut));
 });
 
 app.get('/api/orders/:id', (req, res) => {
-  const o = db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);
-  if (!o) return res.status(404).json({ error: 'Order not found.' });
-  if (o.user_id && !(req.role === 'admin' || (req.user && req.user.id === o.user_id)))
-    return res.status(403).json({ error: 'Not allowed.' });
+  const o = orderFor(req, res); if (!o) return;
   res.json(orderOut(o));
 });
 
 app.post('/api/orders/:id/payment', (req, res) => {
-  const o = db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);
-  if (!o) return res.status(404).json({ error: 'Order not found.' });
-  if (o.user_id && !(req.user && req.user.id === o.user_id) && req.role !== 'admin')
-    return res.status(403).json({ error: 'Not allowed.' });
+  const o = orderFor(req, res); if (!o) return;
   const ref = String(req.body?.payRef || '').trim();
   if (!ref) return res.status(400).json({ error: 'Payment reference is required.' });
   if (o.status !== 'awaiting_payment') return res.status(400).json({ error: 'Payment already recorded for this order.' });
@@ -1225,14 +1787,27 @@ app.post('/api/orders/:id/payment', (req, res) => {
   res.json({ ok: true, order: orderOut(db.prepare('SELECT * FROM orders WHERE id=?').get(o.id)) });
 });
 
-/* ---------- Razorpay gateway ---------- */
+/* ---------- Razorpay gateway ----------
+ * Razorpay settles in these currencies for an Indian merchant account. A zone
+ * outside this list falls back to bank transfer rather than being billed the
+ * right number in the wrong currency. AED and SAR need international payments
+ * enabled on the account; if they are not, the gateway itself will say so. */
+const RZP_CURRENCIES = new Set(['INR', 'AED', 'SAR', 'QAR', 'OMR', 'KWD', 'BHD', 'USD']);
+
 app.post('/api/orders/:id/rzp-order', async (req, res) => {
   if (!rzpEnabled()) return res.status(400).json({ error: 'Online payment is not enabled yet. Please pay by UPI/bank transfer.' });
-  const o = db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);
-  if (!o) return res.status(404).json({ error: 'Order not found.' });
-  if (o.user_id && !(req.user && req.user.id === o.user_id) && req.role !== 'admin')
-    return res.status(403).json({ error: 'Not allowed.' });
+  const o = orderFor(req, res); if (!o) return;
   if (o.status !== 'awaiting_payment') return res.status(400).json({ error: 'Payment already recorded for this order.' });
+  /* The order total is held in the dealer's own currency. Sending it to
+     Razorpay labelled INR charged a 1,000 AED order as ₹1,000 — roughly a
+     96% discount. The currency and the minor-unit scale both have to come
+     from the order's own zone. */
+  const oz = orderZone(o);
+  const currency = o.currency || oz.currency || 'INR';
+  const minor = Math.round(o.total * Math.pow(10, oz.decimals));
+  if (!RZP_CURRENCIES.has(currency))
+    return res.status(400).json({ error: 'Online card payment is not available for ' + currency +
+      ' orders yet. Please pay by bank transfer — the details are on this screen.' });
   const k = rzpKeys();
   try {
     const r = await fetch('https://api.razorpay.com/v1/orders', {
@@ -1241,12 +1816,13 @@ app.post('/api/orders/:id/rzp-order', async (req, res) => {
         'Authorization': 'Basic ' + Buffer.from(k.id + ':' + k.secret).toString('base64'),
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ amount: Math.round(o.total * 100), currency: 'INR', receipt: o.id })
+      body: JSON.stringify({ amount: minor, currency, receipt: o.id }),
+      signal: AbortSignal.timeout(15000)
     });
     const d = await r.json();
     if (!r.ok || !d.id) return res.status(502).json({ error: (d.error && d.error.description) || 'Payment gateway error — try UPI/bank transfer instead.' });
     db.prepare('UPDATE orders SET rzp_order_id=? WHERE id=?').run(d.id, o.id);
-    res.json({ rzpOrderId: d.id, keyId: k.id, amount: Math.round(o.total * 100), currency: 'INR', name: getSetting('payeeName'), contact: JSON.parse(o.contact_json) });
+    res.json({ rzpOrderId: d.id, keyId: k.id, amount: minor, currency, name: getSetting('payeeName'), contact: JSON.parse(o.contact_json) });
   } catch (e) {
     res.status(502).json({ error: 'Could not reach payment gateway — try UPI/bank transfer instead.' });
   }
@@ -1254,8 +1830,7 @@ app.post('/api/orders/:id/rzp-order', async (req, res) => {
 
 app.post('/api/orders/:id/rzp-verify', (req, res) => {
   if (!rzpEnabled()) return res.status(400).json({ error: 'Online payment is not enabled.' });
-  const o = db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);
-  if (!o) return res.status(404).json({ error: 'Order not found.' });
+  const o = orderFor(req, res); if (!o) return;
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
     return res.status(400).json({ error: 'Missing payment details.' });
@@ -1566,14 +2141,30 @@ const REM_DEFAULTS = {
   remBefore: '3',                 // days before due date
   remOnDue: '1',                  // send on the due date itself
   remAfter: '1,3,7',              // days after due date (overdue chasers)
-  remHour: '10',                  // local hour to send (24h)
+  remHour: '10',                  // hour to send, in the business's own timezone
+  remTz: 'Asia/Kolkata',          // where "10 o'clock" means ten o'clock
   remProvider: '',                // '', 'whatsapp' (Meta Cloud API) or 'msg91'
   remTemplate: 'Dear {name}, this is a payment reminder from HPMP Manufacturers (Blue Wave). Order {order} of {amount} placed on {date} is {due}. Kindly arrange the payment. Thank you.'
 };
 const rs = k => { const v = getSetting(k); return v === null || v === undefined || v === '' ? REM_DEFAULTS[k] : v; };
 const dayList = s => String(s || '').split(',').map(x => parseInt(x.trim())).filter(n => isFinite(n) && n >= 0);
-const dayStart = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-const daysBetween = (a, b) => Math.round((dayStart(b) - dayStart(a)) / 86400000);
+/* Hosts run on UTC. Working out "which day is it" and "is it ten o'clock yet"
+ * from the server clock sent India's 10am reminders at 3:30pm; every date here
+ * is therefore read in the business's own timezone. */
+const remTz = () => {
+  const v = rs('remTz');
+  try { new Intl.DateTimeFormat('en-GB', { timeZone: v }); return v; } catch (e) { return 'Asia/Kolkata'; }
+};
+const tzParts = (d, tz) => {
+  const f = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit' });
+  const p = Object.fromEntries(f.formatToParts(d).filter(x => x.type !== 'literal').map(x => [x.type, x.value]));
+  return { y: +p.year, m: +p.month, d: +p.day, h: +(p.hour === '24' ? '0' : p.hour) };
+};
+const localHour = () => tzParts(new Date(), remTz()).h;
+/* midnight of that date, as a plain day number — safe to subtract */
+const dayIndex = d => { const p = tzParts(new Date(d), remTz()); return Math.floor(Date.UTC(p.y, p.m - 1, p.d) / 86400000); };
+const daysBetween = (a, b) => dayIndex(b) - dayIndex(a);
 
 function reminderText(o, u, dueDays) {
   const due = dueDays > 0 ? 'due in ' + dueDays + ' day' + (dueDays > 1 ? 's' : '')
@@ -1703,11 +2294,35 @@ async function smsFast2Sms(to, text) {
     });
     const raw = await r.text();
     let d = {}; try { d = JSON.parse(raw); } catch (e) { /* not json */ }
-    return (r.ok && d.return === true)
-      ? { ok: true, status: 'sent', detail: raw.slice(0, 300) }
-      : { ok: false, status: 'Fast2SMS replied ' + r.status, detail: raw.slice(0, 300) };
+    if (r.ok && d.return === true) return { ok: true, status: 'sent', detail: raw.slice(0, 300) };
+    const help = FAST2SMS_HELP[String(d.status_code || '')];
+    return { ok: false,
+      status: help ? help.short : 'Fast2SMS replied ' + r.status,
+      detail: (help ? help.fix + ' — ' : '') + raw.slice(0, 300) };
   } catch (e) { return { ok: false, status: 'Could not reach Fast2SMS', detail: e.message }; }
 }
+
+/* Fast2SMS answers with a numeric status_code and a terse message. These are
+ * the ones that actually stop a live account, turned into something the admin
+ * can act on without going digging. Codes from Fast2SMS's own error list. */
+const FAST2SMS_HELP = {
+  '412': { short: 'Fast2SMS key rejected',
+           fix: 'The authorisation key is wrong. Copy it again from Fast2SMS → Dev API and save it in Settings.' },
+  '413': { short: 'Fast2SMS key disabled',
+           fix: 'The key has been switched off in your Fast2SMS account. Re-enable or regenerate it.' },
+  '414': { short: 'Fast2SMS has blocked this server\'s IP',
+           fix: 'In Fast2SMS → Dev API, either switch OFF the IP whitelist or add this server\'s address. '
+              + 'On Railway the outbound address changes on every deploy unless you are on the Pro plan with '
+              + 'static outbound IPs, so a whitelist will keep breaking — switching the restriction off is the '
+              + 'fix that lasts.' },
+  '415': { short: 'Fast2SMS account disabled', fix: 'Contact Fast2SMS support — the account itself is switched off.' },
+  '416': { short: 'Fast2SMS wallet is empty', fix: 'Top up the Fast2SMS wallet; no messages send at zero balance.' },
+  '995': { short: 'Fast2SMS flagged this as spam',
+           fix: 'Too many messages to the same number too quickly. Wait a few minutes before retrying.' },
+  '996': { short: 'Fast2SMS KYC not complete', fix: 'Finish KYC in the Fast2SMS dashboard before the OTP route will work.' },
+  '999': { short: 'Fast2SMS needs a first top-up',
+           fix: 'Fast2SMS requires one payment of at least ₹100 into the wallet before the API is enabled.' }
+};
 
 async function smsTwilio(to, text) {
   const sid = getSetting('twilioSid'), tok = getSetting('twilioToken'), from = getSetting('twilioFrom');
@@ -1933,9 +2548,11 @@ async function runCreditReminders(force) {
   const auto = getSetting('remAuto');
   if (auto === '0') return { skipped: 'switched_off' };
   if (!ss('smsProvider') && !mailReady()) return { skipped: 'no_channel' };
-  if (!force && new Date().getHours() !== (isFinite(hour) ? hour : 10)) return { skipped: 'not_send_hour' };
+  if (!force && localHour() !== (isFinite(hour) ? hour : 10)) return { skipped: 'not_send_hour' };
   let sent = 0, skipped = 0;
-  for (const row of creditOutstanding()) {
+  /* taken once — the list was being rebuilt from scratch just to count it */
+  const due = creditOutstanding();
+  for (const row of due) {
     const kind = reminderKind(row.dueDays);
     if (!kind) { skipped++; continue; }
     /* never repeat a delivered reminder, and never log the same one twice in a day */
@@ -1956,7 +2573,7 @@ async function runCreditReminders(force) {
       'Order ' + row.order.id + ' is ' + (row.dueDays < 0 ? Math.abs(row.dueDays) + ' day(s) overdue' : 'due in ' + row.dueDays + ' day(s)') +
       '. Message not delivered (' + r.status + '). Chase them from the Credit tab.');
   }
-  return { sent, skipped, checked: creditOutstanding().length };
+  return { sent, skipped, checked: due.length };
 }
 setInterval(() => { runCreditReminders(false).catch(() => { }); }, 60 * 60 * 1000);
 setTimeout(() => { runCreditReminders(false).catch(() => { }); }, 30000);
@@ -2169,7 +2786,17 @@ app.delete('/api/admin/orders/:id', requireAdmin, (req, res) => {
 /* ---------- backup / restore ----------
  * A full copy of everything as one JSON file, so a wiped host, a bad deploy or
  * a move to another provider never costs you dealers or orders. */
-const BACKUP_TABLES = ['users', 'products', 'orders', 'settings', 'transports', 'dealer_prices', 'offers', 'notifications'];
+/* 'zones' holds the admin's live exchange rates and Gulf VAT percentages, and
+ * 'reminders' is what stops a credit customer being chased twice for the same
+ * order. Leaving them out meant a restore quietly reverted every rate to the
+ * seed values and re-sent reminders that had already gone. */
+const BACKUP_TABLES = ['users', 'products', 'orders', 'settings', 'transports', 'dealer_prices',
+  'offers', 'notifications', 'zones', 'reminders', 'fx_history'];
+
+/* Only columns the table actually has, quoted, so a crafted backup file cannot
+ * smuggle SQL through a JSON key. */
+const tableColumns = t => new Set(db.prepare('SELECT name FROM pragma_table_info(?)').all(t).map(r => r.name));
+const quoteId = c => '"' + String(c).replace(/"/g, '""') + '"';
 
 app.get('/api/admin/backup', requireAdmin, (req, res) => {
   const data = {};
@@ -2194,12 +2821,21 @@ app.post('/api/admin/restore', requireAdmin, (req, res) => {
     for (const t of BACKUP_TABLES) {
       const rows = Array.isArray(backup.data[t]) ? backup.data[t] : null;
       if (!rows) continue;
-      db.prepare('DELETE FROM ' + t).run();
+      const allowed = tableColumns(t);
+      db.prepare('DELETE FROM ' + quoteId(t)).run();
       for (const row of rows) {
-        const cols = Object.keys(row);
+        if (!row || typeof row !== 'object') continue;
+        /* keys that are not real columns are dropped, not interpolated */
+        const cols = Object.keys(row).filter(c => allowed.has(c));
         if (!cols.length) continue;
-        db.prepare('INSERT OR REPLACE INTO ' + t + ' (' + cols.join(',') + ') VALUES (' +
-          cols.map(() => '?').join(',') + ')').run(...cols.map(c => row[c]));
+        db.prepare('INSERT OR REPLACE INTO ' + quoteId(t) + ' (' + cols.map(quoteId).join(',') + ') VALUES (' +
+          cols.map(() => '?').join(',') + ')').run(...cols.map(c => {
+            const v = row[c];
+            /* SQLite binds only these; an object or array in the file would throw
+               and abort the whole restore */
+            return (v === null || typeof v === 'string' || typeof v === 'number'
+              || typeof v === 'bigint') ? v : (typeof v === 'boolean' ? (v ? 1 : 0) : JSON.stringify(v));
+          }));
       }
       counts[t] = rows.length;
     }
@@ -2215,20 +2851,36 @@ app.post('/api/admin/restore', requireAdmin, (req, res) => {
 app.post('/api/admin/reset', requireAdmin, (req, res) => {
   if (!verifyAdminPw(req.body?.password)) return res.status(403).json({ error: 'Verification password is incorrect — deletion cancelled.' });
   const scope = req.body?.scope;
+  /* Everything that hangs off a user goes with them. Left behind, the price
+     lists and push subscriptions would silently reattach themselves to the next
+     account that happened to be issued the same id. */
   if (scope === 'accounts') {
     db.prepare('DELETE FROM users').run();
     db.prepare("DELETE FROM sessions WHERE role='user'").run();
+    db.prepare('DELETE FROM dealer_prices').run();
+    db.prepare("DELETE FROM notifications WHERE user_id<>'admin'").run();
+    db.prepare("DELETE FROM push_subs WHERE user_id<>'admin'").run();
+    db.prepare('DELETE FROM otp_codes').run();
+    db.prepare("UPDATE orders SET user_id=NULL WHERE user_id IS NOT NULL").run();
   } else if (scope === 'orders') {
     db.prepare('DELETE FROM orders').run();
+    db.prepare('DELETE FROM reminders').run();
   } else return res.status(400).json({ error: 'Bad scope.' });
   res.json({ ok: true });
 });
 
 app.post('/api/admin/users/:id/delete', requireAdmin, (req, res) => {
   if (!verifyAdminPw(req.body?.password)) return res.status(403).json({ error: 'Verification password is incorrect — deletion cancelled.' });
-  const r = db.prepare('DELETE FROM users WHERE id=?').run(req.params.id);
+  const id = req.params.id;
+  const r = db.prepare('DELETE FROM users WHERE id=?').run(id);
   if (!r.changes) return res.status(404).json({ error: 'User not found.' });
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id);
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
+  db.prepare('DELETE FROM dealer_prices WHERE user_id=?').run(id);
+  db.prepare('DELETE FROM notifications WHERE user_id=?').run(id);
+  db.prepare('DELETE FROM push_subs WHERE user_id=?').run(id);
+  /* their orders stay — they are the business record — but stop pointing at an
+     account that no longer exists */
+  db.prepare('UPDATE orders SET user_id=NULL WHERE user_id=?').run(id);
   res.json({ ok: true });
 });
 
@@ -2255,11 +2907,12 @@ app.get('/api/admin/settings', requireAdmin, (req, res) => {
     payeeName: getSetting('payeeName'), bankName: getSetting('bankName'),
     accountNo: getSetting('accountNo'), ifsc: getSetting('ifsc'), whatsapp: getSetting('whatsapp'),
     adminEmail: getSetting('adminEmail'), gstPercent: gstPercent(),
+    defaultAdminPassword: usingDefaultAdminPassword(),
     rzpKeyId: getSetting('rzpKeyId') || '', rzpSecretSet: !!getSetting('rzpKeySecret'),
     gstApiKeySet: !!getSetting('gstApiKey'),
     remProvider: rs('remProvider'), remAuto: getSetting('remAuto') === '0' ? '0' : '1',
     remBefore: rs('remBefore'), remOnDue: rs('remOnDue'),
-    remAfter: rs('remAfter'), remHour: rs('remHour'), remTemplate: rs('remTemplate'),
+    remAfter: rs('remAfter'), remHour: rs('remHour'), remTz: remTz(), remTemplate: rs('remTemplate'),
     waPhoneId: getSetting('waPhoneId') || '', waTokenSet: !!getSetting('waToken'),
     smsProvider: ss('smsProvider'), smsRoute: ss('smsRoute'),
     smtpHost: getSetting('smtpHost') || '', smtpPort: getSetting('smtpPort') || '587',
@@ -2275,7 +2928,7 @@ app.get('/api/admin/settings', requireAdmin, (req, res) => {
 app.put('/api/admin/settings', requireAdmin, (req, res) => {
   const b = req.body || {};
   for (const k of ['payeeName', 'bankName', 'accountNo', 'ifsc', 'whatsapp', 'adminEmail', 'rzpKeyId',
-    'remProvider', 'remAuto', 'remBefore', 'remOnDue', 'remAfter', 'remHour', 'remTemplate', 'waPhoneId', 'smsSender',
+    'remProvider', 'remAuto', 'remBefore', 'remOnDue', 'remAfter', 'remHour', 'remTz', 'remTemplate', 'waPhoneId', 'smsSender',
     'smsProvider', 'smsRoute', 'smsTemplateId', 'twilioSid', 'twilioFrom',
     'smtpHost', 'smtpPort', 'smtpUser', 'smtpFrom', 'smtpFromName'])
     if (b[k] !== undefined) setSetting(k, String(b[k]).trim());
@@ -2288,15 +2941,60 @@ app.put('/api/admin/settings', requireAdmin, (req, res) => {
     setSetting('gstApiKey', String(b.gstApiKey).trim());
   if (b.rzpClear) { setSetting('rzpKeyId', ''); setSetting('rzpKeySecret', ''); }
   if (b.adminPassword) {
-    const salt = crypto.randomBytes(8).toString('hex');
+    const pw = String(b.adminPassword);
+    if (pw.length < 10)
+      return res.status(400).json({ error: 'The admin password must be at least 10 characters — it is the key to every dealer account and order.' });
+    if (DEFAULT_ADMIN_PASSWORDS.has(pw))
+      return res.status(400).json({ error: 'Please choose a password that is not the factory default.' });
+    const salt = crypto.randomBytes(16).toString('hex');
     setSetting('adminSalt', salt);
-    setSetting('adminHash', hashPw(String(b.adminPassword), salt));
+    setSetting('adminHash', hashPw(pw, salt));
+    /* an admin password change signs the old admin sessions out */
+    db.prepare("DELETE FROM sessions WHERE role='admin'").run();
   }
   res.json({ ok: true });
 });
 
 /* ---------- static frontend ---------- */
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, p) => {
+    /* index.html carries the whole app, so it must never be served stale after
+       a deploy; the icons and manifest beside it can be cached hard. */
+    if (p.endsWith('index.html') || p.endsWith('sw.js')) res.setHeader('Cache-Control', 'no-cache');
+  }
+}));
+/* An unknown /api path is a 404 in JSON, not the whole SPA — the old catch-all
+ * handed index.html to the Android notification poller when a route was
+ * misspelled, and it read as success. */
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found.' }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.listen(PORT, () => console.log('Blue Wave app running on port ' + PORT));
+/* Last line of defence: anything a route throws lands here as JSON instead of a
+ * stack trace on the dealer's screen. */
+app.use((err, req, res, next) => {
+  console.error('Unhandled error on ' + req.method + ' ' + req.path + ':', err && err.message);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Something went wrong at our end. Please try again.' });
+});
+
+/* Expired sessions, spent rate-limit rows and stale one-time codes are cleared
+ * on boot and once an hour after that. */
+purgeSessions();
+setInterval(purgeSessions, 60 * 60 * 1000);
+
+/* Exchange rates: checked hourly, actually fetched once a day. The first run is
+ * delayed a little so a restart does not hold up the first page load. */
+setTimeout(() => { fxTick().catch(() => { }); }, 20000);
+setInterval(() => { fxTick().catch(() => { }); }, 60 * 60 * 1000);
+
+app.listen(PORT, () => {
+  console.log('Blue Wave app running on port ' + PORT);
+  if (usingDefaultAdminPassword()) {
+    console.warn('\n  ****************************************************************\n' +
+                 '  *  WARNING: the admin account is still on its factory password. *\n' +
+                 '  *  Anyone who has read the setup notes can sign in as admin.    *\n' +
+                 '  *  Set ADMIN_PASSWORD in the host\'s environment variables, or   *\n' +
+                 '  *  change it in Admin -> Settings before sharing the link.      *\n' +
+                 '  ****************************************************************\n');
+  }
+});

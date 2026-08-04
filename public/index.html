@@ -772,8 +772,30 @@ const state={products:[],role:null,user:null,payInfo:null,transports:[],offer:nu
      the server on every products/pay-info refresh, so it always matches the
      prices in state.products */
   zone:null,zones:[]};
+/* An order placed without an account is protected by a secret handed back at
+   checkout, not by the order number — the numbers run in sequence. It is kept
+   here so the payment screen still works after a refresh. */
+function guestOrderTokens(){try{return JSON.parse(localStorage.getItem('bw_order_tokens')||'{}')}catch(e){return {}}}
+function saveGuestOrderToken(id,tok){
+  if(!id||!tok)return;
+  try{
+    const all=guestOrderTokens();all[id]=tok;
+    /* only the recent ones — this is a browser store, not a filing cabinet */
+    const keys=Object.keys(all);if(keys.length>25)delete all[keys[0]];
+    localStorage.setItem('bw_order_tokens',JSON.stringify(all));
+  }catch(e){}
+}
+const guestOrderToken=id=>guestOrderTokens()[id]||'';
+/* pulls the order id out of /orders/BW2608001/payment and friends */
+function orderTokenFor(path){
+  const m=/^\/orders\/([^/?]+)/.exec(path);
+  return m?guestOrderToken(decodeURIComponent(m[1])):'';
+}
 async function api(path,method='GET',body){
-  const r=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
+  const otok=orderTokenFor(path);
+  const r=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json',
+    ...(token?{Authorization:'Bearer '+token}:{}),...(otok?{'X-Order-Token':otok}:{})},
+    body:body?JSON.stringify(body):undefined});
   let d={};try{d=await r.json()}catch(e){}
   if(r.status===401&&token&&path!=='/login'){token='';localStorage.removeItem('bw_token');state.role=null;state.user=null}
   if(!r.ok)throw new Error(d.error||'Something went wrong — check your connection.');
@@ -783,8 +805,46 @@ async function refreshMe(){const d=await api('/me');state.role=d.role;state.user
 /* A guest has no account yet, so they browse in whichever zone they picked on
    the sign-up screen; a signed-in dealer always gets their own. */
 function guestZone(){try{return localStorage.getItem('bw_zone')||'IN'}catch(e){return 'IN'}}
-function setGuestZone(c){try{localStorage.setItem('bw_zone',c||'IN')}catch(e){}}
-const zoneQuery=()=>state.user?'':'?zone='+encodeURIComponent(guestZone());
+function setGuestZone(c){
+  const next=c||'IN';
+  let prev='IN';try{prev=localStorage.getItem('bw_zone')||'IN'}catch(e){}
+  try{localStorage.setItem('bw_zone',next)}catch(e){}
+  if(next===prev)return;
+  /* The currency, the exchange rate and the name of the tax all come from the
+     server per zone. Storing the choice without re-asking left the shop showing
+     rupees and the words "incl. GST" to someone who had just said they were in
+     Dallas — right until they happened to reload. */
+  repaintForZone().catch(()=>{});
+}
+async function repaintForZone(){
+  await Promise.all([
+    refreshProducts(),
+    api('/pay-info'+zoneQuery()).then(d=>{state.payInfo=d;if(d.zone)state.zone=d.zone}).catch(()=>{})
+  ]);
+  if(currentView==='home')renderHome();
+  else if(currentView==='shop')renderShop();
+  else if(currentView==='category')renderCategory();
+  renderNav();
+}
+/* Across the Gulf a dealer may be quoted in their own currency or in dollars —
+   both are offered, because the currencies are pegged to each other and much of
+   the region's import trade is invoiced in USD. The preference is remembered on
+   the device; the server ignores it wherever a zone does not offer a choice, so
+   a stale value can never misprice anything. */
+function curPref(){try{return localStorage.getItem('bw_cur')||''}catch(e){return ''}}
+function setCurPref(c){try{c?localStorage.setItem('bw_cur',c):localStorage.removeItem('bw_cur')}catch(e){}}
+async function switchCurrency(code){
+  if(code===(state.zone&&state.zone.quotedIn))return;
+  setCurPref(code);
+  await repaintForZone();
+}
+const zoneQuery=()=>{
+  const parts=[];
+  /* a signed-in dealer's country comes from their account, never the URL */
+  if(!state.user)parts.push('zone='+encodeURIComponent(guestZone()));
+  const c=curPref();if(c)parts.push('currency='+encodeURIComponent(c));
+  return parts.length?'?'+parts.join('&'):'';
+};
 
 async function refreshProducts(){
   const d=await api('/products'+zoneQuery());
@@ -798,6 +858,42 @@ function offerBanner(){
   return `<div class="notice ok" style="background:linear-gradient(120deg,#fff3d9,#ffe6bd);border-color:#ffcf85;color:#7a4a00">
     <b>${esc(o.name)}</b> — extra <b>${o.percent}% off</b> your dealer prices${o.ends?' until '+esc(o.ends):''}. Already applied to every rate you see.</div>`;
 }
+const agoText=iso=>{
+  if(!iso)return 'never';
+  const m=Math.floor((Date.now()-new Date(iso).getTime())/60000);
+  if(!isFinite(m)||m<0)return 'just now';
+  if(m<2)return 'just now';
+  if(m<60)return m+' minutes ago';
+  const h=Math.floor(m/60); if(h<24)return h===1?'an hour ago':h+' hours ago';
+  const d=Math.floor(h/24); return d===1?'yesterday':d+' days ago';
+};
+/* Prices outside India are converted from rupees at a rate that moves daily.
+   Saying so plainly is better than a dealer noticing a total shifted overnight
+   and wondering whether the price list changed. */
+function fxNote(){
+  const z=state.zone;
+  if(!z||z.code==='IN'||!z.fxAuto)return '';
+  return `<div class="hint" style="margin:6px 0 10px;text-align:center">
+    Prices shown in ${esc(z.currency)}, converted from ₹ at today's rate${z.fxUpdatedAt?' ('+esc(agoText(z.fxUpdatedAt))+')':''}.
+    The rate on your order is fixed the moment you place it.</div>`;
+}
+/* Two buttons where a zone quotes in more than one currency. Nothing is shown
+   at all in India or the US, where there is only one. */
+function currencyToggle(){
+  const z=state.zone;
+  const list=(z&&z.currencies)||[];
+  if(list.length<2)return '';
+  const on=z.quotedIn||z.currency;
+  return `<div style="display:flex;justify-content:center;gap:0;margin:10px 0 2px">
+    <div style="display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff">
+      ${list.map(c=>`<button onclick="switchCurrency('${esc(c)}')"
+        style="border:0;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;
+               background:${c===on?'var(--blue,#0b2a4a)':'transparent'};color:${c===on?'#fff':'var(--muted,#667)'}"
+        ${c===on?'aria-current="true"':''}>${esc(c)}</button>`).join('')}
+    </div></div>`;
+}
+/* The currency switch and the rate note, as one block. */
+const zoneBar=()=>currencyToggle()+fxNote();
 async function refreshTransports(){try{state.transports=await api('/transports')}catch(e){state.transports=[]}}
 
 /* ============ HELPERS ============ */
@@ -809,7 +905,13 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const ZFALLBACK={code:'IN',currency:'INR',symbol:'₹',locale:'en-IN',decimals:2,taxLabel:'GST',taxPercent:18};
 const zone=()=>state.zone||ZFALLBACK;
 function fmtIn(n,z){z=z||zone();
-  const v=Number(n||0).toLocaleString(z.locale||'en-IN',{minimumFractionDigits:0,maximumFractionDigits:z.decimals!=null?z.decimals:2});
+  const dec=z.decimals!=null?z.decimals:2;
+  /* A round number reads better plain — ₹1,299, not ₹1,299.00. But once there
+     IS a fractional part it has to be written out in full: a dollar total of
+     829.2 is $829.20, and printing "$829.2" on what a dealer treats as a
+     quotation looks like a typo. */
+  const frac=Math.abs(Number(n||0)%1)>1e-9;
+  const v=Number(n||0).toLocaleString(z.locale||'en-IN',{minimumFractionDigits:frac?dec:0,maximumFractionDigits:dec});
   /* '₹1,299' reads naturally closed up; a three-letter code needs the space */
   return z.symbol.length>1?z.symbol+' '+v:z.symbol+v;}
 const fmt=n=>fmtIn(n);
@@ -823,8 +925,15 @@ function gstPct(){const p=state.payInfo;
   if(p&&p.taxPercent!=null&&isFinite(p.taxPercent))return p.taxPercent;
   if(p&&isFinite(p.gstPercent))return p.gstPercent;
   return zone().taxPercent!=null?zone().taxPercent:18}
-/* 'GST' in India, 'VAT' across the Gulf — an invoice has to name it correctly. */
+/* 'GST' in India, 'VAT' across the Gulf, 'Sales tax' in the US — an invoice has
+   to name it correctly. */
 function taxLabel(){return (state.payInfo&&state.payInfo.taxLabel)||zone().taxLabel||'GST'}
+/* Qatar and Kuwait have not introduced VAT, and a foreign manufacturer selling
+   into the United States collects no sales tax. Printing "incl. VAT" against a
+   0% rate states something untrue on what a dealer treats as a quotation, so
+   where there is no tax the phrase is simply left off. */
+function inclTax(){const r=gstPct();return r>0?'incl. '+taxLabel():''}
+const inclTaxDot=()=>{const s=inclTax();return s?' · '+s:''};
 function inclGst(amount){const r=gstPct();if(!(r>0))return 0;return Math.round((amount-amount/(1+r/100))*100)/100}
 function toast(msg,err){const t=$('toast');t.textContent=msg;t.className=err?'err on':'on';clearTimeout(t._t);t._t=setTimeout(()=>t.className='',3400)}
 function openModal(id){$(id).classList.add('on')}
@@ -1307,6 +1416,7 @@ function renderHome(){
     :u&&u.status==='pending'?`<div class="notice warn">Your dealer account is pending approval — you can order at MRP meanwhile.</div>`:'';
   $('view-home').innerHTML=`
   ${offerBanner()}
+  ${zoneBar()}
   <div class="hero">
     <div class="rating">⭐ Trusted by dealers &amp; distributors across India</div>
     <h1>Premium AC brackets &amp; heavy-duty appliance trolleys, built to perform</h1>
@@ -1353,7 +1463,7 @@ function railCard(p){
       <button class="wishbtn ${wish.has(p.id)?'on':''}" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist" aria-label="Save to wishlist">
       <svg viewBox="0 0 24 24" fill="${wish.has(p.id)?'currentColor':'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-7-9.4A4.1 4.1 0 0 1 12 7a4.1 4.1 0 0 1 7 3.6C19 15.4 12 20 12 20z"/></svg></button></div>
     <div class="pbody"><div class="pname" style="font-size:12.5px">${esc(p.name)}</div>
-      <div>${price}</div><div class="plabel">incl. ${taxLabel()}</div>
+      <div>${price}</div><div class="plabel">${inclTax()}</div>
       <div class="addrow"><button class="addbtn">View details ›</button></div></div></div>`;
 }
 
@@ -1374,6 +1484,7 @@ function renderShop(){
       <h2 style="font-size:18px;color:var(--navy)">${esc(title)}</h2>
       <div class="hint" style="margin:0">${count} product${count>1?'s':''}</div>
     </div>
+    ${zoneBar()}
     ${notice}
     <div class="grid" id="shopGrid"></div>`;
   renderShopGrid();
@@ -1385,8 +1496,8 @@ function renderShopGrid(){
     const hasDealer=p.dealer!==undefined;
     const save=hasDealer?Math.round((1-p.dealer/p.mrp)*100):0;
     const priceHtml=hasDealer
-      ?`<span class="mrp-strike">${fmt(p.mrp)}</span><span class="dealerprice">${fmt(p.dealer)}</span><span class="save">${save}% OFF</span><div class="plabel">Dealer price · per unit · incl. ${taxLabel()}</div>`
-      :`<span class="mrp-only">${fmt(p.mrp)}</span><div class="plabel">MRP · per unit · incl. ${taxLabel()}</div>`;
+      ?`<span class="mrp-strike">${fmt(p.mrp)}</span><span class="dealerprice">${fmt(p.dealer)}</span><span class="save">${save}% OFF</span><div class="plabel">Dealer price · per unit${inclTaxDot()}</div>`
+      :`<span class="mrp-only">${fmt(p.mrp)}</span><div class="plabel">MRP · per unit${inclTaxDot()}</div>`;
     const hasOpts=!!(p.options&&(p.options.packs||p.options.sizes));
     return `<div class="pcard"><div class="pimg" onclick="openProduct('${p.id}')" style="cursor:pointer">${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:boxArt(56,p.cat)}<button class="wishbtn ${wish.has(p.id)?'on':''}" onclick="event.stopPropagation();toggleWish('${p.id}')" title="Save to wishlist" aria-label="Save to wishlist">
       <svg viewBox="0 0 24 24" fill="${wish.has(p.id)?'currentColor':'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-7-9.4A4.1 4.1 0 0 1 12 7a4.1 4.1 0 0 1 7 3.6C19 15.4 12 20 12 20z"/></svg></button></div><div class="pbody">
@@ -1438,8 +1549,8 @@ function ppPrice(pid){
   const p=state.products.find(x=>x.id===pid);if(!p||!$('pp-price'))return;
   const pk=ppSelPack(p);const add=pk?pk.add||0:0;
   $('pp-price').innerHTML=p.dealer!==undefined
-    ?`<span class="mrp-strike">${fmt(p.mrp+add)}</span><span class="dealerprice">${fmt(p.dealer+add)}</span> <span class="plabel">per pc · incl. ${taxLabel()}${add?` · includes +${fmt(add)} box packing`:''}</span>`
-    :`<span class="mrp-only">${fmt(p.mrp+add)}</span> <span class="plabel">MRP · per pc · incl. ${taxLabel()}${add?` · includes +${fmt(add)} box packing`:''}</span>`;
+    ?`<span class="mrp-strike">${fmt(p.mrp+add)}</span><span class="dealerprice">${fmt(p.dealer+add)}</span> <span class="plabel">per pc${inclTaxDot()}${add?` · includes +${fmt(add)} box packing`:''}</span>`
+    :`<span class="mrp-only">${fmt(p.mrp+add)}</span> <span class="plabel">MRP · per pc${inclTaxDot()}${add?` · includes +${fmt(add)} box packing`:''}</span>`;
 }
 function ppAdd(pid){
   const p=state.products.find(x=>x.id===pid);if(!p)return;
@@ -1487,7 +1598,7 @@ function renderCart(){
       <button class="rm" onclick="rmItemI(${i})" title="Remove"></button></div>`;}).join('');
   const sub=cartSubtotal(),gst=inclGst(sub);
   foot.innerHTML=`<div class="trow"><span>Pricing tier</span><b>${isDealer()?'Dealer (wholesale)':'MRP'}</b></div>
-    <div class="trow big"><span>Total</span><span>${fmt(sub)} <span class="gsttag">incl. ${taxLabel()}</span></span></div>
+    <div class="trow big"><span>Total</span><span>${fmt(sub)} ${inclTax()?`<span class="gsttag">${inclTax()}</span>`:""}</span></div>
     <div class="trow"><span class="gsttag">Includes ${taxLabel()} ${gstPct()}%</span><span class="gsttag">${fmt(gst)}</span></div>
     <button class="wide" onclick="openCheckout()">Checkout</button>`;
 }
@@ -1515,7 +1626,7 @@ function openCheckout(){
     <div class="tblwrap" style="box-shadow:none;border:1px solid var(--line)"><table><thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="trow" style="margin-top:10px"><span>Taxable value</span><span>${fmt(Math.round((sub-gst)*100)/100)}</span></div>
     <div class="trow"><span>${taxLabel()} ${gstPct()}% (included)</span><span>${fmt(gst)}</span></div>
-    <div class="trow big"><span>Order total (incl. ${taxLabel()})</span><span>${fmt(total)}</span></div>
+    <div class="trow big"><span>Order total${inclTax()?` (${inclTax()})`:""}</span><span>${fmt(total)}</span></div>
     ${contact}
     <label>Dispatch through (transport)</label>
     <select id="co-transport">
@@ -1538,13 +1649,19 @@ let checkoutBackTo='shop';
 function closeCheckout(){showView(checkoutBackTo||'shop');renderHeader()}
 async function placeOrder(){
   const u=currentUser();const err=$('co-err');err.style.display='none';
-  const body={items:cart.map(c=>({pid:c.pid,qty:c.qty,pack:c.pack||'',size:c.size||''})),addr:$('co-addr').value.trim(),notes:$('co-notes').value.trim(),transport:$('co-transport')?$('co-transport').value:''};
+  const body={items:cart.map(c=>({pid:c.pid,qty:c.qty,pack:c.pack||'',size:c.size||''})),addr:$('co-addr').value.trim(),notes:$('co-notes').value.trim(),transport:$('co-transport')?$('co-transport').value:'',
+    /* book the order in the currency they were actually looking at */
+    currency:(state.zone&&state.zone.quotedIn)||curPref()||''};
+  if(!u)body.zone=guestZone();
   if(!u){body.name=$('co-name').value.trim();body.phone=$('co-phone').value.trim();body.email=$('co-email').value.trim();
     if(!body.name||!body.phone||!body.addr){err.textContent='Fill name, mobile number and delivery address.';err.style.display='block';return}}
   if(!body.addr){err.textContent='Delivery address is required.';err.style.display='block';return}
   const btn=$('placeBtn');btn.disabled=true;btn.textContent='Placing order…';
   try{
     const d=await api('/orders','POST',body);
+    /* a guest order comes back with its own key — keep it before anything else,
+       or the payment screen cannot reach the order it just created */
+    if(d.order&&d.order.accessToken)saveGuestOrderToken(d.order.id,d.order.accessToken);
     cart=[];saveCart();renderNav();showView(checkoutBackTo||'shop');
     openPayment(d.order,true);
   }catch(e){err.textContent=e.message;err.style.display='block';btn.disabled=false;btn.textContent='Place order → payment'}
@@ -2441,10 +2558,43 @@ async function renderAdmin(tab){
    converted at and the tax charged on top, so opening a new market is a matter
    of setting two numbers rather than re-entering the whole catalogue. */
 async function renderZones(){
-  const zs=await api('/admin/zones');
+  const d=await api('/admin/zones');
+  const zs=d.zones, fx=d.fx;
   const body=$('adminBody');
-  const sample=(state.products&&state.products.length)?null:null;
+  const stale=fx.lastOk&&(Date.now()-new Date(fx.lastOk).getTime())>36*60*60*1000;
+  const failed=/^failed/.test(fx.lastStatus||'');
   body.innerHTML=`
+    <div class="cardbox">
+      <h3>Daily exchange rates</h3>
+      <div class="notice ${fx.auto?(failed||stale?'info':'ok'):'info'}" style="margin-bottom:10px">
+        ${fx.auto
+          ? `Rates are updated <b>automatically once a day</b> from the live market.
+             Last successful update: <b>${agoText(fx.lastOk)}</b>${fx.source?' via '+esc(fx.source):''}.
+             ${failed?'<br>The last attempt did not get through ('+esc(fx.lastStatus)+') — prices are still using the last good rate.':''}
+             ${stale&&!failed?'<br>That is longer ago than expected. Press Update now to check.':''}`
+          : `Automatic updates are <b>switched off</b>. Prices in every country outside India stay at
+             whatever rate is set below until you change it — which drifts away from the real rate as
+             the rupee moves.`}
+      </div>
+      <label class="agree" style="margin:6px 0 10px"><input type="checkbox" id="fx-auto" ${fx.auto?'checked':''}>
+        <span>Follow the live market rate automatically</span></label>
+      <div class="frow" style="margin-top:8px">
+        <div><label>Your margin over the market rate (%)</label>
+          <input id="fx-margin" type="number" step="0.25" min="0" max="25" value="${fx.margin}">
+          <div class="hint">Money coming back from the Gulf loses a little at the bank. This quotes
+            dealers a rate that much better for you, so the rupee amount you actually receive is the
+            one on the price list. 0 quotes at the exact market rate.</div></div>
+        <div><label>Don't move a rate by more than (%)</label>
+          <input id="fx-guard" type="number" step="1" min="1" max="100" value="${fx.guard}">
+          <div class="hint">A safety catch. If a rate ever comes back further out than this, prices are
+            left alone and you get a notification instead of the whole catalogue repricing itself.</div></div>
+      </div>
+      <div style="margin-top:10px">
+        <button class="smallbtn gr-btn" onclick="saveFxSettings()">Save rate settings</button>
+        <button class="smallbtn ok-btn" id="fxNowBtn" onclick="refreshFxNow()">↻ Update rates now</button>
+        <button class="smallbtn gr-btn" onclick="showFxHistory()">Rate history</button>
+      </div>
+    </div>
     <div class="cardbox">
       <h3>Zones, currencies and tax</h3>
       <div class="hint" style="margin-bottom:12px">
@@ -2456,13 +2606,17 @@ async function renderZones(){
       <table class="otable" id="zoneTable">
         <thead><tr>
           <th style="text-align:left">Country</th><th>Currency</th>
-          <th>Rate per ₹1</th><th>Tax %</th><th>Dealers</th><th>Open</th>
+          <th>Rate per ₹1</th><th>Auto</th><th>Tax %</th><th>Dealers</th><th>Open</th>
         </tr></thead>
         <tbody>${zs.map(z=>`
           <tr data-code="${z.code}">
             <td style="text-align:left"><b>${esc(z.country)}</b><br><span class="oitems">${esc(z.taxLabel)} · +${esc(z.dial)}</span></td>
             <td><b>${esc(z.currency)}</b></td>
-            <td><input class="z-fx" type="number" step="0.00001" min="0" value="${z.fx}" style="width:104px;text-align:right"></td>
+            <td><input class="z-fx" type="number" step="0.00000001" min="0" value="${z.fx}" style="width:112px;text-align:right">
+              ${z.code!=='IN'&&z.fxBase?`<br><span class="oitems">market ${(+z.fxBase).toFixed(6)}<br>${esc(agoText(z.fxUpdatedAt))}</span>`:''}</td>
+            <td>${z.code==='IN'
+                 ? '<span class="oitems">base</span>'
+                 : `<input class="z-auto" type="checkbox" ${z.fxAuto?'checked':''} style="width:auto" title="Follow the daily market rate">`}</td>
             <td><input class="z-tax" type="number" step="0.5" min="0" max="100" value="${z.taxPercent}" style="width:74px;text-align:right"></td>
             <td>${z.dealers}${z.pending?`<br><span class="oitems">${z.pending} pending</span>`:''}</td>
             <td>${z.code==='IN'
@@ -2472,6 +2626,8 @@ async function renderZones(){
       </table></div>
       <div class="hint" style="margin-top:10px">
         India is the base currency, so its rate is fixed at 1 and it cannot be closed.
+        Untick <b>Auto</b> to hold a country at a rate you set by hand — useful if you have agreed a
+        fixed rate with a dealer for a season. Typing a rate over an automatic one pins it for you.
         Turning a country off hides it from the sign-up form; dealers already registered there keep their accounts.
       </div>
       <button class="wide blue" style="max-width:260px;margin-top:14px" onclick="saveZones()">Save zones</button>
@@ -2482,6 +2638,72 @@ async function renderZones(){
     </div>`;
   paintZonePreview(zs);
   body.querySelectorAll('.z-fx,.z-tax').forEach(i=>i.addEventListener('input',()=>paintZonePreview(zs)));
+}
+async function saveFxSettings(){
+  try{
+    await api('/admin/fx','PUT',{
+      auto:$('fx-auto').checked,
+      margin:parseFloat($('fx-margin').value),
+      guard:parseFloat($('fx-guard').value)
+    });
+    toast('Rate settings saved');
+    renderAdmin('zones');
+  }catch(e){toast(e.message,1)}
+}
+async function refreshFxNow(accept){
+  const b=$('fxNowBtn'); if(b){b.disabled=true;b.textContent='Checking the market…'}
+  try{
+    const r=await api('/admin/fx/refresh','POST',accept?{accept:true}:undefined);
+    if(!r.ok){
+      toast('Could not reach the rate service: '+(r.status||'unknown'),1);
+    }else if(r.held&&r.held.length){
+      /* The guard stopped something. Show the actual numbers and let the admin
+         decide — never push a jump like this through on its own. */
+      const limit=$('fx-guard')?$('fx-guard').value:'';
+      genModal('A rate moved further than expected',
+        `<div class="notice warn">These are bigger jumps than your ${limit?esc(limit)+'% ':''}safety limit allows,
+           so prices have been left exactly as they were.</div>
+         <div style="overflow-x:auto"><table class="otable">
+           <thead><tr><th style="text-align:left">Country</th><th>Now</th><th>Market says</th><th>Move</th></tr></thead>
+           <tbody>${r.held.map(h=>`<tr>
+             <td style="text-align:left"><b>${esc(h.country)}</b> <span class="oitems">${esc(h.currency)}</span></td>
+             <td>${(+h.current).toFixed(6)}</td>
+             <td><b>${(+h.proposed).toFixed(6)}</b></td>
+             <td style="color:var(--red)"><b>${h.movedPercent}%</b></td></tr>`).join('')}</tbody>
+         </table></div>
+         <div class="hint" style="margin:10px 0">If that looks right, accept it and dealer prices in those
+           countries change straight away. If it looks wrong, leave it — prices carry on at the current rate
+           and tomorrow's check will try again.</div>
+         <button class="wide blue" onclick="closeModal('modal-gen');refreshFxNow(true)">Accept these rates</button>
+         <button class="wide ghost" onclick="closeModal('modal-gen')">Leave them as they are</button>`);
+    }else{
+      toast(r.updated?('Rates updated — '+r.updated+' currenc'+(r.updated===1?'y':'ies')+' changed')
+                     :'Rates checked — nothing has moved');
+    }
+    await refreshZones();
+    if(state.payInfo)state.payInfo=await api('/pay-info'+zoneQuery());
+    await refreshProducts();
+    renderAdmin('zones');
+  }catch(e){toast(e.message,1);if(b){b.disabled=false;b.textContent='↻ Update rates now'}}
+}
+async function showFxHistory(){
+  try{
+    const rows=await api('/admin/fx/history');
+    const body=rows.length?rows.map(r=>`<tr>
+        <td style="text-align:left">${esc(r.code)}</td>
+        <td>${r.previous!=null?(+r.previous).toFixed(6):'—'} → <b>${(+r.rate).toFixed(6)}</b></td>
+        <td>${r.base!=null?(+r.base).toFixed(6):'<span class="oitems">by hand</span>'}</td>
+        <td><span class="oitems">${esc(r.source||'')}${r.note?' · '+esc(r.note):''}</span></td>
+        <td><span class="oitems">${new Date(r.at).toLocaleString('en-IN')}</span></td>
+      </tr>`).join('')
+      :'<tr><td colspan="5" style="text-align:center">No rate changes recorded yet.</td></tr>';
+    genModal('Exchange rate history',
+      `<div class="hint" style="margin-bottom:8px">Every change, automatic or by hand. Orders keep the
+        rate they were placed at, so none of these change an order that already exists.</div>
+       <div style="overflow-x:auto"><table class="otable">
+       <thead><tr><th style="text-align:left">Zone</th><th>Rate per ₹1</th><th>Market</th><th>Source</th><th>When</th></tr></thead>
+       <tbody>${body}</tbody></table></div>`);
+  }catch(e){toast(e.message,1)}
 }
 /* A worked example, so the rate is not an abstract number. */
 function paintZonePreview(zs){
@@ -2503,13 +2725,16 @@ async function saveZones(){
     code:tr.dataset.code,
     fx:parseFloat(tr.querySelector('.z-fx').value),
     taxPercent:parseFloat(tr.querySelector('.z-tax').value),
-    enabled:tr.querySelector('.z-on')?tr.querySelector('.z-on').checked:true
+    enabled:tr.querySelector('.z-on')?tr.querySelector('.z-on').checked:true,
+    ...(tr.querySelector('.z-auto')?{fxAuto:tr.querySelector('.z-auto').checked}:{})
   }));
   const bad=zones.find(z=>!isFinite(z.fx)||z.fx<=0||!isFinite(z.taxPercent)||z.taxPercent<0||z.taxPercent>100);
   if(bad){toast('Check the rate and tax for '+bad.code,1);return}
   try{
-    await api('/admin/zones','POST',{zones});
-    toast('Zones saved — new orders use these rates');
+    const r=await api('/admin/zones','POST',{zones});
+    /* the server tells us when editing a rate has taken a zone off automatic */
+    if(r.notes&&r.notes.length)genModal('Saved',r.notes.map(n=>`<div class="notice info">${esc(n)}</div>`).join(''));
+    else toast('Zones saved — new orders use these rates');
     await refreshZones();
     if(state.payInfo)state.payInfo=await api('/pay-info'+zoneQuery());
     renderAdmin('zones');
@@ -3336,6 +3561,11 @@ async function renderSettings(){
       <div><label>Send on the due date itself</label><select id="st-remondue"><option value="1" ${String(s.remOnDue)!=='0'?'selected':''}>Yes</option><option value="0" ${String(s.remOnDue)==='0'?'selected':''}>No</option></select></div>
       <div><label>Time of day (0–23)</label><input id="st-remhour" type="number" min="0" max="23" value="${esc(s.remHour)}"></div>
     </div>
+    <div><label>Your timezone</label>
+      <select id="st-remtz">${['Asia/Kolkata','Asia/Dubai','Asia/Riyadh','Asia/Muscat','Asia/Qatar','Asia/Kuwait','Asia/Bahrain','America/New_York','America/Chicago','America/Los_Angeles','UTC']
+        .map(z=>`<option value="${z}" ${s.remTz===z?'selected':''}>${z.replace(/^(Asia|America)\//,'').replace(/_/g,' ')}</option>`).join('')}</select>
+      <div class="hint">The hosting runs on UTC. This is what makes "10 o'clock" mean ten o'clock where you are.</div>
+    </div>
     <label>Message template</label>
     <textarea id="st-remtpl" rows="4">${esc(s.remTemplate)}</textarea>
     <div class="hint">Placeholders: <b>{name}</b> {order} {amount} {date} {dueDate} {due}</div>
@@ -3348,11 +3578,13 @@ async function renderSettings(){
     <input id="st-gstkey" type="password" placeholder="${s.gstApiKeySet?'••••••••••••':'Paste key secret'}">
   </div>
   <div class="cardbox"><h3>Admin login</h3>
+    ${s.defaultAdminPassword?`<div class="notice" style="margin-bottom:8px;background:#fdecec;border:1px solid #f0c0c0;color:#8a1c1c">
+      <b>Change this password now.</b> The account is still on the password the app shipped with, which is printed in the setup notes — anyone who has seen them can sign in here and read every dealer and order. Set a new one below before sharing the link.</div>`:''}
     <div class="frow">
       <div><label>Admin email</label><input id="st-aemail" value="${esc(s.adminEmail)}"></div>
       <div><label>New admin password (leave blank to keep current)</label><input id="st-apass" type="password" placeholder="••••••••"></div>
     </div>
-    <div class="hint">Share only with your backend/approval team.</div>
+    <div class="hint">At least 10 characters. Share only with your backend/approval team. Changing it signs out the other admin devices.</div>
   </div>
   <button class="wide blue" style="max-width:260px" onclick="saveSettings()">Save settings</button>
   <div class="cardbox" style="margin-top:16px"><h3>Backup &amp; restore</h3>
@@ -3565,6 +3797,7 @@ async function saveSettings(quiet){
       remBefore:$('st-rembefore').value.trim(),
       remAfter:$('st-remafter').value.trim(),remOnDue:$('st-remondue').value,
       remHour:$('st-remhour').value,remTemplate:$('st-remtpl').value,
+      ...($('st-remtz')?{remTz:$('st-remtz').value}:{}),
       ...($('st-waphone')?{waPhoneId:$('st-waphone').value.trim()}:{}),
       ...($('st-watoken')&&$('st-watoken').value.trim()?{waToken:$('st-watoken').value.trim()}:{}),
       ...($('st-smskey')&&$('st-smskey').value.trim()?{smsKey:$('st-smskey').value.trim()}:{}),
