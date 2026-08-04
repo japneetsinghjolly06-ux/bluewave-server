@@ -298,10 +298,23 @@ const setSetting = (k, v) => db.prepare('INSERT INTO settings(key,value) VALUES(
    fx        starting rate: how much of the local currency 1 INR buys.
              Product prices are held in INR and converted with this. The admin
              sets the real rate in Admin -> Zones; these are only seeds.
-   taxPercent  standard rate as at August 2026. Qatar and Kuwait have not
-             introduced VAT (Kuwait has ruled it out before 2028, Qatar is
-             expected to follow its e-invoicing law), so they sit at 0 and the
-             admin can switch them on the day it lands.
+   taxPercent  what HPMP charges the buyer on the invoice.
+
+             India is 18% GST, charged and collected here.
+
+             Everywhere else is 0. Goods leaving India are exported zero-rated:
+             HPMP does not charge the buyer's VAT or sales tax, and the importer
+             settles it with their own customs authority on arrival. Quoting a
+             Gulf dealer a price "inclusive of VAT" therefore described a tax
+             that was never being collected, and a dealer could reasonably have
+             read it as meaning nothing further fell due at their end.
+
+             Because prices here are tax-inclusive (total = the listed price,
+             tax is the portion within it), this rate never changes what anyone
+             pays — only what the order declares. An admin who does become
+             registered in a Gulf state can set the real rate in Admin -> Zones
+             and it starts appearing again.
+
    Licence formats are deliberately lenient — turning away a real dealer over
    a format guess is worse than the admin eyeballing the number at approval.
    ========================================================================== */
@@ -320,7 +333,7 @@ const ZONES = {
     code: 'AE', country: 'United Arab Emirates', dial: '971', phoneLen: 9,
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'AED', symbol: 'AED', locale: 'en-AE', decimals: 2, fx: 0.0384,
-    taxLabel: 'VAT', taxPercent: 5,
+    taxLabel: 'VAT', taxPercent: 0,
     taxId: { label: 'VAT TRN', placeholder: '100123456700003', hint: '15-digit Tax Registration Number',
              re: '^[0-9]{15}$', upper: false, required: true },
     licence: { label: 'Trade licence number', placeholder: 'e.g. CN-1234567', hint: 'as printed on your DED trade licence',
@@ -332,7 +345,7 @@ const ZONES = {
     code: 'SA', country: 'Saudi Arabia', dial: '966', phoneLen: 9,
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'SAR', symbol: 'SAR', locale: 'en-SA', decimals: 2, fx: 0.0392,
-    taxLabel: 'VAT', taxPercent: 15,
+    taxLabel: 'VAT', taxPercent: 0,
     taxId: { label: 'VAT registration number', placeholder: '300123456700003', hint: '15 digits, starts and ends with 3',
              re: '^3[0-9]{13}3$', upper: false, required: true },
     licence: { label: 'Commercial Registration (CR) number', placeholder: '1010123456', hint: '10-digit CR number',
@@ -344,7 +357,7 @@ const ZONES = {
     code: 'OM', country: 'Oman', dial: '968', phoneLen: 8,
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'OMR', symbol: 'OMR', locale: 'en-OM', decimals: 3, fx: 0.00402,
-    taxLabel: 'VAT', taxPercent: 5,
+    taxLabel: 'VAT', taxPercent: 0,
     taxId: { label: 'VAT identification number', placeholder: 'OM1100000000', hint: 'OM followed by 10 digits',
              re: '^OM[0-9]{10}$', upper: true, required: true },
     licence: { label: 'Commercial Registration (CR) number', placeholder: '1234567', hint: '7 to 10 digits',
@@ -380,7 +393,7 @@ const ZONES = {
     code: 'BH', country: 'Bahrain', dial: '973', phoneLen: 8,
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'BHD', symbol: 'BHD', locale: 'en-BH', decimals: 3, fx: 0.00393,
-    taxLabel: 'VAT', taxPercent: 10,
+    taxLabel: 'VAT', taxPercent: 0,
     taxId: { label: 'VAT account number', placeholder: '200012345600002', hint: '15-digit VAT account number',
              re: '^[0-9]{15}$', upper: false, required: true },
     licence: { label: 'Commercial Registration (CR) number', placeholder: '12345-1', hint: 'CR number as issued by MOIC',
@@ -417,6 +430,20 @@ for (const z of Object.values(ZONES)) {
   db.prepare('INSERT OR IGNORE INTO zones(code,fx,tax_percent,enabled,updated_at) VALUES(?,?,?,1,?)')
     .run(z.code, z.fx, z.taxPercent, now());
 }
+/* One-time correction for databases seeded before export sales were made
+ * zero-rated. Only a zone still sitting on the exact rate it was seeded with is
+ * touched: if the admin has since set their own figure, that is a deliberate
+ * choice and it stands. No price moves either way — these prices are
+ * tax-inclusive, so the rate governs only the tax line an order declares. */
+if (!getSetting('exportZeroRated')) {
+  const SEEDED = { AE: 5, SA: 15, OM: 5, BH: 10 };
+  for (const [code, was] of Object.entries(SEEDED)) {
+    try { db.prepare('UPDATE zones SET tax_percent=0, updated_at=? WHERE code=? AND tax_percent=?')
+      .run(new Date().toISOString(), code, was); } catch (e) { /* zone row not there yet */ }
+  }
+  setSetting('exportZeroRated', '1');
+}
+
 /* Whether this zone follows the daily live rate, the raw mid-market rate it
  * came from, and where it came from — kept apart from `fx` so the admin can
  * always see what was quoted versus what the market was doing. */
@@ -937,7 +964,7 @@ app.get('/api/products', (req, res) => {
     offer: dealer ? pubOffer(offer) : null,
     products: rows.map(p => ({
       id: p.id, name: p.name, cat: p.cat, emoji: p.emoji, image: p.image || '', mrp: c(p.mrp), moq: p.moq,
-      descr: p.descr || '', packing: p.packing || '',
+      descr: p.descr || '', packing: packingForZone(p.packing || '', z),
       options: p.options ? scaleOptions(p.options, z) : null,
       ...(dealer ? {
         dealer: c(rateFor(req.user, p, offer)),
@@ -949,8 +976,53 @@ app.get('/api/products', (req, res) => {
 
 /* Pack options carry a per-piece surcharge in INR ("+₹4 per set"), so it has to
  * travel through the same conversion as the price it is added to. */
+/* ---------- packing differs by market ----------
+ * India ships either way. A gunny bag is cheap, universal and what the local
+ * trade expects, and the material is on a lorry for a day.
+ *
+ * An export consignment is not: it is handled several more times, sits in a
+ * container, and passes through a customs shed. A bag arrives scuffed and the
+ * powder coating is the whole point of the product. So everything leaving
+ * India goes in cartons only — six sets to a master box, the size that stacks
+ * and palletises cleanly.
+ *
+ * The rule lives here rather than in each product row, so it holds for any
+ * product added later without someone having to remember it.
+ */
+const EXPORT_MASTER_QTY = 6;
+const isExportZone = z => !z || z.code !== DEFAULT_ZONE;
+
+/* Box only, at the export master quantity. India is returned untouched.
+ *
+ * The carton costs nothing extra abroad. In India the +₹4 / +₹6 buys the dealer
+ * an upgrade from a gunny bag, so it is a real charge for a real choice. Abroad
+ * the carton IS the packing — there is nothing to upgrade from — so an export
+ * price is the rupee price converted, and nothing else. */
+function packsForZone(o, z) {
+  if (!o || !Array.isArray(o.packs) || !isExportZone(z)) return o;
+  const box = o.packs.find(p => p.id === 'box') || o.packs[o.packs.length - 1];
+  if (!box) return { ...o, packs: [] };
+  return { ...o, packs: [{ ...box, master: EXPORT_MASTER_QTY + ' pcs per master box', add: 0 }] };
+}
+
+/* The prose beside the choice has to say the same thing. The opening line
+ * describes what one set contains and is kept as written — including anything
+ * the admin has edited; only the per-method lines are replaced. */
+function packingForZone(text, z) {
+  if (!isExportZone(z) || !text) return text || '';
+  const kept = String(text).split('\n')
+    .filter(l => !/^\s*(gunny bag|box)\s+packing\s*:/i.test(l));
+  return kept.concat(
+    'Export packing: cartons only — ' + EXPORT_MASTER_QTY +
+    ' sets per master box, 5-ply corrugated, strapped and palletised. ' +
+    'Gunny bag packing is not offered outside India: it does not survive container handling well ' +
+    'enough to protect the powder coating.'
+  ).join('\n');
+}
+
 function scaleOptions(json, z) {
   let o; try { o = JSON.parse(json); } catch (e) { return null; }
+  o = packsForZone(o, z);
   if (o && Array.isArray(o.packs)) o.packs = o.packs.map(pk => ({ ...pk, add: toZone(pk.add || 0, z) }));
   return o;
 }
@@ -1668,8 +1740,12 @@ app.post('/api/orders', (req, res) => {
     if (!p || !qty || qty < 1) return res.status(400).json({ error: 'Invalid item in cart.' });
     let rate = toZone(dealer ? rateFor(req.user, p) : p.mrp, z);
     let label = p.name;
-    const opts = p.options ? JSON.parse(p.options) : null;
-    if (opts && opts.packs) {
+    /* Filtered for the market first, so an export order cannot ask for gunny
+       packing — whether from an old app build, a stale cart or a hand-made
+       request. Outside India the only entry left is the carton, and that is
+       what gets priced and printed on the dispatch slip. */
+    const opts = p.options ? packsForZone(JSON.parse(p.options), z) : null;
+    if (opts && opts.packs && opts.packs.length) {
       const pk = opts.packs.find(x => x.id === String(it.pack || 'gunny')) || opts.packs[0];
       const add = toZone(pk.add || 0, z);
       rate = Math.round((rate + add) * Math.pow(10, z.decimals)) / Math.pow(10, z.decimals);

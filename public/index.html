@@ -932,7 +932,12 @@ function taxLabel(){return (state.payInfo&&state.payInfo.taxLabel)||zone().taxLa
    into the United States collects no sales tax. Printing "incl. VAT" against a
    0% rate states something untrue on what a dealer treats as a quotation, so
    where there is no tax the phrase is simply left off. */
-function inclTax(){const r=gstPct();return r>0?'incl. '+taxLabel():''}
+/* Only the Indian price carries a tax phrase. Goods leaving India for the Gulf
+   or the US are exported zero-rated — HPMP does not charge the buyer's VAT, the
+   importer settles it at customs — so describing an export quote as "inclusive
+   of VAT" says something that is not true, and a dealer could reasonably read it
+   as meaning no VAT falls due at their end. Export prices are simply prices. */
+function inclTax(){const r=gstPct();return (r>0&&zone().code==='IN')?'incl. '+taxLabel():''}
 const inclTaxDot=()=>{const s=inclTax();return s?' · '+s:''};
 function inclGst(amount){const r=gstPct();if(!(r>0))return 0;return Math.round((amount-amount/(1+r/100))*100)/100}
 function toast(msg,err){const t=$('toast');t.textContent=msg;t.className=err?'err on':'on';clearTimeout(t._t);t._t=setTimeout(()=>t.className='',3400)}
@@ -945,7 +950,10 @@ let cart=[];try{cart=JSON.parse(localStorage.getItem('bw_cart_v3'))||[]}catch(e)
 function saveCart(){localStorage.setItem('bw_cart_v3',JSON.stringify(cart))}
 function packOf(p,packId){return p&&p.options&&p.options.packs?(p.options.packs.find(x=>x.id===packId)||p.options.packs[0]):null}
 function lineRate(c){const p=state.products.find(x=>x.id===c.pid);if(!p)return 0;const pk=packOf(p,c.pack);return priceFor(p)+(pk?pk.add||0:0)}
-function lineLabel(c){const p=state.products.find(x=>x.id===c.pid);if(!p)return '';let l=p.name;const pk=packOf(p,c.pack);if(pk)l+=' · '+(pk.id==='box'?'Box':'Gunny bag');if(c.size)l+=' · '+c.size;return l}
+/* Named from the server's own label rather than guessing "anything that is not
+   box must be gunny" — outside India gunny is not on offer at all, and a cart
+   carried over from a previous zone falls back to whatever IS offered. */
+function lineLabel(c){const p=state.products.find(x=>x.id===c.pid);if(!p)return '';let l=p.name;const pk=packOf(p,c.pack);if(pk)l+=' · '+String(pk.label||'').replace(/\s*packing$/i,'');if(c.size)l+=' · '+c.size;return l}
 let wish=new Set();try{wish=new Set(JSON.parse(localStorage.getItem('bw_wish')||'[]'))}catch(e){}
 function toggleWish(pid){if(wish.has(pid))wish.delete(pid);else wish.add(pid);localStorage.setItem('bw_wish',JSON.stringify([...wish]));if(currentView==='shop')renderShopGrid()}
 /* Line-art marks in place of the old emoji — same idea, drawn properly.
@@ -1525,9 +1533,20 @@ function openProduct(pid){
     <div id="pp-price" style="margin-bottom:6px"></div>
     ${p.descr?`<div class="msub" style="margin-bottom:8px">${esc(p.descr)}</div>`:''}
     ${p.packing?`<div class="regdetail" style="font-size:12.5px"><b>Master packing details</b><br>${esc(p.packing).replace(/\n/g,'<br>')}</div>`:''}`;
-  if(o.packs)html+=`<label>Packing type</label>`+o.packs.map((pk,i)=>`<label style="display:flex;gap:9px;align-items:center;font-weight:400;font-size:13.5px;margin:5px 0;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer">
+  /* Outside India there is only one way material ships, so the single option is
+     stated rather than offered as a choice of one. The hidden input keeps the
+     rest of the page (pricing, add-to-cart) working unchanged. */
+  if(o.packs&&o.packs.length===1){
+    const pk=o.packs[0];
+    html+=`<label>Packing</label>
+      <div style="font-size:13.5px;margin:5px 0;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--soft,#f7f9fb)">
+        <b>${esc(pk.label)}</b><br><span class="hint">${esc(pk.master)}</span></div>
+      <input type="hidden" name="pp-pack" value="${esc(pk.id)}">`;
+  }else if(o.packs&&o.packs.length){
+    html+=`<label>Packing type</label>`+o.packs.map((pk,i)=>`<label style="display:flex;gap:9px;align-items:center;font-weight:400;font-size:13.5px;margin:5px 0;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer">
       <input type="radio" name="pp-pack" value="${pk.id}" ${i===0?'checked':''} style="width:auto" onchange="ppPrice('${p.id}')">
-      <span style="flex:1"><b>${esc(pk.label)}</b><br><span class="hint">${esc(pk.master)}${pk.add?` · +₹${pk.add} per pc`:' · standard price'}</span></span></label>`).join('');
+      <span style="flex:1"><b>${esc(pk.label)}</b><br><span class="hint">${esc(pk.master)}${pk.add?` · +${fmt(pk.add)} per pc`:' · standard price'}</span></span></label>`).join('');
+  }
   if(o.sizes)html+=`<label>Select size</label><select id="pp-size">${o.sizes.map(s=>`<option>${esc(s)}</option>`).join('')}</select>`;
   html+=`<label>Quantity</label><input id="pp-qty" type="number" min="1" value="${dealer?p.moq:1}">
     <button class="wide" style="margin-top:12px" onclick="ppAdd('${p.id}')">Add to cart</button>
@@ -1544,7 +1563,14 @@ function openProduct(pid){
 }
 function closeProduct(){showView(productBackTo||'home');renderHeader()}
 window.addEventListener('popstate',()=>{if(currentView==='product')closeProduct();else if(currentView==='auth')closeAuth();else if(currentView==='checkout')closeCheckout()});
-function ppSelPack(p){if(!(p.options&&p.options.packs))return null;const r=document.querySelector('input[name=pp-pack]:checked');return p.options.packs.find(x=>x.id===(r?r.value:''))||p.options.packs[0]}
+/* Reads the chosen packing. Where only one is offered the input is hidden
+   rather than a radio, so ':checked' never matches it — take its value too. */
+function ppSelPack(p){
+  if(!(p.options&&p.options.packs&&p.options.packs.length))return null;
+  const r=document.querySelector('input[name=pp-pack]:checked')
+        ||document.querySelector('input[type=hidden][name=pp-pack]');
+  return p.options.packs.find(x=>x.id===(r?r.value:''))||p.options.packs[0];
+}
 function ppPrice(pid){
   const p=state.products.find(x=>x.id===pid);if(!p||!$('pp-price'))return;
   const pk=ppSelPack(p);const add=pk?pk.add||0:0;
@@ -1599,7 +1625,7 @@ function renderCart(){
   const sub=cartSubtotal(),gst=inclGst(sub);
   foot.innerHTML=`<div class="trow"><span>Pricing tier</span><b>${isDealer()?'Dealer (wholesale)':'MRP'}</b></div>
     <div class="trow big"><span>Total</span><span>${fmt(sub)} ${inclTax()?`<span class="gsttag">${inclTax()}</span>`:""}</span></div>
-    <div class="trow"><span class="gsttag">Includes ${taxLabel()} ${gstPct()}%</span><span class="gsttag">${fmt(gst)}</span></div>
+    ${inclTax()?`<div class="trow"><span class="gsttag">Includes ${taxLabel()} ${gstPct()}%</span><span class="gsttag">${fmt(gst)}</span></div>`:''}
     <button class="wide" onclick="openCheckout()">Checkout</button>`;
 }
 
@@ -1624,8 +1650,8 @@ function openCheckout(){
     </div>
     <div class="msub">Review your order and confirm. Pay online or by bank transfer next.</div>
     <div class="tblwrap" style="box-shadow:none;border:1px solid var(--line)"><table><thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="trow" style="margin-top:10px"><span>Taxable value</span><span>${fmt(Math.round((sub-gst)*100)/100)}</span></div>
-    <div class="trow"><span>${taxLabel()} ${gstPct()}% (included)</span><span>${fmt(gst)}</span></div>
+    ${inclTax()?`<div class="trow" style="margin-top:10px"><span>Taxable value</span><span>${fmt(Math.round((sub-gst)*100)/100)}</span></div>
+    <div class="trow"><span>${taxLabel()} ${gstPct()}% (included)</span><span>${fmt(gst)}</span></div>`:''}
     <div class="trow big"><span>Order total${inclTax()?` (${inclTax()})`:""}</span><span>${fmt(total)}</span></div>
     ${contact}
     <label>Dispatch through (transport)</label>
