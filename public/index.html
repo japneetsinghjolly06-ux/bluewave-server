@@ -45,6 +45,21 @@ header{position:sticky;top:0;z-index:50;background:#fff;color:var(--brand-dark);
 .logo b{font-size:15px;display:block;line-height:1.1;color:#3a2f8f}
 .logo span{font-size:10.5px;color:var(--mut)}
 .hspace{flex:1}
+/* Country / currency picker, shown to visitors who have not signed in. A
+   dealer's country comes from their account and the admin console is always in
+   rupees, so for them there is nothing to choose and it is not rendered. */
+.hdrzone{display:none}
+.hdrzone.on{display:inline-flex;align-items:center}
+.hdrzone select{appearance:none;-webkit-appearance:none;border:1px solid var(--line);background:#fff
+  url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+  no-repeat right 6px center/14px 14px;
+  border-radius:9px;padding:5px 24px 5px 9px;font-size:12.5px;font-weight:700;color:var(--navy);
+  cursor:pointer;max-width:150px;line-height:1.2}
+.hdrzone select:focus{outline:2px solid var(--blue-lt);outline-offset:1px}
+@media(max-width:420px){
+  .hdrzone select{max-width:96px;padding:5px 22px 5px 7px;font-size:12px}
+  .logo span{display:none}
+}
 .hbtn{background:#fff;border:1px solid var(--line);color:var(--brand-dark);padding:7px 13px;border-radius:9px;font-size:13px;font-weight:600}
 .hbtn.solid{background:var(--accent);border-color:var(--accent);color:#fff}
 .hero .hbtn{background:transparent;border:1px solid rgba(255,255,255,.45);color:#fff}
@@ -438,61 +453,89 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   .sp-stage,.sp-ring circle,.sp-wave,.sp-word,.sp-sweep,.sp-star{animation:none!important;opacity:1;filter:none;stroke-dashoffset:0}
   .sp-sweep,.sp-star{display:none}
 }
-/* ---- printable dispatch slip ----
+/* ---- printable dispatch slip (A5) ----
    Browser printing uses these; the phone apps get the same design as a
-   standalone document from printDocument(), so both routes look identical. */
+   standalone document from printDocument(), so both routes look identical.
+   Screen layout is untouched — #printArea is hidden until a print is asked for. */
 #printArea{display:none}
 @media print{
   body::before,body::after{display:none!important}
   body>*{display:none!important}
   body.printing #printArea{display:block!important}
   body{background:#fff;padding:0;margin:0}
-  @page{size:A4;margin:12mm 11mm}
+#printArea{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;padding:0}
+  @page{size:A5;margin:8mm 7mm}
+  *{box-sizing:border-box}
   #printArea{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
-    color:#101820;font-size:11px;line-height:1.42;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  #printArea *{box-sizing:border-box}
-  .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2.5px solid #0b2a4a;padding-bottom:9px;margin-bottom:11px}
-  .pr-id{display:flex;gap:10px;align-items:center}
-  .pr-logo{width:38px;height:38px;flex:0 0 38px;border-radius:9px;background:#0b2a4a;color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
-  .pr-brand{font-size:15px;font-weight:800;color:#0b2a4a;line-height:1.2}
-  .pr-logo-img{width:52px;height:52px;flex:0 0 52px;object-fit:contain}
+       color:#101820;font-size:8.6px;line-height:1.34;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pr-doc{width:134mm;margin:0 auto}
+
+  /* letterhead */
+  .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+           border-bottom:1.8px solid #0b2a4a;padding-bottom:5px;margin-bottom:6px}
+  .pr-id{display:flex;gap:6px;align-items:flex-start}
+  .pr-logo{width:26px;height:26px;flex:0 0 26px;border-radius:6px;background:#0b2a4a;color:#fff;
+           font-weight:800;font-size:10px;display:flex;align-items:center;justify-content:center}
+  .pr-logo-img{width:30px;height:30px;flex:0 0 30px;object-fit:contain}
   .pr-idtext{min-width:0}
-  .pr-gstin{font-size:9.5px;color:#0b2a4a;margin-top:2px}
-  .pr-tag{font-size:9.5px;color:#5b6b7a}
-  .pr-meta{text-align:right;min-width:190px}
-  .pr-title{font-size:14px;font-weight:800;letter-spacing:1.6px;color:#0b2a4a;margin-bottom:4px}
-  .pr-metatab{margin-left:auto;border-collapse:collapse;font-size:10px}
-  .pr-metatab .k{color:#5b6b7a;padding:1px 8px 1px 0;text-align:right;white-space:nowrap}
+  .pr-brand{font-size:11px;font-weight:800;color:#0b2a4a;line-height:1.15}
+  .pr-tag{font-size:7.4px;color:#5b6b7a;line-height:1.3}
+  .pr-gstin{font-size:7.8px;color:#0b2a4a;margin-top:1px}
+  .pr-meta{text-align:right;min-width:128px}
+  .pr-title{font-size:11px;font-weight:800;letter-spacing:1.2px;color:#0b2a4a;margin-bottom:2px}
+  .pr-metatab{margin-left:auto;border-collapse:collapse;font-size:7.8px}
+  .pr-metatab .k{color:#5b6b7a;padding:0 6px 0 0;text-align:right;white-space:nowrap}
   .pr-metatab .v{text-align:right;white-space:nowrap}
-  .pr-no{font-size:12.5px;letter-spacing:.4px}
-  .pr-panels{display:flex;gap:9px;margin-bottom:10px}
-  .pr-panel{flex:1;border:1px solid #cdd8e3;border-radius:5px;padding:7px 9px;min-width:0}
-  .pr-ph{font-size:8.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#5b6b7a;display:block;margin-bottom:3px}
-  .pr-name{font-weight:800;font-size:12px;color:#0b2a4a}
-  .pr-attn{font-size:10px;color:#33414f}
-  .pr-addr{font-size:10px;color:#33414f;margin:2px 0 4px;white-space:pre-line}
-  .pr-kv{border-collapse:collapse;width:100%;font-size:10px}
-  .pr-kv .k{color:#5b6b7a;padding:1px 8px 1px 0;white-space:nowrap;vertical-align:top;width:1%}
+  .pr-no{font-size:10px;letter-spacing:.3px}
+
+  /* consignee / dispatch */
+  .pr-panels{display:flex;gap:6px;margin-bottom:6px}
+  .pr-panel{flex:1;border:1px solid #cdd8e3;border-radius:4px;padding:5px 6px;min-width:0}
+  .pr-ph{font-size:6.8px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:#5b6b7a;
+         display:block;margin-bottom:2px}
+  .pr-name{font-weight:800;font-size:9.4px;color:#0b2a4a;line-height:1.2}
+  .pr-attn{font-size:7.8px;color:#33414f}
+  .pr-addr{font-size:7.8px;color:#33414f;margin:1px 0 2px;white-space:pre-line}
+  .pr-kv{border-collapse:collapse;width:100%;font-size:7.8px}
+  .pr-kv .k{color:#5b6b7a;padding:0 6px 0 0;white-space:nowrap;vertical-align:top;width:1%}
   .pr-kv .v{word-break:break-word}
-  .pr-items{width:100%;border-collapse:collapse;margin-bottom:9px}
-  .pr-items th{background:#0b2a4a;color:#fff;font-size:9px;letter-spacing:.6px;text-transform:uppercase;padding:5px 6px;text-align:left;font-weight:700}
-  .pr-items td{border-bottom:1px solid #dde5ed;padding:5px 6px;vertical-align:top;font-size:10.5px}
+
+  /* the two figures the slip exists to communicate */
+  .pr-band{display:flex;gap:6px;margin-bottom:6px}
+  .pr-bandcell{flex:1;border:1.4px solid #0b2a4a;border-radius:4px;padding:4px 6px;text-align:center;
+               background:#f2f6fa}
+  .pr-bandlabel{font-size:6.8px;font-weight:800;letter-spacing:1px;color:#5b6b7a}
+  .pr-bandfig{font-size:19px;font-weight:800;color:#0b2a4a;line-height:1.1}
+  .pr-bandnote{background:#fff;border-color:#cdd8e3}
+  .pr-bandnote .pr-bandfig{font-size:13px;color:#33414f}
+
+  /* items — no rate, no amount, no tax: this sheet carries no money */
+  .pr-items{width:100%;border-collapse:collapse;margin-bottom:6px;table-layout:fixed}
+  .pr-items th{background:#0b2a4a;color:#fff;font-size:7px;letter-spacing:.5px;text-transform:uppercase;
+               padding:3px 4px;text-align:left;font-weight:700}
+  .pr-items td{border-bottom:1px solid #dde5ed;padding:3px 4px;vertical-align:top;font-size:8.4px;
+               word-wrap:break-word}
   .pr-items tbody tr:nth-child(even) td{background:#f6f9fc}
-  .pr-items .r{text-align:right}
   .pr-items .c{text-align:center}
-  .pr-sub{font-size:9px;color:#6b7a89;margin-top:1px}
-  .pr-sum td{border-top:1px solid #cdd8e3;border-bottom:0;padding-top:5px}
-  .pr-total td{border-top:2px solid #0b2a4a;border-bottom:0;font-weight:800;font-size:12.5px;color:#0b2a4a;padding-top:6px}
+  .pr-items .r{text-align:right}
+  .pr-items td.pr-big{font-size:12.5px;font-weight:800;color:#0b2a4a;letter-spacing:.2px}
+  .pr-sub{font-size:7px;color:#6b7a89;margin-top:0}
+  .pr-total td{border-top:1.6px solid #0b2a4a;border-bottom:0;font-weight:800;font-size:10.5px;
+               color:#0b2a4a;padding-top:4px}
+  /* a long order runs onto a second sheet — repeat the header, never split a row */
   #printArea thead{display:table-header-group}
   #printArea tfoot{display:table-row-group}
   #printArea tr{page-break-inside:avoid}
-  .pr-words{border:1px solid #cdd8e3;border-left:3px solid #0b2a4a;border-radius:4px;padding:6px 9px;margin-bottom:10px;font-size:10.5px;font-weight:600;color:#0b2a4a}
-  .pr-notes{font-size:10px;color:#33414f;white-space:pre-line}
-  .pr-decl{font-size:9px;color:#5b6b7a;border-top:1px dashed #cdd8e3;padding-top:6px;margin:10px 0 0}
-  .pr-sign{display:flex;justify-content:space-between;gap:12px;margin-top:26px;font-size:9.5px;color:#5b6b7a;text-align:center;page-break-inside:avoid}
+
+  .pr-notesbox{border:1px solid #cdd8e3;border-left:2.5px solid #0b2a4a;border-radius:3px;
+               padding:4px 6px;margin-bottom:6px;font-size:8px;color:#33414f;white-space:pre-line}
+  .pr-decl{font-size:7px;color:#5b6b7a;border-top:1px dashed #cdd8e3;padding-top:4px;margin:6px 0 0}
+  .pr-sign{display:flex;justify-content:space-between;gap:6px;margin-top:14px;font-size:7.2px;
+           color:#5b6b7a;text-align:center;page-break-inside:avoid}
   .pr-sign>div{flex:1}
-  .pr-line{border-top:1px solid #8a99a8;margin-bottom:3px;height:22px}
-  .pr-foot{margin-top:12px;padding-top:5px;border-top:1px solid #e4ebf2;font-size:8.5px;color:#8a99a8;text-align:center}
+  .pr-line{border-top:1px solid #8a99a8;margin-bottom:2px;height:14px}
+  .pr-foot{margin-top:7px;padding-top:3px;border-top:1px solid #e4ebf2;
+           font-size:6.6px;color:#8a99a8;text-align:center}
 }
 
 
@@ -646,6 +689,7 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
       <img class="mark" src="/icons/logo.png" alt="Blue Wave logo">
       <div><b>Blue Wave</b><span>HPMP Manufacturers Pvt Ltd</span></div>
     </div>
+    <span id="hdrZone" class="hdrzone"></span>
     <div class="hspace"></div>
     <span id="hdrAuth"></span>
   </div>
@@ -838,7 +882,16 @@ async function api(path,method='GET',body){
 async function refreshMe(){const d=await api('/me');state.role=d.role;state.user=d.user||null}
 /* A guest has no account yet, so they browse in whichever zone they picked on
    the sign-up screen; a signed-in dealer always gets their own. */
-function guestZone(){try{return localStorage.getItem('bw_zone')||'IN'}catch(e){return 'IN'}}
+/* India unless the visitor has actively chosen otherwise. A stored value for a
+   country that has since been closed to new dealers falls back to India too,
+   rather than quietly pricing in a currency the shop no longer serves. */
+function guestZone(){
+  let v='IN';
+  try{v=localStorage.getItem('bw_zone')||'IN'}catch(e){return 'IN'}
+  const zs=state.zones||[];
+  if(zs.length&&!zs.some(z=>z.code===v&&z.enabled!==false))return 'IN';
+  return v;
+}
 function setGuestZone(c){
   const next=c||'IN';
   let prev='IN';try{prev=localStorage.getItem('bw_zone')||'IN'}catch(e){}
@@ -859,6 +912,9 @@ async function repaintForZone(){
   else if(currentView==='shop')renderShop();
   else if(currentView==='category')renderCategory();
   renderNav();
+  /* keep the header picker showing what is actually being quoted — the sign-up
+     form can change the zone too */
+  renderZonePicker();
 }
 /* Across the Gulf a dealer may be quoted in their own currency or in dollars —
    both are offered, because the currencies are pegged to each other and much of
@@ -1162,9 +1218,52 @@ function renderHeader(){
   if(b){b.style.display=['product','auth','checkout','shop','reg','notif','otp'].includes(currentView)?'block':'none';
     b.onclick=currentView==='auth'?closeAuth:currentView==='checkout'?closeCheckout:currentView==='shop'?()=>showView('category')
       :currentView==='reg'?closeRegDetail:currentView==='notif'?closeNotifs:currentView==='otp'?closeOtp:closeProduct;}
+  renderZonePicker();
   const h=$('hdrAuth');
   h.innerHTML=`<button class="bellbtn" onclick="openNotifications()" title="Notifications">${PICON.bell}<span class="belldot" id="bellDot" style="display:none"></span></button>`;
   updateBell();
+}
+
+/* ---- country / currency picker ----
+   A visitor arrives with no account, so nothing tells the app where they are.
+   Until now the only way to change it was a side effect of touching the country
+   box on the sign-up form, which nobody would find — so a Gulf buyer had no way
+   to see prices in their own money before registering. India is the default and
+   what a first-time visitor always sees. */
+function renderZonePicker(){
+  const el=$('hdrZone');if(!el)return;
+  /* a dealer's country comes from their account; the admin console is rupees */
+  if(currentUser()||isAdmin()||state.role==='admin'){el.className='hdrzone';el.innerHTML='';return}
+  const zones=(state.zones||[]).filter(z=>z.enabled!==false);
+  if(!zones.length){el.className='hdrzone';el.innerHTML='';return}
+  /* What is actually being quoted, as the server reported it — not what is in
+     localStorage. A stored preference the current zone does not offer (USD left
+     over from browsing Dubai, then switching to India) is ignored server-side,
+     and the picker has to agree with the prices on screen rather than with the
+     stale value. */
+  const here=(state.zone&&state.zone.code)||guestZone()||'IN';
+  const z0=zones.find(x=>x.code===here)||zones[0];
+  const offered=z0?(z0.currencies||[z0.currency]):[];
+  const want=(state.zone&&state.zone.quotedIn)||curPref();
+  const cur=offered.includes(want)?want:(z0?z0.currency:'INR');
+  /* one row per currency a country can be quoted in */
+  const opts=[];
+  for(const z of zones){
+    for(const c of (z.currencies||[z.currency])){
+      const sel=z.code===here&&c===cur;
+      opts.push(`<option value="${esc(z.code)}|${esc(c)}"${sel?' selected':''}>${esc(z.country)} · ${esc(c)}</option>`);
+    }
+  }
+  el.className='hdrzone on';
+  el.innerHTML=`<select id="hdrZoneSel" aria-label="Country and currency"
+    title="Show prices for another country" onchange="pickZoneCurrency(this.value)">${opts.join('')}</select>`;
+}
+async function pickZoneCurrency(v){
+  const [code,cur]=String(v||'').split('|');
+  if(!code)return;
+  try{localStorage.setItem('bw_zone',code)}catch(e){}
+  setCurPref(cur||'');
+  await repaintForZone();
 }
 /* Refresh inside the app: pulls fresh prices, orders and notifications and
    redraws the screen you are on. It does not reload the page, so the opening
@@ -1458,7 +1557,13 @@ async function logout(){
   nativeAuth();
   try{if(pushSupported()){const reg=await navigator.serviceWorker.ready;const s=await reg.pushManager.getSubscription();
     if(s){await api('/push/unsubscribe','POST',{endpoint:s.endpoint}).catch(()=>{});await s.unsubscribe()}}}catch(e){}
-  await refreshProducts();renderHeader();updateBell();showView('home');toast('Logged out');
+  /* Signing out changes the zone as surely as signing in does — an admin drops
+     from rupees back to whatever this visitor had chosen. pay-info carries the
+     currency and tax label every figure is formatted with, so re-read it here
+     too; refreshing only the products left the first screen after logout drawn
+     half in the old zone and half in the new one. */
+  await repaintForZone();
+  renderHeader();updateBell();showView('home');toast('Logged out');
 }
 
 /* ============ HOME ============ */
@@ -3200,24 +3305,39 @@ function amountInWords(amount,o){
   return s.charAt(0).toUpperCase()+s.slice(1);
 }
 
+/* ---------- the printed dispatch slip ----------
+   A5, and deliberately carries no money on it: no rates, no amounts, no tax,
+   no total. Invoicing is done in the billing software, and the copy that
+   travels with the goods is handled by the loader, the driver and the
+   consignee's storeman — none of whom need the price, and one of whom is a
+   third party. What this sheet has to answer is "what is in the vehicle, how
+   many packages, and who signs for it", so quantity and package count are the
+   two figures given real size.
+
+   This is the print layout only. Nothing here changes what the app shows on
+   screen — #printArea is display:none until a print is asked for. */
 function printSlip(o){
   const c=o.contact||{};
-  const taxed=!!(o.gst&&o.taxPercent);
-  const taxable=taxed?Math.round((o.total-o.gst)*100)/100:o.total;
   const wa=String(c.whatsapp||c.phone||'').replace(/\D/g,'');
   const s=state.payInfo||{};
   const totalQty=o.items.reduce((a,i)=>a+i.qty,0);
-  /* Master boxes across the whole consignment — the number the loader counts
-     onto the vehicle, and the one that is wanted most and is most tedious to
-     work out from a column of piece counts. */
+  /* Master packages across the consignment — the number counted onto the
+     vehicle, and the one most tedious to work out from a column of pieces. */
   const boxes=o.items.reduce((a,i)=>a+(i.perBox?Math.ceil(i.qty/i.perBox):0),0);
   const anyBoxes=o.items.some(i=>i.perBox);
-  /* An Indian gunny order is counted in bags, not boxes. Calling every package
-     a "box" on the slip is the sort of small wrongness a loading team stops
-     trusting the paperwork over. */
-  const pkgWord=o.items.some(i=>/bag/i.test(i.master||i.packLabel||''))
-    ? (o.items.every(i=>!i.master||/bag/i.test(i.master)) ? 'bag' : 'package')
-    : 'box';
+  /* Name the package for what it actually is. Brackets go out in gunny bags or
+     cartons, trolleys in bundles; a consignment of all three is just packages.
+     Calling every one of them a "box" is the sort of small wrongness a loading
+     team stops trusting the paperwork over. */
+  const pkgWord=(()=>{
+    const kinds=new Set();
+    o.items.forEach(i=>{
+      if(!i.perBox)return;
+      const t=(i.master||i.packLabel||'').toLowerCase();
+      kinds.add(/bag/.test(t)?'BAGS':/bundle/.test(t)?'BUNDLES':'BOXES');
+    });
+    return kinds.size===1?[...kinds][0]:'PACKAGES';
+  })();
   const d=new Date(o.createdAt);
   const dispatched=o.dispatchedAt?new Date(o.dispatchedAt):null;
   const local=o.dispatchMode==='local';
@@ -3228,7 +3348,7 @@ function printSlip(o){
   const co=(s.company)||{name:s.payeeName||'HPMP Manufacturers Pvt Ltd',phone:s.whatsapp||''};
   const addrLine=[co.address,co.city,[co.state,co.pincode].filter(Boolean).join(' - ')]
     .filter(Boolean).join(', ');
-  const contactLine=[co.phone,co.email,co.website].filter(Boolean).join('  ·  ');
+  const contactLine=[co.phone,co.email].filter(Boolean).join('  ·  ');
 
   $('printArea').innerHTML=`
   <div class="pr-doc">
@@ -3238,17 +3358,16 @@ function printSlip(o){
                  :`<div class="pr-logo">BW</div>`}
         <div class="pr-idtext">
           <div class="pr-brand">${esc(co.name||'HPMP Manufacturers Pvt Ltd')}</div>
-          <div class="pr-tag">Blue Wave &middot; AC mounting brackets &amp; appliance trolleys</div>
           ${addrLine?`<div class="pr-tag">${esc(addrLine)}</div>`:''}
           ${contactLine?`<div class="pr-tag">${esc(contactLine)}</div>`:''}
-          ${co.gstin?`<div class="pr-gstin">GSTIN <b>${esc(co.gstin)}</b>${co.cin?` &middot; CIN ${esc(co.cin)}`:''}</div>`:''}
+          ${co.gstin?`<div class="pr-gstin">GSTIN <b>${esc(co.gstin)}</b></div>`:''}
         </div>
       </div>
       <div class="pr-meta">
         <div class="pr-title">DISPATCH SLIP</div>
         <table class="pr-metatab">
           ${row('Order no.',`<b class="pr-no">${esc(o.id)}</b>`)}
-          ${row('Order date',day(d))}
+          ${row('Date',day(d))}
           ${row('Status',esc(STATUS_LABEL[o.status]||o.status))}
           ${dispatched?row('Dispatched',day(dispatched)):''}
         </table>
@@ -3264,32 +3383,43 @@ function printSlip(o){
         <table class="pr-kv">
           ${row('Phone',esc(c.phone||'—'))}
           ${wa&&wa!==String(c.phone||'').replace(/\D/g,'')?row('WhatsApp',esc(wa)):''}
-          ${c.email?row('Email',esc(c.email)):''}
           ${c.gstin?row(esc(o.taxIdLabel||'GSTIN'),`<b>${esc(c.gstin)}</b>`):''}
         </table>
       </div>
       <div class="pr-panel">
         <div class="pr-ph">Dispatch</div>
         <table class="pr-kv">
-          ${row('Mode',local?'Local delivery (same city)':o.dispatchMode==='outstation'?'Outstation — by transport':'Not dispatched yet')}
+          ${row('Mode',local?'Local delivery':o.dispatchMode==='outstation'?'Outstation':'Not dispatched')}
           ${row('Transporter',esc(o.dispatchTransport||o.transport||'—'))}
-          ${local?row('Vehicle',`<b>${esc(o.vehicleNo||'—')}</b>`):row('LR / docket no.',`<b>${esc(o.lrNumber||'—')}</b>`)}
+          ${local?row('Vehicle',`<b>${esc(o.vehicleNo||'—')}</b>`):row('LR / docket',`<b>${esc(o.lrNumber||'—')}</b>`)}
           ${local&&o.driverName?row('Driver',esc(o.driverName)+(o.driverPhone?' &middot; '+esc(o.driverPhone):'')):''}
-          ${anyBoxes?row('Total packages',`<b>${boxes}</b> master ${pkgWord}${boxes===1?'':'s'}`):''}
-          ${row('Total pieces',`<b>${totalQty}</b>`)}
+          ${o.creditDue?row('Terms',`Credit &middot; due ${day(new Date(o.creditDue))}`):row('Terms','Advance')}
         </table>
+      </div>
+    </div>
+
+    <div class="pr-band">
+      <div class="pr-bandcell">
+        <div class="pr-bandlabel">TOTAL PIECES</div>
+        <div class="pr-bandfig">${totalQty}</div>
+      </div>
+      ${anyBoxes?`<div class="pr-bandcell">
+        <div class="pr-bandlabel">TOTAL ${pkgWord}</div>
+        <div class="pr-bandfig">${boxes}</div>
+      </div>`:''}
+      <div class="pr-bandcell pr-bandnote">
+        <div class="pr-bandlabel">LINE ITEMS</div>
+        <div class="pr-bandfig">${o.items.length}</div>
       </div>
     </div>
 
     <table class="pr-items">
       <thead><tr>
-        <th class="c" style="width:24px">#</th>
-        <th>Description</th>
-        <th style="width:150px">Packing</th>
-        <th class="c" style="width:52px">Pkgs</th>
-        <th class="r" style="width:44px">Qty</th>
-        <th class="r" style="width:76px">Rate</th>
-        <th class="r" style="width:88px">Amount</th>
+        <th class="c" style="width:6%">#</th>
+        <th style="width:46%">Description</th>
+        <th style="width:26%">Packing</th>
+        <th class="c" style="width:11%">Pkgs</th>
+        <th class="c" style="width:11%">Qty</th>
       </tr></thead>
       <tbody>
       ${o.items.map((i,n)=>{
@@ -3304,52 +3434,28 @@ function printSlip(o){
           <td class="c">${n+1}</td>
           <td><b>${esc(nm)}</b>${i.size?`<div class="pr-sub">Size: ${esc(i.size)}</div>`:''}</td>
           <td>${esc(pack)}${i.master?`<div class="pr-sub">${esc(i.master)}</div>`:''}</td>
-          <td class="c">${bx?`<b>${bx}</b>`:'—'}</td>
-          <td class="r"><b>${i.qty}</b></td>
-          <td class="r">${fmtOrder(i.rate,o)}</td>
-          <td class="r">${fmtOrder(i.rate*i.qty,o)}</td></tr>`;}).join('')}
+          <td class="c pr-big">${bx||'—'}</td>
+          <td class="c pr-big">${i.qty}</td></tr>`;}).join('')}
       </tbody>
       <tfoot>
-        <tr class="pr-sum"><td colspan="3" class="r">Total</td>
-          <td class="c">${anyBoxes?'<b>'+boxes+'</b>':'—'}</td>
-          <td class="r"><b>${totalQty}</b></td>
-          <td class="r">${taxed?'Taxable':''}</td>
-          <td class="r">${fmtOrder(taxable,o)}</td></tr>
-        ${taxed?`<tr class="pr-sum"><td colspan="5"></td>
-          <td class="r">${esc(o.taxLabel||'GST')} ${o.taxPercent}%</td>
-          <td class="r">${fmtOrder(o.gst,o)}</td></tr>`:''}
-        <tr class="pr-total"><td colspan="5"></td>
-          <td class="r">GRAND TOTAL</td><td class="r">${fmtOrder(o.total,o)}</td></tr>
+        <tr class="pr-total">
+          <td colspan="3" class="r">TOTAL</td>
+          <td class="c">${anyBoxes?boxes:'—'}</td>
+          <td class="c">${totalQty}</td></tr>
       </tfoot>
     </table>
 
-    <div class="pr-words"><span class="pr-ph">Amount in words</span><div>${esc(amountInWords(o.total,o))}</div></div>
-
-    <div class="pr-panels">
-      <div class="pr-panel">
-        <div class="pr-ph">Payment</div>
-        <table class="pr-kv">
-          ${row('Terms',o.creditDue?'Credit':'Advance')}
-          ${row('Reference',esc(o.payRef||'—'))}
-          ${o.creditDue?row('Due on',`<b>${day(new Date(o.creditDue))}</b>${o.creditSettled?' (settled)':''}`):''}
-          ${row('Pricing',o.tier==='dealer'?'Dealer / wholesale':'MRP')}
-        </table>
-      </div>
-      <div class="pr-panel">
-        <div class="pr-ph">Notes</div>
-        <div class="pr-notes">${o.notes?esc(o.notes):'<span class="pr-sub">—</span>'}</div>
-      </div>
-    </div>
+    ${o.notes?`<div class="pr-notesbox"><span class="pr-ph">Order notes</span><div>${esc(o.notes)}</div></div>`:''}
 
     <div class="pr-decl">
-      Goods are counted and checked at the time of loading. Please examine the packages and note any
-      shortage or damage on the transporter&rsquo;s copy before signing for them.
+      Goods counted and checked at loading. Examine the packages and note any shortage or damage on the
+      transporter&rsquo;s copy before signing. This slip carries no prices &mdash; the tax invoice is issued separately.
     </div>
 
     <div class="pr-sign">
       <div><div class="pr-line"></div>Packed by</div>
       <div><div class="pr-line"></div>Checked by</div>
-      <div><div class="pr-line"></div>For ${esc(s.payeeName||'HPMP Manufacturers Pvt Ltd')}</div>
+      <div><div class="pr-line"></div>For ${esc(co.name||'HPMP Manufacturers Pvt Ltd')}</div>
       <div><div class="pr-line"></div>Received in good condition</div>
     </div>
 
@@ -3378,71 +3484,78 @@ function printSlip(o){
 function printDocument(inner){
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
-  @page{size:A4;margin:12mm 11mm}
+  @page{size:A5;margin:8mm 7mm}
   *{box-sizing:border-box}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
-       color:#101820;font-size:11px;line-height:1.42;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .pr-doc{max-width:190mm;margin:0 auto}
+       color:#101820;font-size:8.6px;line-height:1.34;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pr-doc{width:134mm;margin:0 auto}
 
   /* letterhead */
-  .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
-           border-bottom:2.5px solid #0b2a4a;padding-bottom:9px;margin-bottom:11px}
-  .pr-id{display:flex;gap:10px;align-items:center}
-  .pr-logo{width:38px;height:38px;flex:0 0 38px;border-radius:9px;background:#0b2a4a;color:#fff;
-           font-weight:800;font-size:15px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center}
-  .pr-brand{font-size:15px;font-weight:800;color:#0b2a4a;line-height:1.2}
-  .pr-logo-img{width:52px;height:52px;flex:0 0 52px;object-fit:contain}
+  .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+           border-bottom:1.8px solid #0b2a4a;padding-bottom:5px;margin-bottom:6px}
+  .pr-id{display:flex;gap:6px;align-items:flex-start}
+  .pr-logo{width:26px;height:26px;flex:0 0 26px;border-radius:6px;background:#0b2a4a;color:#fff;
+           font-weight:800;font-size:10px;display:flex;align-items:center;justify-content:center}
+  .pr-logo-img{width:30px;height:30px;flex:0 0 30px;object-fit:contain}
   .pr-idtext{min-width:0}
-  .pr-gstin{font-size:9.5px;color:#0b2a4a;margin-top:2px}
-  .pr-tag{font-size:9.5px;color:#5b6b7a}
-  .pr-meta{text-align:right;min-width:190px}
-  .pr-title{font-size:14px;font-weight:800;letter-spacing:1.6px;color:#0b2a4a;margin-bottom:4px}
-  .pr-metatab{margin-left:auto;border-collapse:collapse;font-size:10px}
-  .pr-metatab .k{color:#5b6b7a;padding:1px 8px 1px 0;text-align:right;white-space:nowrap}
+  .pr-brand{font-size:11px;font-weight:800;color:#0b2a4a;line-height:1.15}
+  .pr-tag{font-size:7.4px;color:#5b6b7a;line-height:1.3}
+  .pr-gstin{font-size:7.8px;color:#0b2a4a;margin-top:1px}
+  .pr-meta{text-align:right;min-width:128px}
+  .pr-title{font-size:11px;font-weight:800;letter-spacing:1.2px;color:#0b2a4a;margin-bottom:2px}
+  .pr-metatab{margin-left:auto;border-collapse:collapse;font-size:7.8px}
+  .pr-metatab .k{color:#5b6b7a;padding:0 6px 0 0;text-align:right;white-space:nowrap}
   .pr-metatab .v{text-align:right;white-space:nowrap}
-  .pr-no{font-size:12.5px;letter-spacing:.4px}
+  .pr-no{font-size:10px;letter-spacing:.3px}
 
-  /* consignee / dispatch panels */
-  .pr-panels{display:flex;gap:9px;margin-bottom:10px}
-  .pr-panel{flex:1;border:1px solid #cdd8e3;border-radius:5px;padding:7px 9px;min-width:0}
-  .pr-ph{font-size:8.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#5b6b7a;
-         display:block;margin-bottom:3px}
-  .pr-name{font-weight:800;font-size:12px;color:#0b2a4a}
-  .pr-attn{font-size:10px;color:#33414f}
-  .pr-addr{font-size:10px;color:#33414f;margin:2px 0 4px;white-space:pre-line}
-  .pr-kv{border-collapse:collapse;width:100%;font-size:10px}
-  .pr-kv .k{color:#5b6b7a;padding:1px 8px 1px 0;white-space:nowrap;vertical-align:top;width:1%}
+  /* consignee / dispatch */
+  .pr-panels{display:flex;gap:6px;margin-bottom:6px}
+  .pr-panel{flex:1;border:1px solid #cdd8e3;border-radius:4px;padding:5px 6px;min-width:0}
+  .pr-ph{font-size:6.8px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:#5b6b7a;
+         display:block;margin-bottom:2px}
+  .pr-name{font-weight:800;font-size:9.4px;color:#0b2a4a;line-height:1.2}
+  .pr-attn{font-size:7.8px;color:#33414f}
+  .pr-addr{font-size:7.8px;color:#33414f;margin:1px 0 2px;white-space:pre-line}
+  .pr-kv{border-collapse:collapse;width:100%;font-size:7.8px}
+  .pr-kv .k{color:#5b6b7a;padding:0 6px 0 0;white-space:nowrap;vertical-align:top;width:1%}
   .pr-kv .v{word-break:break-word}
 
-  /* items */
-  .pr-items{width:100%;border-collapse:collapse;margin-bottom:9px}
-  .pr-items th{background:#0b2a4a;color:#fff;font-size:9px;letter-spacing:.6px;text-transform:uppercase;
-               padding:5px 6px;text-align:left;font-weight:700}
-  .pr-items td{border-bottom:1px solid #dde5ed;padding:5px 6px;vertical-align:top;font-size:10.5px}
+  /* the two figures the slip exists to communicate */
+  .pr-band{display:flex;gap:6px;margin-bottom:6px}
+  .pr-bandcell{flex:1;border:1.4px solid #0b2a4a;border-radius:4px;padding:4px 6px;text-align:center;
+               background:#f2f6fa}
+  .pr-bandlabel{font-size:6.8px;font-weight:800;letter-spacing:1px;color:#5b6b7a}
+  .pr-bandfig{font-size:19px;font-weight:800;color:#0b2a4a;line-height:1.1}
+  .pr-bandnote{background:#fff;border-color:#cdd8e3}
+  .pr-bandnote .pr-bandfig{font-size:13px;color:#33414f}
+
+  /* items — no rate, no amount, no tax: this sheet carries no money */
+  .pr-items{width:100%;border-collapse:collapse;margin-bottom:6px;table-layout:fixed}
+  .pr-items th{background:#0b2a4a;color:#fff;font-size:7px;letter-spacing:.5px;text-transform:uppercase;
+               padding:3px 4px;text-align:left;font-weight:700}
+  .pr-items td{border-bottom:1px solid #dde5ed;padding:3px 4px;vertical-align:top;font-size:8.4px;
+               word-wrap:break-word}
   .pr-items tbody tr:nth-child(even) td{background:#f6f9fc}
-  .pr-items .r{text-align:right}
   .pr-items .c{text-align:center}
-  .pr-sub{font-size:9px;color:#6b7a89;margin-top:1px}
-  .pr-sum td{border-top:1px solid #cdd8e3;border-bottom:0;padding-top:5px;font-size:10.5px}
-  .pr-total td{border-top:2px solid #0b2a4a;border-bottom:0;font-weight:800;font-size:12.5px;
-               color:#0b2a4a;padding-top:6px}
+  .pr-items .r{text-align:right}
+  .pr-items td.pr-big{font-size:12.5px;font-weight:800;color:#0b2a4a;letter-spacing:.2px}
+  .pr-sub{font-size:7px;color:#6b7a89;margin-top:0}
+  .pr-total td{border-top:1.6px solid #0b2a4a;border-bottom:0;font-weight:800;font-size:10.5px;
+               color:#0b2a4a;padding-top:4px}
   /* a long order runs onto a second sheet — repeat the header, never split a row */
   thead{display:table-header-group}
   tfoot{display:table-row-group}
   tr{page-break-inside:avoid}
 
-  .pr-words{border:1px solid #cdd8e3;border-left:3px solid #0b2a4a;border-radius:4px;
-            padding:6px 9px;margin-bottom:10px;font-size:10.5px;font-weight:600;color:#0b2a4a}
-  .pr-notes{font-size:10px;color:#33414f;white-space:pre-line}
-
-  .pr-decl{font-size:9px;color:#5b6b7a;border-top:1px dashed #cdd8e3;padding-top:6px;margin:10px 0 0}
-  .pr-sign{display:flex;justify-content:space-between;gap:12px;margin-top:26px;font-size:9.5px;
+  .pr-notesbox{border:1px solid #cdd8e3;border-left:2.5px solid #0b2a4a;border-radius:3px;
+               padding:4px 6px;margin-bottom:6px;font-size:8px;color:#33414f;white-space:pre-line}
+  .pr-decl{font-size:7px;color:#5b6b7a;border-top:1px dashed #cdd8e3;padding-top:4px;margin:6px 0 0}
+  .pr-sign{display:flex;justify-content:space-between;gap:6px;margin-top:14px;font-size:7.2px;
            color:#5b6b7a;text-align:center;page-break-inside:avoid}
   .pr-sign>div{flex:1}
-  .pr-line{border-top:1px solid #8a99a8;margin-bottom:3px;height:22px}
-  .pr-foot{margin-top:12px;padding-top:5px;border-top:1px solid #e4ebf2;
-           font-size:8.5px;color:#8a99a8;text-align:center}
-</style></head><body>${inner}</body></html>`;
+  .pr-line{border-top:1px solid #8a99a8;margin-bottom:2px;height:14px}
+  .pr-foot{margin-top:7px;padding-top:3px;border-top:1px solid #e4ebf2;
+           font-size:6.6px;color:#8a99a8;text-align:center}</style></head><body>${inner}</body></html>`;
 }
 
 /* customer-facing order card — same clear item-wise layout the admin sees */

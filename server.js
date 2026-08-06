@@ -88,26 +88,35 @@ function productMeta(name) {
       ]})
     };
   }
+  /* Trolleys ship in bundles, not bags or cartons. There is no choice to make —
+     one bundle size per product — but the count still has to be structured
+     data, not just a sentence, or the dispatch slip cannot work out how many
+     bundles are going on the vehicle. */
+  const bundle = qty => JSON.stringify({ packs: [
+    { id: 'bundle', label: 'Bundle packing', master: qty + ' pcs per bundle', add: 0 }
+  ]});
   if (n.includes('xuv')) {
-    const cartons = n.includes('300') ? 10 : 6;
+    const per = n.includes('300') ? 10 : 6;
     return {
       descr: `${name} — height and width adjustable appliance trolley for washing machines and refrigerators. Smooth-rolling wheels with brake locks, high-grade steel frame, 7-tank powder coating. Adjustable to fit all standard appliance sizes.`,
-      packing: `Each trolley packed knocked-down in an individual printed carton with assembly hardware.\nMaster packing: ${cartons} cartons per bundle.`,
-      options: ''
+      packing: `Each trolley packed knocked-down in an individual printed carton with assembly hardware.\nMaster packing: ${per} pcs per bundle.`,
+      options: bundle(per)
     };
   }
   if (n.includes('angle')) {
     return {
       descr: 'Angle Trolly — fixed-frame appliance trolley with smooth-rolling wheels. Sturdy angle-steel construction with 7-tank powder coating, ideal for washing machines, coolers and refrigerators. Available in multiple sizes.',
       packing: 'Each trolley packed in an individual carton with wheels pre-fitted.\nMaster packing: 6 pcs per bundle.',
-      options: JSON.stringify({ sizes: ['19 x 24 inch', '22 x 22 inch', '22 x 24 inch', '23 x 24 inch', '24 x 24 inch'] })
+      options: JSON.stringify({ sizes: ['19 x 24 inch', '22 x 22 inch', '22 x 24 inch', '23 x 24 inch', '24 x 24 inch'],
+        packs: JSON.parse(bundle(6)).packs })
     };
   }
   if (n.includes('front load')) {
     return {
       descr: 'Front Load Trolly — fixed-frame trolley designed for front-load washing machines. Wide stable base, vibration-friendly design, smooth-rolling wheels with brake locks, 7-tank powder coated steel. Available in multiple sizes.',
       packing: 'Each trolley packed in an individual carton with wheels pre-fitted.\nMaster packing: 6 pcs per bundle.',
-      options: JSON.stringify({ sizes: ['Ultra 6 kg', 'Ultra 7 kg', 'Ultra 8 kg'] })
+      options: JSON.stringify({ sizes: ['Ultra 6 kg', 'Ultra 7 kg', 'Ultra 8 kg'],
+        packs: JSON.parse(bundle(6)).packs })
     };
   }
   return { descr: '', packing: '', options: '' };
@@ -134,6 +143,7 @@ db.prepare('SELECT id,name,options,packing FROM products').all().forEach(p => {
     db.prepare('UPDATE products SET packing=? WHERE id=?').run(m.packing, p.id);
   }
 });
+
 /* Orders placed without an account used to be readable by anyone who could
  * guess the number — and the numbers run in sequence, so guessing was counting.
  * A guest order now carries a secret handed only to the person who placed it. */
@@ -447,6 +457,31 @@ if (!getSetting('exportZeroRated')) {
       .run(new Date().toISOString(), code, was); } catch (e) { /* zone row not there yet */ }
   }
   setSetting('exportZeroRated', '1');
+}
+
+/* One-time: give the trolleys their bundle quantity as structured data.
+ *
+ * The count was only ever a sentence in the packing note, so the dispatch slip
+ * had nothing to count with and printed a dash where the bundle figure should
+ * be — a loader had to work it out from the piece count and the prose. Sizes
+ * and pack lists are generated, not admin-edited, so regenerating them is safe;
+ * the packing note is only rewritten where it still matches what the app wrote,
+ * so an admin's own wording is never overwritten. */
+if (!getSetting('trolleyBundles')) {
+  db.prepare('SELECT id,name,options,packing FROM products').all().forEach(p => {
+    const m = productMeta(p.name);
+    if (!m.options) return;
+    let want; try { want = JSON.parse(m.options); } catch (e) { return; }
+    if (!want.packs) return;                       // brackets already had packs
+    let have = {}; try { have = JSON.parse(p.options || '{}'); } catch (e) { have = {}; }
+    if (Array.isArray(have.packs) && have.packs.length) return;   // already done
+    const merged = { ...have, ...want };           // keep sizes, add packs
+    const gen = productMeta(p.name).packing;
+    const untouched = !p.packing || /cartons per bundle|pcs per bundle/.test(p.packing);
+    db.prepare('UPDATE products SET options=?' + (untouched ? ', packing=?' : '') + ' WHERE id=?')
+      .run(...(untouched ? [JSON.stringify(merged), gen, p.id] : [JSON.stringify(merged), p.id]));
+  });
+  setSetting('trolleyBundles', '1');
 }
 
 /* Whether this zone follows the daily live rate, the raw mid-market rate it
@@ -971,11 +1006,14 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; " +
+    /* Razorpay's checkout pulls a second script from its CDN. Listing only
+       checkout.razorpay.com blocked it, which showed up as a CSP error the
+       moment the payment sheet opened. */
+    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: blob:; " +
     "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com; " +
-    "frame-src https://api.razorpay.com https://checkout.razorpay.com; " +
+    "frame-src https://api.razorpay.com https://checkout.razorpay.com https://cdn.razorpay.com; " +
     "object-src 'none'; base-uri 'self'; form-action 'self'");
   /* Nothing the API returns should ever be cached by a proxy — several
      responses are specific to the signed-in dealer. */
@@ -1042,6 +1080,13 @@ const isExportZone = z => !z || z.code !== DEFAULT_ZONE;
  * price is the rupee price converted, and nothing else. */
 function packsForZone(o, z) {
   if (!o || !Array.isArray(o.packs) || !isExportZone(z)) return o;
+  /* The rule is "no gunny bags abroad". A product that was never offered in a
+     gunny bag has nothing to swap — a trolley goes out in a bundle of six (ten
+     for the XUV 300) in Hyderabad and in Dubai alike, because that is a fact
+     about the product rather than a choice of market. Rewriting every single
+     pack as a six-piece carton would have quietly changed the XUV 300 from ten
+     per bundle to six for export, and relabelled bundles as boxes. */
+  if (!o.packs.some(p => p.id === 'gunny')) return o;
   const box = o.packs.find(p => p.id === 'box') || o.packs[o.packs.length - 1];
   if (!box) return { ...o, packs: [] };
   return { ...o, packs: [{ ...box, master: EXPORT_MASTER_QTY + ' pcs per master box', add: 0 }] };
