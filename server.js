@@ -201,6 +201,11 @@ try { db.exec("ALTER TABLE users ADD COLUMN reset_at TEXT DEFAULT ''"); } catch 
 /* one-time code for signing in with a mobile number */
 try { db.exec("ALTER TABLE users ADD COLUMN login_code TEXT DEFAULT ''"); } catch (e) { /* exists */ }
 try { db.exec("ALTER TABLE users ADD COLUMN login_at TEXT DEFAULT ''"); } catch (e) { /* exists */ }
+/* A blank tax number has to be NULL, never ''. The column is UNIQUE, and SQLite
+ * treats every '' as the same value while allowing any number of NULLs — so one
+ * stored '' is enough to lock every later dealer out of registering without one. */
+try { db.exec("UPDATE users SET gstin=NULL WHERE gstin=''"); } catch (e) { /* nothing to tidy */ }
+
 /* Wrong guesses against a live code. Without these a six-digit code is only a
  * million tries away from anyone's account, and nothing was counting. */
 try { db.exec('ALTER TABLE users ADD COLUMN login_tries INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
@@ -323,7 +328,7 @@ const ZONES = {
     code: 'IN', country: 'India', dial: '91', phoneLen: 10,
     currency: 'INR', symbol: '₹', locale: 'en-IN', decimals: 2, fx: 1,
     taxLabel: 'GST', taxPercent: 18,
-    taxId: { label: 'GSTIN', placeholder: '36ABCDE1234F1Z5', hint: '15 characters, e.g. 36ABCDE1234F1Z5',
+    taxId: { label: 'GSTIN', short: 'GSTIN', placeholder: '36ABCDE1234F1Z5', hint: '15 characters, e.g. 36ABCDE1234F1Z5',
              re: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$', upper: true, required: true },
     licence: null,
     regionLabel: 'State',
@@ -334,8 +339,8 @@ const ZONES = {
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'AED', symbol: 'AED', locale: 'en-AE', decimals: 2, fx: 0.0384,
     taxLabel: 'VAT', taxPercent: 0,
-    taxId: { label: 'VAT TRN', placeholder: '100123456700003', hint: '15-digit Tax Registration Number',
-             re: '^[0-9]{15}$', upper: false, required: true },
+    taxId: { label: 'VAT TRN', short: 'VAT', placeholder: '100123456700003', hint: '15-digit Tax Registration Number — leave blank if you are not VAT registered',
+             re: '^[0-9]{15}$', upper: false, required: false },
     licence: { label: 'Trade licence number', placeholder: 'e.g. CN-1234567', hint: 'as printed on your DED trade licence',
                re: '^[A-Za-z0-9][A-Za-z0-9\\-\\/ ]{2,29}$', upper: true, required: true },
     regionLabel: 'Emirate',
@@ -346,8 +351,8 @@ const ZONES = {
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'SAR', symbol: 'SAR', locale: 'en-SA', decimals: 2, fx: 0.0392,
     taxLabel: 'VAT', taxPercent: 0,
-    taxId: { label: 'VAT registration number', placeholder: '300123456700003', hint: '15 digits, starts and ends with 3',
-             re: '^3[0-9]{13}3$', upper: false, required: true },
+    taxId: { label: 'VAT registration number', short: 'VAT', placeholder: '300123456700003', hint: '15 digits, starts and ends with 3 — leave blank if you are not VAT registered',
+             re: '^3[0-9]{13}3$', upper: false, required: false },
     licence: { label: 'Commercial Registration (CR) number', placeholder: '1010123456', hint: '10-digit CR number',
                re: '^[0-9]{10}$', upper: false, required: true },
     regionLabel: 'Region',
@@ -358,8 +363,8 @@ const ZONES = {
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'OMR', symbol: 'OMR', locale: 'en-OM', decimals: 3, fx: 0.00402,
     taxLabel: 'VAT', taxPercent: 0,
-    taxId: { label: 'VAT identification number', placeholder: 'OM1100000000', hint: 'OM followed by 10 digits',
-             re: '^OM[0-9]{10}$', upper: true, required: true },
+    taxId: { label: 'VAT identification number', short: 'VAT', placeholder: 'OM1100000000', hint: 'OM followed by 10 digits — leave blank if you are not VAT registered',
+             re: '^OM[0-9]{10}$', upper: true, required: false },
     licence: { label: 'Commercial Registration (CR) number', placeholder: '1234567', hint: '7 to 10 digits',
                re: '^[0-9]{7,10}$', upper: false, required: true },
     regionLabel: 'Governorate',
@@ -370,7 +375,7 @@ const ZONES = {
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'QAR', symbol: 'QAR', locale: 'en-QA', decimals: 2, fx: 0.0380,
     taxLabel: 'VAT', taxPercent: 0,
-    taxId: { label: 'Tax Identification Number (TIN)', placeholder: '5012345678', hint: 'your Dhareeba TIN — leave blank if not registered',
+    taxId: { label: 'Tax Identification Number (TIN)', short: 'TIN', placeholder: '5012345678', hint: 'your Dhareeba TIN — leave blank if not registered',
              re: '^[0-9]{8,12}$', upper: false, required: false },
     licence: { label: 'Commercial Registration (CR) number', placeholder: '123456', hint: '6 to 10 digits',
                re: '^[0-9]{6,10}$', upper: false, required: true },
@@ -382,7 +387,7 @@ const ZONES = {
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'KWD', symbol: 'KWD', locale: 'en-KW', decimals: 3, fx: 0.00320,
     taxLabel: 'VAT', taxPercent: 0,
-    taxId: { label: 'Tax card number', placeholder: 'optional', hint: 'Kuwait has no VAT yet — leave blank if you have no tax card',
+    taxId: { label: 'Tax card number', short: 'Tax card', placeholder: 'optional', hint: 'Kuwait has no VAT yet — leave blank if you have no tax card',
              re: '^[A-Za-z0-9\\-\\/]{4,20}$', upper: true, required: false },
     licence: { label: 'Commercial Licence number', placeholder: '123456', hint: '4 to 12 digits',
                re: '^[0-9]{4,12}$', upper: false, required: true },
@@ -394,8 +399,8 @@ const ZONES = {
     altCurrency: 'USD',   // Gulf currencies are pegged to the dollar; much of the trade is invoiced in it
     currency: 'BHD', symbol: 'BHD', locale: 'en-BH', decimals: 3, fx: 0.00393,
     taxLabel: 'VAT', taxPercent: 0,
-    taxId: { label: 'VAT account number', placeholder: '200012345600002', hint: '15-digit VAT account number',
-             re: '^[0-9]{15}$', upper: false, required: true },
+    taxId: { label: 'VAT account number', short: 'VAT', placeholder: '200012345600002', hint: '15-digit VAT account number — leave blank if you are not VAT registered',
+             re: '^[0-9]{15}$', upper: false, required: false },
     licence: { label: 'Commercial Registration (CR) number', placeholder: '12345-1', hint: 'CR number as issued by MOIC',
                re: '^[0-9]{4,8}(-[0-9]{1,3})?$', upper: false, required: true },
     regionLabel: 'Governorate',
@@ -410,7 +415,7 @@ const ZONES = {
      * their end. So this sits at 0, like Qatar and Kuwait, and the admin can
      * switch it on for a state if that ever changes. */
     taxLabel: 'Sales tax', taxPercent: 0,
-    taxId: { label: 'Federal EIN', placeholder: '12-3456789', hint: '9-digit EIN, e.g. 12-3456789 — leave blank if you trade as a sole proprietor',
+    taxId: { label: 'Federal EIN', short: 'EIN', placeholder: '12-3456789', hint: '9-digit EIN, e.g. 12-3456789 — leave blank if you trade as a sole proprietor',
              re: '^[0-9]{2}-?[0-9]{7}$', upper: false, required: false },
     /* Business registration is a state matter and the formats vary wildly, so
      * this is checked loosely and read properly by the admin at approval —
@@ -1221,8 +1226,12 @@ app.post('/api/register', (req, res) => {
 
   if (f.email.toLowerCase() === String(getSetting('adminEmail')).toLowerCase()) return res.status(400).json({ error: 'This email is reserved.' });
   if (db.prepare('SELECT 1 FROM users WHERE email=?').get(f.email)) return res.status(400).json({ error: 'An account with this email already exists — try logging in.' });
-  /* Tax numbers are only unique within a country, and some zones allow a blank
-     one, so an empty value must never collide with another blank. */
+  /* Tax numbers are only unique within a country, and most zones now allow a
+     blank one, so an empty value must never collide with another blank.
+     The column is UNIQUE and SQLite permits any number of NULLs but only one
+     empty string — so a blank is stored as NULL, not ''. Without that, the
+     second dealer anywhere to register without a VAT number is refused with an
+     unexplained server error. */
   if (f.gstin && db.prepare('SELECT 1 FROM users WHERE gstin=? AND country=?').get(f.gstin, f.country))
     return res.status(400).json({ error: 'This ' + z.taxId.label + ' is already registered — try logging in or contact support.' });
   const salt = crypto.randomBytes(16).toString('hex');
@@ -1231,7 +1240,7 @@ app.post('/api/register', (req, res) => {
   const phoneNat = nationalDigits(f.phone, z);
   db.prepare(`INSERT INTO users(id,name,phone,email,pass_hash,salt,company,gstin,type,addr,city,state,pincode,whatsapp,status,mobile_code,email_ok,created_at,country,licence_no)
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,1,?,?,?)`)
-    .run(id, f.name, phoneNat, f.email, hashPw(f.password, salt), salt, f.company, f.gstin, f.type, f.addr, f.city, f.state, f.pincode, waNat, mCode, now(), f.country, f.licence);
+    .run(id, f.name, phoneNat, f.email, hashPw(f.password, salt), salt, f.company, f.gstin || null, f.type, f.addr, f.city, f.state, f.pincode, waNat, mCode, now(), f.country, f.licence);
   notifyAdmin('registration', 'New registration — ' + f.company,
     f.name + ' (' + f.type + ') from ' + (f.city || '—') + ', ' + z.country + ', mobile +' + z.dial + ' ' + phoneNat +
     '. Verify the ' + (z.taxId ? z.taxId.label : 'business details') + ' and approve the account.');
@@ -1556,7 +1565,7 @@ app.post('/api/me/complete', requireUser, (req, res) => {
   }
   db.prepare(`UPDATE users SET name=?, email=?, company=?, gstin=?, type=?, addr=?, city=?, state=?,
       pincode=?, phone=?, whatsapp=?, pass_hash=?, salt=?, country=?, licence_no=?, status='pending' WHERE id=?`)
-    .run(f.name, f.email, f.company, f.gstin, type, f.addr, f.city, f.state, f.pincode,
+    .run(f.name, f.email, f.company, f.gstin || null, type, f.addr, f.city, f.state, f.pincode,
       phone, waNum, hash, salt, f.country, f.licence, u.id);
 
   notifyAdmin('registration', 'New registration — ' + f.company,
@@ -1745,18 +1754,29 @@ app.post('/api/orders', (req, res) => {
        request. Outside India the only entry left is the carton, and that is
        what gets priced and printed on the dispatch slip. */
     const opts = p.options ? packsForZone(JSON.parse(p.options), z) : null;
+    /* Held aside for the dispatch slip: how the goods are packed and how many
+       go in a master box. Snapshotted onto the line rather than looked up when
+       the slip is printed, because master quantities differ by market and can
+       be edited later — a slip reprinted next year must still describe the
+       consignment that actually left the building. */
+    let packId = '', packLabel = '', master = '', perBox = 0, size = '';
     if (opts && opts.packs && opts.packs.length) {
       const pk = opts.packs.find(x => x.id === String(it.pack || 'gunny')) || opts.packs[0];
       const add = toZone(pk.add || 0, z);
       rate = Math.round((rate + add) * Math.pow(10, z.decimals)) / Math.pow(10, z.decimals);
       label += ' — ' + pk.label + (add ? ' (+' + z.symbol + add + '/pc)' : '');
+      packId = pk.id; packLabel = pk.label; master = pk.master || '';
+      const m = /(\d+)/.exec(master);           // "6 pcs per master box" -> 6
+      perBox = m ? parseInt(m[1], 10) : 0;
     }
     if (opts && opts.sizes) {
       const sz = String(it.size || '');
       if (!opts.sizes.includes(sz)) return res.status(400).json({ error: 'Please choose a size for ' + p.name + '.' });
       label += ' — ' + sz;
+      size = sz;
     }
-    lines.push({ pid: p.id, name: label, qty, rate });
+    lines.push({ pid: p.id, name: label, qty, rate, product: p.name,
+      pack: packId, packLabel, master, perBox, size });
   }
   /* Prices are tax-inclusive: total = listed price; tax = the portion within it.
      A zone with no VAT yet (Qatar, Kuwait) simply books zero. */
@@ -1807,6 +1827,11 @@ const orderOut = o => {
     country: o.country || DEFAULT_ZONE, currency: z.currency, symbol: z.symbol,
     decimals: z.decimals, locale: z.locale,
     taxPercent: z.taxPercent, taxLabel: z.taxLabel, fxRate: o.fx_rate || 1,
+    /* What the customer's tax number is called where they are — GSTIN in India,
+       VAT across the Gulf, EIN in the States. Carried on the order itself, so a
+       slip printed years later still reads correctly even if that zone has
+       since been switched off. */
+    taxIdLabel: (z.taxId && (z.taxId.short || z.taxId.label)) || 'Tax no.',
     gstPercent: z.taxPercent, tier: o.tier, status: o.status, payRef: o.pay_ref,
     transport: o.transport || '', lrNumber: o.lr_number || '', dispatchTransport: o.dispatch_transport || '',
     dispatchMode: o.dispatch_mode || '', vehicleNo: o.vehicle_no || '', driverName: o.driver_name || '', driverPhone: o.driver_phone || '',
@@ -2178,7 +2203,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
   const licence = b.licence === undefined ? (u.licence_no || '') : normLicence(b.licence, uz);
   db.prepare(`UPDATE users SET name=?, company=?, phone=?, whatsapp=?, email=?, gstin=?, type=?,
     addr=?, city=?, state=?, pincode=?, country=?, licence_no=? WHERE id=?`)
-    .run(name, company, nationalDigits(phone, uz), nationalDigits(whatsapp || phone, uz), email, gstin, type, addr, city,
+    .run(name, company, nationalDigits(phone, uz), nationalDigits(whatsapp || phone, uz), email, gstin || null, type, addr, city,
       state || gi.stateName || '', pincode, uz.code, licence, u.id);
   res.json({ ok: true, user: pubUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)) });
 });

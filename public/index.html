@@ -438,27 +438,58 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   .sp-stage,.sp-ring circle,.sp-wave,.sp-word,.sp-sweep,.sp-star{animation:none!important;opacity:1;filter:none;stroke-dashoffset:0}
   .sp-sweep,.sp-star{display:none}
 }
-/* ---- printable order slip ---- */
+/* ---- printable dispatch slip ----
+   Browser printing uses these; the phone apps get the same design as a
+   standalone document from printDocument(), so both routes look identical. */
 #printArea{display:none}
 @media print{
   body::before,body::after{display:none!important}
   body>*{display:none!important}
   body.printing #printArea{display:block!important}
   body{background:#fff;padding:0;margin:0}
-  #printArea{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;color:#000;font-size:12px;padding:6mm}
-  .pr-head{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}
-  .pr-brand{font-size:16px;font-weight:bold}
-  .pr-title{font-size:15px;font-weight:bold;text-align:right}
-  .pr-right{text-align:right}
-  .pr-sub{font-size:10px;color:#444}
-  .pr-two{width:100%;border-collapse:collapse;margin-bottom:10px}
-  .pr-two td{width:50%;vertical-align:top;border:1px solid #000;padding:6px;font-size:11px}
-  .pr-items{width:100%;border-collapse:collapse}
-  .pr-items th,.pr-items td{border:1px solid #000;padding:5px 6px;font-size:11px}
-  .pr-items th{background:#eee}
+  @page{size:A4;margin:12mm 11mm}
+  #printArea{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
+    color:#101820;font-size:11px;line-height:1.42;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #printArea *{box-sizing:border-box}
+  .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2.5px solid #0b2a4a;padding-bottom:9px;margin-bottom:11px}
+  .pr-id{display:flex;gap:10px;align-items:center}
+  .pr-logo{width:38px;height:38px;flex:0 0 38px;border-radius:9px;background:#0b2a4a;color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .pr-brand{font-size:15px;font-weight:800;color:#0b2a4a;line-height:1.2}
+  .pr-tag{font-size:9.5px;color:#5b6b7a}
+  .pr-meta{text-align:right;min-width:190px}
+  .pr-title{font-size:14px;font-weight:800;letter-spacing:1.6px;color:#0b2a4a;margin-bottom:4px}
+  .pr-metatab{margin-left:auto;border-collapse:collapse;font-size:10px}
+  .pr-metatab .k{color:#5b6b7a;padding:1px 8px 1px 0;text-align:right;white-space:nowrap}
+  .pr-metatab .v{text-align:right;white-space:nowrap}
+  .pr-no{font-size:12.5px;letter-spacing:.4px}
+  .pr-panels{display:flex;gap:9px;margin-bottom:10px}
+  .pr-panel{flex:1;border:1px solid #cdd8e3;border-radius:5px;padding:7px 9px;min-width:0}
+  .pr-ph{font-size:8.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#5b6b7a;display:block;margin-bottom:3px}
+  .pr-name{font-weight:800;font-size:12px;color:#0b2a4a}
+  .pr-attn{font-size:10px;color:#33414f}
+  .pr-addr{font-size:10px;color:#33414f;margin:2px 0 4px;white-space:pre-line}
+  .pr-kv{border-collapse:collapse;width:100%;font-size:10px}
+  .pr-kv .k{color:#5b6b7a;padding:1px 8px 1px 0;white-space:nowrap;vertical-align:top;width:1%}
+  .pr-kv .v{word-break:break-word}
+  .pr-items{width:100%;border-collapse:collapse;margin-bottom:9px}
+  .pr-items th{background:#0b2a4a;color:#fff;font-size:9px;letter-spacing:.6px;text-transform:uppercase;padding:5px 6px;text-align:left;font-weight:700}
+  .pr-items td{border-bottom:1px solid #dde5ed;padding:5px 6px;vertical-align:top;font-size:10.5px}
+  .pr-items tbody tr:nth-child(even) td{background:#f6f9fc}
   .pr-items .r{text-align:right}
-  .pr-total td{font-weight:bold;font-size:12.5px}
-  .pr-sign{display:flex;justify-content:space-between;margin-top:26px;font-size:11px}
+  .pr-items .c{text-align:center}
+  .pr-sub{font-size:9px;color:#6b7a89;margin-top:1px}
+  .pr-sum td{border-top:1px solid #cdd8e3;border-bottom:0;padding-top:5px}
+  .pr-total td{border-top:2px solid #0b2a4a;border-bottom:0;font-weight:800;font-size:12.5px;color:#0b2a4a;padding-top:6px}
+  #printArea thead{display:table-header-group}
+  #printArea tfoot{display:table-row-group}
+  #printArea tr{page-break-inside:avoid}
+  .pr-words{border:1px solid #cdd8e3;border-left:3px solid #0b2a4a;border-radius:4px;padding:6px 9px;margin-bottom:10px;font-size:10.5px;font-weight:600;color:#0b2a4a}
+  .pr-notes{font-size:10px;color:#33414f;white-space:pre-line}
+  .pr-decl{font-size:9px;color:#5b6b7a;border-top:1px dashed #cdd8e3;padding-top:6px;margin:10px 0 0}
+  .pr-sign{display:flex;justify-content:space-between;gap:12px;margin-top:26px;font-size:9.5px;color:#5b6b7a;text-align:center;page-break-inside:avoid}
+  .pr-sign>div{flex:1}
+  .pr-line{border-top:1px solid #8a99a8;margin-bottom:3px;height:22px}
+  .pr-foot{margin-top:12px;padding-top:5px;border-top:1px solid #e4ebf2;font-size:8.5px;color:#8a99a8;text-align:center}
 }
 
 
@@ -928,6 +959,15 @@ function gstPct(){const p=state.payInfo;
 /* 'GST' in India, 'VAT' across the Gulf, 'Sales tax' in the US — an invoice has
    to name it correctly. */
 function taxLabel(){return (state.payInfo&&state.payInfo.taxLabel)||zone().taxLabel||'GST'}
+/* And the customer's own registration number is called something different in
+   each place — GSTIN in India, VAT across the Gulf, EIN in the States. Labelling
+   a Dubai dealer's VAT number "GSTIN" is simply wrong on a document they file. */
+function taxIdLabelOf(z){return (z&&z.taxId&&(z.taxId.short||z.taxId.label))||'GSTIN'}
+function myTaxIdLabel(){
+  const u=currentUser();
+  const z=(u&&(state.zones||[]).find(x=>x.code===u.country))||state.zone;
+  return taxIdLabelOf(z);
+}
 /* Qatar and Kuwait have not introduced VAT, and a foreign manufacturer selling
    into the United States collects no sales tax. Printing "incl. VAT" against a
    0% rate states something untrue on what a dealer treats as a quotation, so
@@ -1637,7 +1677,7 @@ function openCheckout(){
   const u=currentUser();
   const rows=cart.map(c=>{const r=lineRate(c);return `<tr><td>${esc(lineLabel(c))}</td><td>${c.qty}</td><td>${fmt(r)}</td><td><b>${fmt(r*c.qty)}</b></td></tr>`}).join('');
   const sub=cartSubtotal(),gst=inclGst(sub),total=sub;
-  const contact=u?`<div class="regdetail"><b>${esc(u.company)}</b> · ${esc(u.name)}<br>${esc(u.phone)} · ${esc(u.email)}<br>GSTIN: <span class="gstin-code">${esc(u.gstin)}</span></div>
+  const contact=u?`<div class="regdetail"><b>${esc(u.company)}</b> · ${esc(u.name)}<br>${esc(u.phone)} · ${esc(u.email)}${u.gstin?'<br>'+esc(myTaxIdLabel())+': <span class="gstin-code">'+esc(u.gstin)+'</span>':''}</div>
     <label>Delivery address <span class="req">*</span></label><textarea id="co-addr" rows="2">${esc(u.addr)}, ${esc(u.city)}, ${esc(u.state)}</textarea>`
   :`<div class="notice info" style="margin-bottom:6px">Ordering as <b>guest at MRP</b>. <a href="javascript:openAuth('register')">Create an account</a> for wholesale rates.</div>
     <div class="frow"><div><label>Full name <span class="req">*</span></label><input id="co-name"></div>
@@ -2536,7 +2576,7 @@ async function renderAccount(){
       <span class="badge b-${uu.status}">${USTATUS_LABEL[uu.status]}</span>
       ${uu.status==='approved'?(uu.terms==='credit'?`<span class="badge b-shipped">Credit customer · pay within ${uu.creditDays||30} days</span>`:`<span class="badge b-approved">Advance payment customer</span>`):''}
       <div class="regdetail"><b>${esc(uu.company)}</b> (${esc(uu.type)})<br>${esc(uu.name)} · ${esc(uu.phone)}<br>${esc(uu.whatsapp||uu.phone)}<br>${esc(uu.email)}<br>
-      GSTIN: <span class="gstin-code">${esc(uu.gstin)}</span><br>${esc(uu.addr)},<br>${esc(uu.city)}, ${esc(uu.state)}${uu.pincode?' - '+esc(uu.pincode):''}</div>
+      ${uu.gstin?esc(myTaxIdLabel())+': <span class="gstin-code">'+esc(uu.gstin)+'</span><br>':''}${esc(uu.addr)},<br>${esc(uu.city)}, ${esc(uu.state)}${uu.pincode?' - '+esc(uu.pincode):''}</div>
       <div class="hint">${statusMsg[uu.status]}</div>
       <button class="wide blue" style="margin-top:12px" onclick="refreshProducts().then(()=>showView('shop'))">Continue shopping</button>
     </div>
@@ -2988,7 +3028,7 @@ function orderCard(o){
       <div class="olabel">Customer</div>
       <b>${esc(o.contact.company||o.contact.name)}</b>${o.contact.company?' · '+esc(o.contact.name):''}<br>
       ${esc(o.contact.phone)} <a href="https://wa.me/91${wa}" target="_blank">WhatsApp</a>
-      ${o.contact.gstin?'<br>GSTIN: <span class="gstin-code">'+esc(o.contact.gstin)+'</span>':''}
+      ${o.contact.gstin?'<br>'+esc(o.taxIdLabel||'GSTIN')+': <span class="gstin-code">'+esc(o.contact.gstin)+'</span>':''}
       <br>${esc(o.addr)}
       ${o.notes?'<br>'+esc(o.notes):''}
     </div>
@@ -3070,42 +3110,198 @@ async function printOrder(id){
   if(!o)return toast('Order not found',1);
   printSlip(o);
 }
+/* Amount in words. India groups in lakh and crore; everywhere else groups in
+   thousands and millions — "12,34,567" written out for a Dubai bank, or
+   "1.2 million" for an Indian one, each reads as a mistake to the other. */
+const NUM_ONES=['','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+const NUM_TENS=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+function under1000(n){
+  let s='';
+  if(n>=100){s+=NUM_ONES[Math.floor(n/100)]+' hundred';n%=100;if(n)s+=' and ';}
+  if(n>=20){s+=NUM_TENS[Math.floor(n/10)];n%=10;if(n)s+='-'+NUM_ONES[n];}
+  else if(n)s+=NUM_ONES[n];
+  return s;
+}
+function wordsIndian(n){
+  if(n===0)return 'zero';
+  const parts=[];
+  const crore=Math.floor(n/10000000);n%=10000000;
+  const lakh=Math.floor(n/100000);n%=100000;
+  const thou=Math.floor(n/1000);n%=1000;
+  if(crore)parts.push(under1000(crore)+' crore');
+  if(lakh)parts.push(under1000(lakh)+' lakh');
+  if(thou)parts.push(under1000(thou)+' thousand');
+  if(n)parts.push(under1000(n));
+  return parts.join(' ');
+}
+function wordsIntl(n){
+  if(n===0)return 'zero';
+  const parts=[];
+  for(const [v,nm] of [[1e9,'billion'],[1e6,'million'],[1e3,'thousand']]){
+    const q=Math.floor(n/v);if(q){parts.push(under1000(q)+' '+nm);n%=v;}
+  }
+  if(n)parts.push(under1000(n));
+  return parts.join(' ');
+}
+const MINOR_UNIT={INR:'paise',USD:'cents',AED:'fils',SAR:'halalas',QAR:'dirhams',OMR:'baisa',KWD:'fils',BHD:'fils'};
+function amountInWords(amount,o){
+  const dec=(o&&o.decimals!=null)?o.decimals:2;
+  const cur=(o&&o.currency)||'INR';
+  const whole=Math.floor(Math.abs(amount));
+  const frac=Math.round((Math.abs(amount)-whole)*Math.pow(10,dec));
+  const say=n=>cur==='INR'?wordsIndian(n):wordsIntl(n);
+  const minor=MINOR_UNIT[cur]||'';
+  const tail=frac?' and '+say(frac)+(minor?' '+minor:''):'';
+  const s=cur+' '+say(whole)+tail+' only';
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+
 function printSlip(o){
-  const taxable=o.gst?Math.round((o.total-o.gst)*100)/100:o.total;
-  const wa=String(o.contact&&(o.contact.whatsapp||o.contact.phone)||'').replace(/\D/g,'').slice(-10);
   const c=o.contact||{};
+  const taxed=!!(o.gst&&o.taxPercent);
+  const taxable=taxed?Math.round((o.total-o.gst)*100)/100:o.total;
+  const wa=String(c.whatsapp||c.phone||'').replace(/\D/g,'');
+  const s=state.payInfo||{};
+  const totalQty=o.items.reduce((a,i)=>a+i.qty,0);
+  /* Master boxes across the whole consignment — the number the loader counts
+     onto the vehicle, and the one that is wanted most and is most tedious to
+     work out from a column of piece counts. */
+  const boxes=o.items.reduce((a,i)=>a+(i.perBox?Math.ceil(i.qty/i.perBox):0),0);
+  const anyBoxes=o.items.some(i=>i.perBox);
+  /* An Indian gunny order is counted in bags, not boxes. Calling every package
+     a "box" on the slip is the sort of small wrongness a loading team stops
+     trusting the paperwork over. */
+  const pkgWord=o.items.some(i=>/bag/i.test(i.master||i.packLabel||''))
+    ? (o.items.every(i=>!i.master||/bag/i.test(i.master)) ? 'bag' : 'package')
+    : 'box';
+  const d=new Date(o.createdAt);
+  const dispatched=o.dispatchedAt?new Date(o.dispatchedAt):null;
+  const local=o.dispatchMode==='local';
+  const day=x=>x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  const row=(k,v)=>v?`<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`:'';
+
   $('printArea').innerHTML=`
+  <div class="pr-doc">
     <div class="pr-head">
-      <div><div class="pr-brand">Blue Wave · HPMP Manufacturers Pvt Ltd</div>
-        <div class="pr-sub">AC brackets &amp; appliance trolleys</div></div>
-      <div class="pr-right"><div class="pr-title">ORDER SLIP</div>
-        <div class="pr-sub">${o.id}<br>${new Date(o.createdAt).toLocaleString('en-IN')}</div></div>
+      <div class="pr-id">
+        <div class="pr-logo">BW</div>
+        <div>
+          <div class="pr-brand">${esc(s.payeeName||'HPMP Manufacturers Pvt Ltd')}</div>
+          <div class="pr-tag">Blue Wave &middot; AC mounting brackets &amp; appliance trolleys</div>
+          ${s.whatsapp?`<div class="pr-tag">${esc(s.whatsapp)}</div>`:''}
+        </div>
+      </div>
+      <div class="pr-meta">
+        <div class="pr-title">DISPATCH SLIP</div>
+        <table class="pr-metatab">
+          ${row('Order no.',`<b class="pr-no">${esc(o.id)}</b>`)}
+          ${row('Order date',day(d))}
+          ${row('Status',esc(STATUS_LABEL[o.status]||o.status))}
+          ${dispatched?row('Dispatched',day(dispatched)):''}
+        </table>
+      </div>
     </div>
-    <table class="pr-two"><tr>
-      <td><b>Customer</b><br>${esc(c.company||c.name||'')}<br>${c.company&&c.name?esc(c.name)+'<br>':''}
-        ${c.phone?'Phone: '+esc(c.phone):''}${wa&&c.phone&&wa!==String(c.phone).replace(/\D/g,'').slice(-10)?'<br>WhatsApp: '+esc(wa):''}
-        ${c.gstin?'<br>GSTIN: '+esc(c.gstin):''}
-        <br>${esc(o.addr)}</td>
-      <td><b>Dispatch</b><br>Preferred transport: ${o.transport?esc(o.transport):'—'}
-        <br>Mode: ${o.dispatchMode==='local'?'Local (same city)':o.dispatchMode==='outstation'?'Outstation':'—'}
-        <br>Sent via: ${esc(o.dispatchTransport||'—')}
-        ${o.dispatchMode==='local'?`<br>Vehicle: <b>${esc(o.vehicleNo)||'—'}</b><br>Driver: ${esc(o.driverName||'—')}${o.driverPhone?' · '+esc(o.driverPhone):''}`
-          :`<br>LR number: <b>${esc(o.lrNumber)||'—'}</b>`}
-        <br>Status: ${STATUS_LABEL[o.status]}
-        <br>Pricing: ${o.tier==='dealer'?'Dealer':'MRP'}</td>
-    </tr></table>
-    <table class="pr-items"><thead><tr><th>#</th><th>Product</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead><tbody>
+
+    <div class="pr-panels">
+      <div class="pr-panel">
+        <div class="pr-ph">Consignee</div>
+        <div class="pr-name">${esc(c.company||c.name||'—')}</div>
+        ${c.company&&c.name?`<div class="pr-attn">Attn: ${esc(c.name)}</div>`:''}
+        <div class="pr-addr">${esc(o.addr||'').replace(/\n/g,'<br>')}</div>
+        <table class="pr-kv">
+          ${row('Phone',esc(c.phone||'—'))}
+          ${wa&&wa!==String(c.phone||'').replace(/\D/g,'')?row('WhatsApp',esc(wa)):''}
+          ${c.email?row('Email',esc(c.email)):''}
+          ${c.gstin?row(esc(o.taxIdLabel||'GSTIN'),`<b>${esc(c.gstin)}</b>`):''}
+        </table>
+      </div>
+      <div class="pr-panel">
+        <div class="pr-ph">Dispatch</div>
+        <table class="pr-kv">
+          ${row('Mode',local?'Local delivery (same city)':o.dispatchMode==='outstation'?'Outstation — by transport':'Not dispatched yet')}
+          ${row('Transporter',esc(o.dispatchTransport||o.transport||'—'))}
+          ${local?row('Vehicle',`<b>${esc(o.vehicleNo||'—')}</b>`):row('LR / docket no.',`<b>${esc(o.lrNumber||'—')}</b>`)}
+          ${local&&o.driverName?row('Driver',esc(o.driverName)+(o.driverPhone?' &middot; '+esc(o.driverPhone):'')):''}
+          ${anyBoxes?row('Total packages',`<b>${boxes}</b> master ${pkgWord}${boxes===1?'':'s'}`):''}
+          ${row('Total pieces',`<b>${totalQty}</b>`)}
+        </table>
+      </div>
+    </div>
+
+    <table class="pr-items">
+      <thead><tr>
+        <th class="c" style="width:24px">#</th>
+        <th>Description</th>
+        <th style="width:150px">Packing</th>
+        <th class="c" style="width:52px">Pkgs</th>
+        <th class="r" style="width:44px">Qty</th>
+        <th class="r" style="width:76px">Rate</th>
+        <th class="r" style="width:88px">Amount</th>
+      </tr></thead>
+      <tbody>
       ${o.items.map((i,n)=>{
-        const parts=String(i.name).split(' — ');const nm=parts.shift();const extra=parts.join(' — ');
-        return `<tr><td>${n+1}</td><td>${esc(nm)}${extra?'<br><span class="pr-sub">'+esc(extra)+'</span>':''}</td>
-        <td class="r"><b>${i.qty}</b></td><td class="r">${fmtOrder(i.rate,o)}</td><td class="r">${fmtOrder(i.rate*i.qty,o)}</td></tr>`}).join('')}
-      <tr><td colspan="3"></td><td class="r">Taxable</td><td class="r">${fmtOrder(taxable,o)}</td></tr>
-      ${o.gst?`<tr><td colspan="3"></td><td class="r">${o.taxLabel||'GST'} ${o.taxPercent!=null?o.taxPercent:(o.gstPercent||18)}%</td><td class="r">${fmtOrder(o.gst,o)}</td></tr>`:''}
-      <tr class="pr-total"><td colspan="3"></td><td class="r">TOTAL (incl. ${o.taxLabel||'GST'})</td><td class="r">${fmtOrder(o.total,o)}</td></tr>
-    </tbody></table>
-    ${o.notes?`<p><b>Order notes:</b> ${esc(o.notes)}</p>`:''}
-    <p><b>Payment:</b> ${esc(o.payRef)||'—'}${o.creditDue&&!o.creditSettled?' · Credit due '+new Date(o.creditDue).toLocaleDateString('en-IN'):''}</p>
-    <div class="pr-sign"><div>Packed by ______________</div><div>Checked by ______________</div><div>Received by ______________</div></div>`;
+        /* orders placed before the slip carried packing detail stored only a
+           combined label — split it back apart so old ones still print well */
+        const parts=String(i.name).split(' — ');
+        const nm=i.product||parts.shift();
+        const extra=i.product?'':parts.join(' — ');
+        const pack=i.packLabel||extra||'—';
+        const bx=i.perBox?Math.ceil(i.qty/i.perBox):0;
+        return `<tr>
+          <td class="c">${n+1}</td>
+          <td><b>${esc(nm)}</b>${i.size?`<div class="pr-sub">Size: ${esc(i.size)}</div>`:''}</td>
+          <td>${esc(pack)}${i.master?`<div class="pr-sub">${esc(i.master)}</div>`:''}</td>
+          <td class="c">${bx?`<b>${bx}</b>`:'—'}</td>
+          <td class="r"><b>${i.qty}</b></td>
+          <td class="r">${fmtOrder(i.rate,o)}</td>
+          <td class="r">${fmtOrder(i.rate*i.qty,o)}</td></tr>`;}).join('')}
+      </tbody>
+      <tfoot>
+        <tr class="pr-sum"><td colspan="3" class="r">Total</td>
+          <td class="c">${anyBoxes?'<b>'+boxes+'</b>':'—'}</td>
+          <td class="r"><b>${totalQty}</b></td>
+          <td class="r">${taxed?'Taxable':''}</td>
+          <td class="r">${fmtOrder(taxable,o)}</td></tr>
+        ${taxed?`<tr class="pr-sum"><td colspan="5"></td>
+          <td class="r">${esc(o.taxLabel||'GST')} ${o.taxPercent}%</td>
+          <td class="r">${fmtOrder(o.gst,o)}</td></tr>`:''}
+        <tr class="pr-total"><td colspan="5"></td>
+          <td class="r">GRAND TOTAL</td><td class="r">${fmtOrder(o.total,o)}</td></tr>
+      </tfoot>
+    </table>
+
+    <div class="pr-words"><span class="pr-ph">Amount in words</span><div>${esc(amountInWords(o.total,o))}</div></div>
+
+    <div class="pr-panels">
+      <div class="pr-panel">
+        <div class="pr-ph">Payment</div>
+        <table class="pr-kv">
+          ${row('Terms',o.creditDue?'Credit':'Advance')}
+          ${row('Reference',esc(o.payRef||'—'))}
+          ${o.creditDue?row('Due on',`<b>${day(new Date(o.creditDue))}</b>${o.creditSettled?' (settled)':''}`):''}
+          ${row('Pricing',o.tier==='dealer'?'Dealer / wholesale':'MRP')}
+        </table>
+      </div>
+      <div class="pr-panel">
+        <div class="pr-ph">Notes</div>
+        <div class="pr-notes">${o.notes?esc(o.notes):'<span class="pr-sub">—</span>'}</div>
+      </div>
+    </div>
+
+    <div class="pr-decl">
+      Goods are counted and checked at the time of loading. Please examine the packages and note any
+      shortage or damage on the transporter&rsquo;s copy before signing for them.
+    </div>
+
+    <div class="pr-sign">
+      <div><div class="pr-line"></div>Packed by</div>
+      <div><div class="pr-line"></div>Checked by</div>
+      <div><div class="pr-line"></div>For ${esc(s.payeeName||'HPMP Manufacturers Pvt Ltd')}</div>
+      <div><div class="pr-line"></div>Received in good condition</div>
+    </div>
+
+    <div class="pr-foot">${esc(o.id)} &middot; printed ${new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})} &middot; Blue Wave</div>
+  </div>`;
   /* inside the iPhone app, hand the slip to iOS printing (AirPrint / Save as PDF) */
   if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.BlueWavePrint){
     try{
@@ -3129,22 +3325,67 @@ function printSlip(o){
 function printDocument(inner){
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
-  @page{size:A4;margin:10mm}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;color:#000;font-size:12px;margin:0}
-  .pr-head{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}
-  .pr-brand{font-size:16px;font-weight:bold}
-  .pr-title{font-size:15px;font-weight:bold;text-align:right}
-  .pr-right{text-align:right}
-  .pr-sub{font-size:10px;color:#444}
-  .pr-two{width:100%;border-collapse:collapse;margin-bottom:10px}
-  .pr-two td{width:50%;vertical-align:top;border:1px solid #000;padding:6px;font-size:11px}
-  .pr-items{width:100%;border-collapse:collapse}
-  .pr-items th,.pr-items td{border:1px solid #000;padding:5px 6px;font-size:11px}
-  .pr-items th{background:#eee}
+  @page{size:A4;margin:12mm 11mm}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
+       color:#101820;font-size:11px;line-height:1.42;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pr-doc{max-width:190mm;margin:0 auto}
+
+  /* letterhead */
+  .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+           border-bottom:2.5px solid #0b2a4a;padding-bottom:9px;margin-bottom:11px}
+  .pr-id{display:flex;gap:10px;align-items:center}
+  .pr-logo{width:38px;height:38px;flex:0 0 38px;border-radius:9px;background:#0b2a4a;color:#fff;
+           font-weight:800;font-size:15px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center}
+  .pr-brand{font-size:15px;font-weight:800;color:#0b2a4a;line-height:1.2}
+  .pr-tag{font-size:9.5px;color:#5b6b7a}
+  .pr-meta{text-align:right;min-width:190px}
+  .pr-title{font-size:14px;font-weight:800;letter-spacing:1.6px;color:#0b2a4a;margin-bottom:4px}
+  .pr-metatab{margin-left:auto;border-collapse:collapse;font-size:10px}
+  .pr-metatab .k{color:#5b6b7a;padding:1px 8px 1px 0;text-align:right;white-space:nowrap}
+  .pr-metatab .v{text-align:right;white-space:nowrap}
+  .pr-no{font-size:12.5px;letter-spacing:.4px}
+
+  /* consignee / dispatch panels */
+  .pr-panels{display:flex;gap:9px;margin-bottom:10px}
+  .pr-panel{flex:1;border:1px solid #cdd8e3;border-radius:5px;padding:7px 9px;min-width:0}
+  .pr-ph{font-size:8.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#5b6b7a;
+         display:block;margin-bottom:3px}
+  .pr-name{font-weight:800;font-size:12px;color:#0b2a4a}
+  .pr-attn{font-size:10px;color:#33414f}
+  .pr-addr{font-size:10px;color:#33414f;margin:2px 0 4px;white-space:pre-line}
+  .pr-kv{border-collapse:collapse;width:100%;font-size:10px}
+  .pr-kv .k{color:#5b6b7a;padding:1px 8px 1px 0;white-space:nowrap;vertical-align:top;width:1%}
+  .pr-kv .v{word-break:break-word}
+
+  /* items */
+  .pr-items{width:100%;border-collapse:collapse;margin-bottom:9px}
+  .pr-items th{background:#0b2a4a;color:#fff;font-size:9px;letter-spacing:.6px;text-transform:uppercase;
+               padding:5px 6px;text-align:left;font-weight:700}
+  .pr-items td{border-bottom:1px solid #dde5ed;padding:5px 6px;vertical-align:top;font-size:10.5px}
+  .pr-items tbody tr:nth-child(even) td{background:#f6f9fc}
   .pr-items .r{text-align:right}
-  .pr-total td{font-weight:bold;font-size:12.5px}
-  .pr-sign{display:flex;justify-content:space-between;margin-top:26px;font-size:11px}
-  p{margin:6px 0}
+  .pr-items .c{text-align:center}
+  .pr-sub{font-size:9px;color:#6b7a89;margin-top:1px}
+  .pr-sum td{border-top:1px solid #cdd8e3;border-bottom:0;padding-top:5px;font-size:10.5px}
+  .pr-total td{border-top:2px solid #0b2a4a;border-bottom:0;font-weight:800;font-size:12.5px;
+               color:#0b2a4a;padding-top:6px}
+  /* a long order runs onto a second sheet — repeat the header, never split a row */
+  thead{display:table-header-group}
+  tfoot{display:table-row-group}
+  tr{page-break-inside:avoid}
+
+  .pr-words{border:1px solid #cdd8e3;border-left:3px solid #0b2a4a;border-radius:4px;
+            padding:6px 9px;margin-bottom:10px;font-size:10.5px;font-weight:600;color:#0b2a4a}
+  .pr-notes{font-size:10px;color:#33414f;white-space:pre-line}
+
+  .pr-decl{font-size:9px;color:#5b6b7a;border-top:1px dashed #cdd8e3;padding-top:6px;margin:10px 0 0}
+  .pr-sign{display:flex;justify-content:space-between;gap:12px;margin-top:26px;font-size:9.5px;
+           color:#5b6b7a;text-align:center;page-break-inside:avoid}
+  .pr-sign>div{flex:1}
+  .pr-line{border-top:1px solid #8a99a8;margin-bottom:3px;height:22px}
+  .pr-foot{margin-top:12px;padding-top:5px;border-top:1px solid #e4ebf2;
+           font-size:8.5px;color:#8a99a8;text-align:center}
 </style></head><body>${inner}</body></html>`;
 }
 
