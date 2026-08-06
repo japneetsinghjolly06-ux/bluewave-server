@@ -544,6 +544,40 @@ if (!getSetting('masterPackSizeCoded')) {
   setSetting('masterPackSizeCoded', '1');
 }
 
+/* The 2026 additions: three size-coded XEON brackets and the Mobile Stand.
+ *
+ * Added here rather than to the seed block so an existing database picks them
+ * up too — the seed only ever runs on an empty one. Matched by name, so this
+ * never creates a duplicate of a product the admin has already keyed in.
+ *
+ * They go in HIDDEN (active = 0). The packing, description and master carton
+ * are known and are filled in from productMeta; the prices are not, and a
+ * guessed price on a live product is an order at the wrong money. The MRP and
+ * dealer figures below are a starting point carried from the nearest existing
+ * bracket — the admin sets the real ones in Admin -> Pricing and ticks Live,
+ * and until then no dealer can see or order them. */
+if (!getSetting('sku2026')) {
+  const NEW_SKUS = [
+    ['Xeon AC Bracket (500x500)', 'AC Brackets', 1299, 365, 50],
+    ['Xeon AC Bracket (550x550)', 'AC Brackets', 1299, 365, 50],
+    ['Xeon AC Bracket (600x600)', 'AC Brackets', 1299, 365, 50],
+    ['Mobile Stand', 'Accessories', 499, 150, 50]
+  ];
+  const ins = db.prepare(`INSERT INTO products(id,name,cat,emoji,mrp,dealer,moq,active,sort,descr,packing,options)
+    VALUES(?,?,?,'',?,?,?,0,?,?,?,?)`);
+  let added = 0;
+  for (const [name, cat, mrp, dealer, moq] of NEW_SKUS) {
+    if (db.prepare('SELECT 1 FROM products WHERE name=? COLLATE NOCASE').get(name)) continue;
+    const m = productMeta(name);
+    const sort = (db.prepare('SELECT COALESCE(MAX(sort),0) s FROM products').get().s) + 1;
+    ins.run(uid('p'), name, cat, mrp, dealer, moq, sort, m.descr || '', m.packing || '', m.options || '');
+    added++;
+  }
+  if (added) console.log(added + ' new product(s) added, hidden until priced: ' +
+    NEW_SKUS.map(s => s[0]).join(', '));
+  setSetting('sku2026', '1');
+}
+
 /* Whether this zone follows the daily live rate, the raw mid-market rate it
  * came from, and where it came from — kept apart from `fx` so the admin can
  * always see what was quoted versus what the market was doing. */
