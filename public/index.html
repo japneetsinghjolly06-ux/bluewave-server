@@ -462,13 +462,20 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   body::before,body::after{display:none!important}
   body>*{display:none!important}
   body.printing #printArea{display:block!important}
-  body{background:#fff;padding:0;margin:0}
-#printArea{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;padding:0}
+  /* the app's own body carries a viewport min-height and bottom padding to
+     clear the nav bar; both would push the slip down the sheet */
+  body{background:#fff;padding:0;margin:0;min-height:0;height:auto;display:block}
   @page{size:A5;margin:8mm 7mm}
   *{box-sizing:border-box}
   #printArea{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
-       color:#101820;font-size:8.6px;line-height:1.34;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .pr-doc{width:134mm;margin:0 auto}
+       color:#101820;font-size:8.6px;line-height:1.34;margin:0;padding:0;min-height:0;
+       -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* The slip starts in the top-left corner of the printable area. It used to
+     carry 'margin:0 auto', which centres it — harmless when the sheet really is
+     A5, but a printer loaded with A4 (most of them) laid a 134mm block in the
+     middle of a 190mm page with a wide gap down each side, and nothing sitting
+     where the top of a letterhead belongs. */
+  .pr-doc{width:100%;max-width:134mm;margin:0;padding:0}
 
   /* letterhead */
   .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
@@ -3487,8 +3494,14 @@ function printDocument(inner){
   @page{size:A5;margin:8mm 7mm}
   *{box-sizing:border-box}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
-       color:#101820;font-size:8.6px;line-height:1.34;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .pr-doc{width:134mm;margin:0 auto}
+       color:#101820;font-size:8.6px;line-height:1.34;margin:0;padding:0;min-height:0;
+       -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* The slip starts in the top-left corner of the printable area. It used to
+     carry 'margin:0 auto', which centres it — harmless when the sheet really is
+     A5, but a printer loaded with A4 (most of them) laid a 134mm block in the
+     middle of a 190mm page with a wide gap down each side, and nothing sitting
+     where the top of a letterhead belongs. */
+  .pr-doc{width:100%;max-width:134mm;margin:0;padding:0}
 
   /* letterhead */
   .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
