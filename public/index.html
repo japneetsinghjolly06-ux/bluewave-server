@@ -3341,7 +3341,7 @@ function printSlip(o){
     o.items.forEach(i=>{
       if(!i.perBox)return;
       const t=(i.master||i.packLabel||'').toLowerCase();
-      kinds.add(/bag/.test(t)?'BAGS':/bundle/.test(t)?'BUNDLES':'BOXES');
+      kinds.add(/bag/.test(t)?'BAGS':/bundle/.test(t)?'BUNDLES':/carton/.test(t)?'CARTONS':'BOXES');
     });
     return kinds.size===1?[...kinds][0]:'PACKAGES';
   })();

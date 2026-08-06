@@ -65,8 +65,43 @@ try { db.exec("ALTER TABLE products ADD COLUMN packing TEXT DEFAULT ''"); } catc
 try { db.exec("ALTER TABLE products ADD COLUMN options TEXT DEFAULT ''"); } catch (e) { /* column exists */ }
 
 /* Default descriptions, master packing details and options per product line */
+/* A bracket named by its frame size — 500x500, 550x550, 600x600 — rather than
+ * by load rating. Matched on the dimensions themselves so a new size needs no
+ * code change. */
+const SIZE_CODED = /(\d{3,4})\s*[x×*]\s*(\d{3,4})/i;
+
 function productMeta(name) {
   const n = name.toLowerCase();
+
+  /* Checked BEFORE the load-rated XEON rule below, which would otherwise claim
+     these by the word "xeon" alone and hand them the 15-per-bag / 12-per-box
+     figures of the smaller brackets — wrong on the dispatch slip in a way
+     nobody would spot until a consignment was short. */
+  const dims = SIZE_CODED.exec(name);
+  if (n.includes('xeon') && dims) {
+    const size = dims[1] + ' x ' + dims[2];
+    return {
+      descr: `XEON ${size} mm AC wall mounting bracket set for split AC outdoor units — fits all major brands. High-grade steel with 7-tank powder coating for rust-free life even in humid climates. Sold as a set of 2 arms with complete mounting hardware.`,
+      packing: `Each set: 2 powder-coated arms + nut-bolt hardware kit, strapped together.\nMaster packing: 6 sets per master box, 5-ply corrugated.`,
+      /* One way only, so there is nothing for the dealer to choose and nothing
+         extra to pay — the carton is simply how this size ships. */
+      options: JSON.stringify({ packs: [
+        { id: 'box', label: 'Box packing', master: '6 pcs per master box', add: 0 }
+      ]})
+    };
+  }
+
+  /* Mobile Stand — a small accessory, so a master carton holds fifty. */
+  if (n.includes('mobile stand')) {
+    return {
+      descr: 'Mobile Stand — powder-coated steel stand for mobile handsets and small devices. Stable weighted base, scratch-free contact pads, finished to the same 7-tank standard as the rest of the range.',
+      packing: 'Each stand packed in an individual printed carton.\nMaster packing: 50 pcs per master carton.',
+      options: JSON.stringify({ packs: [
+        { id: 'carton', label: 'Carton packing', master: '50 pcs per master carton', add: 0 }
+      ]})
+    };
+  }
+
   if (n.includes('xeon')) {
     const w = n.includes('2.7') ? '2.7' : n.includes('3.5') ? '3.5' : '3';
     return {
@@ -482,6 +517,31 @@ if (!getSetting('trolleyBundles')) {
       .run(...(untouched ? [JSON.stringify(merged), gen, p.id] : [JSON.stringify(merged), p.id]));
   });
   setSetting('trolleyBundles', '1');
+}
+
+/* One-time: correct any size-coded XEON bracket or Mobile Stand already in the
+ * catalogue.
+ *
+ * Before the rules above existed, a bracket named by frame size matched on the
+ * word "xeon" alone and inherited the 15-per-bag / 12-per-box figures of the
+ * load-rated brackets, and a Mobile Stand matched nothing and carried no master
+ * packing at all. Either way the dispatch slip counted wrongly. Only products
+ * whose stored packing disagrees with the rule are touched. */
+if (!getSetting('masterPackSizeCoded')) {
+  db.prepare('SELECT id,name,options,packing FROM products').all().forEach(p => {
+    const n = String(p.name || '').toLowerCase();
+    const affected = (n.includes('xeon') && SIZE_CODED.test(p.name)) || n.includes('mobile stand');
+    if (!affected) return;
+    const m = productMeta(p.name);
+    if (!m.options || p.options === m.options) return;
+    /* the note is only rewritten where it still matches something the app
+       generated, so an admin's own wording survives */
+    const generated = !p.packing || /master (bag|box|carton|bundle)|pcs per|sets per/i.test(p.packing);
+    db.prepare('UPDATE products SET options=?' + (generated ? ', packing=?' : '') + ' WHERE id=?')
+      .run(...(generated ? [m.options, m.packing, p.id] : [m.options, p.id]));
+    console.log('Master packing corrected for ' + p.name + ' → ' + JSON.parse(m.options).packs[0].master);
+  });
+  setSetting('masterPackSizeCoded', '1');
 }
 
 /* Whether this zone follows the daily live rate, the raw mid-market rate it
@@ -1044,8 +1104,10 @@ app.get('/api/products', (req, res) => {
     offer: dealer ? pubOffer(offer) : null,
     products: rows.map(p => ({
       id: p.id, name: p.name, cat: p.cat, emoji: p.emoji, image: p.image || '', mrp: c(p.mrp), moq: p.moq,
-      descr: p.descr || '', packing: packingForZone(p.packing || '', z),
-      options: p.options ? scaleOptions(p.options, z) : null,
+      descr: p.descr || '', packing: packingForZone(p.packing || '', z, p),
+      /* not gated on p.options: an AC bracket with no packing recorded at all
+         still ships abroad in a carton of six, and the slip has to say so */
+      options: scaleOptions(p.options, z, p),
       ...(dealer ? {
         dealer: c(rateFor(req.user, p, offer)),
         listDealer: c(custom[p.id] !== undefined ? custom[p.id] : p.dealer)
@@ -1072,33 +1134,62 @@ app.get('/api/products', (req, res) => {
 const EXPORT_MASTER_QTY = 6;
 const isExportZone = z => !z || z.code !== DEFAULT_ZONE;
 
-/* Box only, at the export master quantity. India is returned untouched.
- *
- * The carton costs nothing extra abroad. In India the +₹4 / +₹6 buys the dealer
+/* The carton costs nothing extra abroad. In India the +₹4 / +₹6 buys the dealer
  * an upgrade from a gunny bag, so it is a real charge for a real choice. Abroad
  * the carton IS the packing — there is nothing to upgrade from — so an export
  * price is the rupee price converted, and nothing else. */
-function packsForZone(o, z) {
-  if (!o || !Array.isArray(o.packs) || !isExportZone(z)) return o;
-  /* The rule is "no gunny bags abroad". A product that was never offered in a
-     gunny bag has nothing to swap — a trolley goes out in a bundle of six (ten
-     for the XUV 300) in Hyderabad and in Dubai alike, because that is a fact
-     about the product rather than a choice of market. Rewriting every single
-     pack as a six-piece carton would have quietly changed the XUV 300 from ten
-     per bundle to six for export, and relabelled bundles as boxes. */
-  if (!o.packs.some(p => p.id === 'gunny')) return o;
-  const box = o.packs.find(p => p.id === 'box') || o.packs[o.packs.length - 1];
-  if (!box) return { ...o, packs: [] };
-  return { ...o, packs: [{ ...box, master: EXPORT_MASTER_QTY + ' pcs per master box', add: 0 }] };
+
+/* Is this an AC bracket / stand?
+ *
+ * Decided from the category first, so a product filed correctly is caught
+ * whatever it is called, and from the name second, so one filed loosely is
+ * still caught. A Mobile Stand is an accessory rather than a bracket despite
+ * the word "stand", and a trolley is never a bracket — both keep their own
+ * master packing. */
+const isAcBracket = p => {
+  if (!p) return false;
+  const cat = String(p.cat || '').toLowerCase(), nm = String(p.name || '').toLowerCase();
+  if (/mobile/.test(nm)) return false;
+  if (/troll/.test(cat) || /troll/.test(nm)) return false;
+  return /bracket/.test(cat) || /bracket/.test(nm) || /\bac stand\b/.test(nm)
+      || /xeon|titanic/.test(nm);
+};
+
+/* Export packing.
+ *
+ * Every AC bracket leaves India the same way: cartons only, six sets to a
+ * master box, whatever it is called and however it is packed at home. That is
+ * a market rule, so it is applied by category rather than by matching product
+ * names — a bracket added next year is covered without anyone remembering to
+ * come back here.
+ *
+ * Nothing else is touched. A trolley goes out in a bundle of six (ten for the
+ * XUV 300) and a Mobile Stand in a carton of fifty, in Hyderabad and in Dubai
+ * alike, because those are facts about the product rather than choices of
+ * market. Forcing every product to a six-piece carton would quietly have turned
+ * the XUV 300 into six per bundle for export and relabelled bundles as boxes. */
+function packsForZone(o, z, p) {
+  if (!isExportZone(z)) return o;
+  if (!isAcBracket(p)) return o;
+  const packs = (o && Array.isArray(o.packs)) ? o.packs : [];
+  const base = packs.find(k => k.id === 'box') || packs[packs.length - 1] || {};
+  return { ...(o || {}), packs: [{
+    ...base, id: 'box', label: 'Box packing',
+    master: EXPORT_MASTER_QTY + ' pcs per master box', add: 0
+  }] };
 }
 
 /* The prose beside the choice has to say the same thing. The opening line
  * describes what one set contains and is kept as written — including anything
  * the admin has edited; only the per-method lines are replaced. */
-function packingForZone(text, z) {
-  if (!isExportZone(z) || !text) return text || '';
-  const kept = String(text).split('\n')
-    .filter(l => !/^\s*(gunny bag|box)\s+packing\s*:/i.test(l));
+function packingForZone(text, z, p) {
+  /* Only the brackets are standardised abroad, so only their note is rewritten.
+     A trolley's or an accessory's note describes packing that does not change
+     between markets and is left exactly as it is. */
+  if (!isExportZone(z) || !isAcBracket(p)) return text || '';
+  const kept = String(text || '').split('\n')
+    .filter(l => l.trim() && !/^\s*(gunny bag|box)\s+packing\s*:/i.test(l)
+                 && !/^\s*master packing\s*:/i.test(l));
   return kept.concat(
     'Export packing: cartons only — ' + EXPORT_MASTER_QTY +
     ' sets per master box, 5-ply corrugated, strapped and palletised. ' +
@@ -1107,9 +1198,10 @@ function packingForZone(text, z) {
   ).join('\n');
 }
 
-function scaleOptions(json, z) {
-  let o; try { o = JSON.parse(json); } catch (e) { return null; }
-  o = packsForZone(o, z);
+function scaleOptions(json, z, p) {
+  let o = null;
+  if (json) { try { o = JSON.parse(json); } catch (e) { o = null; } }
+  o = packsForZone(o, z, p);
   if (o && Array.isArray(o.packs)) o.packs = o.packs.map(pk => ({ ...pk, add: toZone(pk.add || 0, z) }));
   return o;
 }
@@ -1836,7 +1928,7 @@ app.post('/api/orders', (req, res) => {
        packing — whether from an old app build, a stale cart or a hand-made
        request. Outside India the only entry left is the carton, and that is
        what gets priced and printed on the dispatch slip. */
-    const opts = p.options ? packsForZone(JSON.parse(p.options), z) : null;
+    const opts = packsForZone(p.options ? JSON.parse(p.options) : null, z, p);
     /* Held aside for the dispatch slip: how the goods are packed and how many
        go in a master box. Snapshotted onto the line rather than looked up when
        the slip is printed, because master quantities differ by market and can
@@ -2897,7 +2989,15 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
   const id = uid('p');
   db.prepare('INSERT INTO products(id,name,cat,emoji,mrp,dealer,moq,active,sort) VALUES(?,?,?,?,?,?,?,1,?)')
     .run(id, name, cat, cat.toLowerCase().includes('bracket') ? '' : '', mrp, dealer, Math.max(1, parseInt(b.moq) || 50), sort);
-  res.json({ ok: true, id });
+  /* Give it its description, packing note and master packing straight away.
+     This used to wait for backfillMeta() on the next restart, so a trolley
+     added this morning printed a dash where its bundle count belongs on every
+     slip until someone happened to redeploy. */
+  const m = productMeta(name);
+  if (m.descr || m.packing || m.options)
+    db.prepare('UPDATE products SET descr=?, packing=?, options=? WHERE id=?')
+      .run(m.descr || '', m.packing || '', m.options || '', id);
+  res.json({ ok: true, id, packing: m.packing || '' });
 });
 
 app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
