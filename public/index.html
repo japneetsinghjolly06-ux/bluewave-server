@@ -873,6 +873,11 @@ async function switchCurrency(code){
   await repaintForZone();
 }
 const zoneQuery=()=>{
+  /* The admin console is a rupee console — it manages a catalogue priced in
+     rupees. An admin is not a `user`, so without this they fell through to the
+     guest branch and carried whatever country was last left in this browser
+     into the console, revenue tile and all. */
+  if(state.role==='admin')return '';
   const parts=[];
   /* a signed-in dealer's country comes from their account, never the URL */
   if(!state.user)parts.push('zone='+encodeURIComponent(guestZone()));
@@ -2183,6 +2188,11 @@ function paintRegisterMode(){
 function afterLogin(d){
   token=d.token;localStorage.setItem('bw_token',token);
   state.role=d.role;state.user=d.user||null;
+  /* Signing in changes which zone applies — an admin drops to rupees, a dealer
+     moves to their own country. pay-info carries the currency and tax that
+     every figure on screen is formatted with, so it has to be re-read here or
+     the first screen after sign-in is still drawn in the previous zone. */
+  api('/pay-info'+zoneQuery()).then(p=>{state.payInfo=p;if(p.zone)state.zone=p.zone;renderHeader()}).catch(()=>{});
   refreshProducts().then(()=>{renderHeader();
     refreshNotifs(true);syncPush();nativeAuth();
     if(d.role==='admin'){showView('admin');toast('Welcome, Admin')}

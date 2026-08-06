@@ -483,6 +483,24 @@ function zoneLive(code) {
 }
 const zoneOfUser = u => zoneLive(u && u.country ? u.country : DEFAULT_ZONE);
 
+/* Which zone a request is priced in.
+ *
+ *   a signed-in dealer  their own country, always
+ *   the admin           India, always
+ *   a guest             whichever country they picked
+ *
+ * The admin case is the one that bites. An admin is not a `user`, so they used
+ * to fall through to the guest branch and inherit whatever zone was left in
+ * that browser — sign in after looking at the shop as a Dubai visitor and the
+ * whole console, revenue tile included, switched to dirhams. The catalogue is
+ * kept in rupees and the admin manages it in rupees; there is no version of
+ * this screen that should be quoting AED. */
+function zoneForRequest(req, asked) {
+  if (req.role === 'admin') return zoneLive(DEFAULT_ZONE);
+  if (req.user) return zoneOfUser(req.user);
+  return zoneLive(asked || DEFAULT_ZONE);
+}
+
 /* ---------- quoting a zone in a second currency ----------
  * Every Gulf currency is pegged to the dollar and a great deal of the region's
  * import business is invoiced in dollars, so a dealer there is offered both:
@@ -976,7 +994,7 @@ app.get('/api/products', (req, res) => {
   /* Prices live in INR. A signed-in dealer sees them in their own currency; a
      guest sees the zone they picked, falling back to India. Either may ask for
      the zone's alternate currency instead — USD, across the Gulf. */
-  const z = quoteZone(req.user ? zoneOfUser(req.user) : zoneLive(req.query.zone || DEFAULT_ZONE), req);
+  const z = quoteZone(zoneForRequest(req, req.query.zone), req);
   const c = v => toZone(v, z);
   /* One lookup for this dealer's whole custom price list, instead of two queries
      per product per request. */
@@ -1055,7 +1073,7 @@ const rzpKeys = () => ({ id: getSetting('rzpKeyId') || '', secret: getSetting('r
 const rzpEnabled = () => { const k = rzpKeys(); return !!(k.id && k.secret); };
 
 app.get('/api/pay-info', (req, res) => {
-  const z = quoteZone(req.user ? zoneOfUser(req.user) : zoneLive(req.query.zone || DEFAULT_ZONE), req);
+  const z = quoteZone(zoneForRequest(req, req.query.zone), req);
   res.json({
     payeeName: getSetting('payeeName'),
     bankName: getSetting('bankName'), accountNo: getSetting('accountNo'),
@@ -1761,7 +1779,7 @@ app.post('/api/orders', (req, res) => {
      figure they agreed to and the one their invoice has to show. Across the
      Gulf that is either the local currency or dollars, whichever they were
      looking at when they placed it. */
-  const z = quoteZone(req.user ? zoneOfUser(req.user) : zoneLive(b.zone || DEFAULT_ZONE), req);
+  const z = quoteZone(zoneForRequest(req, b.zone), req);
   const lines = [];
   for (const it of items) {
     const p = db.prepare('SELECT * FROM products WHERE id=? AND active=1').get(String(it.pid));
