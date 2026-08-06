@@ -455,6 +455,9 @@ footer{background:var(--navy);color:#a9c6e2;font-size:12.5px;margin-top:36px}
   .pr-id{display:flex;gap:10px;align-items:center}
   .pr-logo{width:38px;height:38px;flex:0 0 38px;border-radius:9px;background:#0b2a4a;color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
   .pr-brand{font-size:15px;font-weight:800;color:#0b2a4a;line-height:1.2}
+  .pr-logo-img{width:52px;height:52px;flex:0 0 52px;object-fit:contain}
+  .pr-idtext{min-width:0}
+  .pr-gstin{font-size:9.5px;color:#0b2a4a;margin-top:2px}
   .pr-tag{font-size:9.5px;color:#5b6b7a}
   .pr-meta{text-align:right;min-width:190px}
   .pr-title{font-size:14px;font-weight:800;letter-spacing:1.6px;color:#0b2a4a;margin-bottom:4px}
@@ -2909,20 +2912,49 @@ async function editDealer(uid){
     const u=users.find(x=>x.id===uid);
     if(!u)return toast('Dealer not found',1);
     const types=['Dealer','Distributor','Retailer','Contractor'];
+    /* The form follows the dealer's own country: a Dubai dealer has a VAT TRN
+       and a trade licence, not a GSTIN and a pincode, and labelling their
+       fields with Indian names made the admin screen read as though it had
+       filed them wrongly. */
+    /* the admin list, not the public one — a dealer may belong to a country
+       that has since been closed to new sign-ups, and their details still have
+       to be editable */
+    let allZones=state.zones||[];
+    try{allZones=(await api('/admin/zones')).zones||allZones}catch(e){}
+    const z=allZones.find(x=>x.code===(u.country||'IN'))||state.zone||{};
+    const tid=z.taxId, lic=z.licence, pc=z.postcode;
+    const req='<span class="req">*</span>', opt=' <span class="hint">(optional)</span>';
     genModal('Edit dealer details',`
       <div class="msub">Correct anything the dealer entered wrongly at registration. Changes apply to their account immediately.</div>
       <div class="frow"><div><label>Contact person name</label><input id="ed-name" value="${esc(u.name)}"></div>
       <div><label>Business / company name</label><input id="ed-company" value="${esc(u.company)}"></div></div>
-      <div class="frow"><div><label>Mobile number</label><input id="ed-phone" value="${esc(u.phone)}"></div>
+      <div class="frow">
+        <div><label>Country</label><select id="ed-country">
+          ${allZones.map(x=>`<option value="${x.code}"${x.code===(u.country||'IN')?' selected':''}>${esc(x.country)}</option>`).join('')}
+        </select><div class="hint">Changing this switches which tax and address fields apply.</div></div>
+        <div><label>Business type</label><select id="ed-type">${types.map(t=>`<option${t===u.type?' selected':''}>${t}</option>`).join('')}</select></div>
+      </div>
+      <div class="frow"><div><label>Mobile number ${z.dial?`<span class="hint">(+${esc(z.dial)})</span>`:''}</label><input id="ed-phone" value="${esc(u.phone)}"></div>
       <div><label>WhatsApp number</label><input id="ed-wa" value="${esc(u.whatsapp||u.phone)}"></div></div>
       <div><label>Email (login ID)</label><input id="ed-email" value="${esc(u.email)}"></div>
-      <div class="frow"><div><label>GSTIN</label><input id="ed-gstin" value="${esc(u.gstin)}" style="text-transform:uppercase"></div>
-      <div><label>Business type</label><select id="ed-type">${types.map(t=>`<option${t===u.type?' selected':''}>${t}</option>`).join('')}</select></div></div>
+      ${tid?`<div><label>${esc(tid.label)} ${tid.required?req:opt}</label>
+        <input id="ed-gstin" value="${esc(u.gstin||'')}" placeholder="${esc(tid.placeholder||'')}"
+          ${tid.upper?'style="text-transform:uppercase;font-family:Consolas,monospace"':''}>
+        <div class="hint">${esc(tid.hint||'')}</div></div>`
+      :`<input id="ed-gstin" type="hidden" value="">`}
+      ${lic?`<div><label>${esc(lic.label)} ${lic.required?req:opt}</label>
+        <input id="ed-licence" value="${esc(u.licence||'')}" placeholder="${esc(lic.placeholder||'')}"
+          ${lic.upper?'style="text-transform:uppercase"':''}>
+        <div class="hint">${esc(lic.hint||'')}</div></div>`:''}
       <div><label>Address</label><input id="ed-addr" value="${esc(u.addr||'')}"></div>
       <div class="frow"><div><label>City</label><input id="ed-city" value="${esc(u.city||'')}"></div>
-      <div><label>State</label><input id="ed-state" value="${esc(u.state||'')}"></div></div>
-      <div><label>Pincode</label><input id="ed-pin" value="${esc(u.pincode||'')}" maxlength="6"></div>
-      <div class="hint">Verify the corrected GSTIN on the <a href="https://services.gst.gov.in/services/searchtp" target="_blank">GST portal</a> before saving.</div>
+      <div><label>${esc(z.regionLabel||'State')}</label><input id="ed-state" value="${esc(u.state||'')}"></div></div>
+      ${pc?`<div><label>${esc(pc.label)} ${pc.required?req:opt}</label>
+        <input id="ed-pin" value="${esc(u.pincode||'')}" placeholder="${esc(pc.hint||'')}"></div>`
+      :`<input id="ed-pin" type="hidden" value="">`}
+      <div class="hint">${(u.country||'IN')==='IN'
+        ? 'Verify the corrected GSTIN on the <a href="https://services.gst.gov.in/services/searchtp" target="_blank">GST portal</a> before saving.'
+        : 'Check the '+esc(tid?tid.label:'tax number')+' and licence against the documents the dealer sent before saving.'}</div>
       <button class="wide blue" onclick="saveDealerEdit('${uid}')">Save corrections</button>
       <button class="wide ghost" onclick="closeModal('modal-gen')">Cancel</button>`);
   }catch(e){toast(e.message,1)}
@@ -2931,7 +2963,9 @@ async function saveDealerEdit(uid){
   const g=id=>($(id)?$(id).value.trim():'');
   const body={name:g('ed-name'),company:g('ed-company'),phone:g('ed-phone'),whatsapp:g('ed-wa'),
     email:g('ed-email'),gstin:g('ed-gstin').toUpperCase(),type:g('ed-type'),
-    addr:g('ed-addr'),city:g('ed-city'),state:g('ed-state'),pincode:g('ed-pin')};
+    addr:g('ed-addr'),city:g('ed-city'),state:g('ed-state'),pincode:g('ed-pin'),
+    ...($('ed-country')?{country:g('ed-country')}:{}),
+    ...($('ed-licence')?{licence:g('ed-licence')}:{})};
   if(!body.name||!body.company)return toast('Name and company are required',1);
   try{await api('/admin/users/'+uid,'PUT',body);closeModal('modal-gen');toast('Dealer details corrected');renderAdmin('regs')}
   catch(e){toast(e.message,1)}
@@ -3179,16 +3213,25 @@ function printSlip(o){
   const local=o.dispatchMode==='local';
   const day=x=>x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
   const row=(k,v)=>v?`<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`:'';
+  /* The letterhead. Anything left blank in Admin → Settings → Company details
+     is simply left out rather than printed as an empty line. */
+  const co=(s.company)||{name:s.payeeName||'HPMP Manufacturers Pvt Ltd',phone:s.whatsapp||''};
+  const addrLine=[co.address,co.city,[co.state,co.pincode].filter(Boolean).join(' - ')]
+    .filter(Boolean).join(', ');
+  const contactLine=[co.phone,co.email,co.website].filter(Boolean).join('  ·  ');
 
   $('printArea').innerHTML=`
   <div class="pr-doc">
     <div class="pr-head">
       <div class="pr-id">
-        <div class="pr-logo">BW</div>
-        <div>
-          <div class="pr-brand">${esc(s.payeeName||'HPMP Manufacturers Pvt Ltd')}</div>
+        ${co.logo?`<img class="pr-logo-img" src="${co.logo}" alt="">`
+                 :`<div class="pr-logo">BW</div>`}
+        <div class="pr-idtext">
+          <div class="pr-brand">${esc(co.name||'HPMP Manufacturers Pvt Ltd')}</div>
           <div class="pr-tag">Blue Wave &middot; AC mounting brackets &amp; appliance trolleys</div>
-          ${s.whatsapp?`<div class="pr-tag">${esc(s.whatsapp)}</div>`:''}
+          ${addrLine?`<div class="pr-tag">${esc(addrLine)}</div>`:''}
+          ${contactLine?`<div class="pr-tag">${esc(contactLine)}</div>`:''}
+          ${co.gstin?`<div class="pr-gstin">GSTIN <b>${esc(co.gstin)}</b>${co.cin?` &middot; CIN ${esc(co.cin)}`:''}</div>`:''}
         </div>
       </div>
       <div class="pr-meta">
@@ -3338,6 +3381,9 @@ function printDocument(inner){
   .pr-logo{width:38px;height:38px;flex:0 0 38px;border-radius:9px;background:#0b2a4a;color:#fff;
            font-weight:800;font-size:15px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center}
   .pr-brand{font-size:15px;font-weight:800;color:#0b2a4a;line-height:1.2}
+  .pr-logo-img{width:52px;height:52px;flex:0 0 52px;object-fit:contain}
+  .pr-idtext{min-width:0}
+  .pr-gstin{font-size:9.5px;color:#0b2a4a;margin-top:2px}
   .pr-tag{font-size:9.5px;color:#5b6b7a}
   .pr-meta{text-align:right;min-width:190px}
   .pr-title{font-size:14px;font-weight:800;letter-spacing:1.6px;color:#0b2a4a;margin-bottom:4px}
@@ -3737,7 +3783,56 @@ async function delTransport(id){
 async function renderSettings(){
   const s=await api('/admin/settings');
   window.__settings=s;
-  $('adminBody').innerHTML=`<div class="cardbox"><h3>Payment details (shown to customers at checkout)</h3>
+  const co=s.company||{};
+  $('adminBody').innerHTML=`<div class="cardbox"><h3>Company details</h3>
+    <div class="hint" style="margin-bottom:10px">Your own business, as it appears on the letterhead of every
+      dispatch slip and order copy. Fill this in once — the print layout picks it up everywhere.</div>
+    <div class="frow" style="align-items:flex-start">
+      <div>
+        <label>Brand logo</label>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div id="co-logo-box" style="width:76px;height:76px;border:1px solid var(--line);border-radius:10px;
+               display:flex;align-items:center;justify-content:center;background:#fff;overflow:hidden">
+            ${co.logo?`<img src="${co.logo}" alt="" style="max-width:100%;max-height:100%;object-fit:contain">`
+                     :`<span class="hint" style="text-align:center;font-size:10px">no logo</span>`}
+          </div>
+          <div>
+            <button class="smallbtn gr-btn" onclick="$('coLogoFile').click()">Upload logo</button>
+            <button class="smallbtn gr-btn" onclick="useBlueWaveLogo()">Use Blue Wave logo</button>
+            ${co.logo?`<button class="smallbtn no-btn" onclick="clearCompanyLogo()">Remove</button>`:''}
+            <input type="file" id="coLogoFile" accept="image/*" style="display:none" onchange="pickCompanyLogo(this)">
+            <div class="hint" style="margin-top:4px">PNG or JPG, square works best. Stored inside the app so it
+              prints from the phone as well as the browser.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label>Registered / legal name</label><input id="co-name" value="${esc(co.name||'')}" placeholder="HPMP Manufacturers Pvt Ltd">
+        <label style="margin-top:8px">GSTIN</label>
+        <input id="co-gstin" value="${esc(co.gstin||'')}" placeholder="36ABCDE1234F1Z5" maxlength="15"
+               style="text-transform:uppercase;font-family:Consolas,monospace">
+        <div class="hint">Printed on every slip — a customer's accounts team looks for this.</div>
+      </div>
+    </div>
+    <label>Address</label>
+    <textarea id="co-addr" rows="2" placeholder="Plot 12, Industrial Estate, Balanagar">${esc(co.address||'')}</textarea>
+    <div class="frow">
+      <div><label>City</label><input id="co-city" value="${esc(co.city||'')}" placeholder="Hyderabad"></div>
+      <div><label>State</label><input id="co-state" value="${esc(co.state||'')}" placeholder="Telangana"></div>
+    </div>
+    <div class="frow">
+      <div><label>Pincode</label><input id="co-pin" value="${esc(co.pincode||'')}" placeholder="500037" maxlength="6"></div>
+      <div><label>Phone</label><input id="co-phone" value="${esc(co.phone||'')}" placeholder="+91 79952 65800"></div>
+    </div>
+    <div class="frow">
+      <div><label>Email</label><input id="co-email" value="${esc(co.email||'')}" placeholder="sales@hpmpmanufacturerspvtltd.com"></div>
+      <div><label>Website (optional)</label><input id="co-web" value="${esc(co.website||'')}" placeholder="www.hpmpmanufacturerspvtltd.com"></div>
+    </div>
+    <div><label>CIN (optional)</label><input id="co-cin" value="${esc(co.cin||'')}" placeholder="U28999TG2019PTC000000"></div>
+    <button class="wide blue" style="max-width:260px;margin-top:12px" onclick="saveSettings()">Save company details</button>
+    <button class="wide ghost" style="max-width:260px" onclick="previewSlip()">Preview a dispatch slip</button>
+  </div>
+  <div class="cardbox"><h3>Payment details (shown to customers at checkout)</h3>
     <div class="frow">
       <div><label>Payee / account name</label><input id="st-payee" value="${esc(s.payeeName)}"></div>
       <div><label>WhatsApp number</label><input id="st-wa2" value="${esc(s.whatsapp)}" disabled style="display:none"></div>
@@ -4043,9 +4138,85 @@ async function smsLog(){
       :`<div class="empty">Nothing sent yet.</div><button class="wide ghost" onclick="closeModal('modal-gen')">Close</button>`);
   }catch(e){toast(e.message,1)}
 }
+/* ---- company logo ----
+   Held as a data URL rather than a file path: the dispatch slip is printed
+   from inside the phone apps too, where it is handed to the OS as a
+   self-contained document with no server to fetch an image from. */
+let pendingLogo=null;                       // set only while an unsaved pick is on screen
+function showLogo(dataUrl){
+  const box=$('co-logo-box');if(!box)return;
+  box.innerHTML=dataUrl?`<img src="${dataUrl}" alt="" style="max-width:100%;max-height:100%;object-fit:contain">`
+                       :'<span class="hint" style="text-align:center;font-size:10px">no logo</span>';
+}
+function pickCompanyLogo(input){
+  const f=input.files&&input.files[0];if(!f)return;
+  if(f.size>700000)return toast('That image is a bit large — please use one under 700 KB',1);
+  const r=new FileReader();
+  r.onload=()=>{pendingLogo=String(r.result);showLogo(pendingLogo);toast('Logo ready — press Save company details')};
+  r.onerror=()=>toast('Could not read that image',1);
+  r.readAsDataURL(f);
+  input.value='';
+}
+/* Inlines the logo that ships with the app, so the slip has a mark on it
+   without anyone having to find an image file first. */
+async function useBlueWaveLogo(){
+  try{
+    const r=await fetch('/icons/logo.png');
+    const b=await r.blob();
+    pendingLogo=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result));fr.onerror=rej;fr.readAsDataURL(b)});
+    showLogo(pendingLogo);toast('Blue Wave logo ready — press Save company details');
+  }catch(e){toast('Could not load the bundled logo',1)}
+}
+function clearCompanyLogo(){pendingLogo='';showLogo('');toast('Logo removed — press Save company details')}
+
+/* Shows the admin what a slip actually looks like, using their own details and
+   a made-up order, so the letterhead can be checked without printing one. */
+async function previewSlip(){
+  try{
+    await saveSettings(true);
+    state.payInfo=await api('/pay-info'+zoneQuery());
+    const orders=await api('/admin/orders');
+    let o=orders[0];
+    if(!o){
+      const p=(state.products||[])[0]||{id:'x',name:'XEON AC Bracket (3 Kg)'};
+      o={id:'BW-SAMPLE',createdAt:new Date().toISOString(),status:'shipped',tier:'dealer',
+        currency:'INR',symbol:'₹',decimals:2,locale:'en-IN',taxLabel:'GST',taxPercent:18,
+        taxIdLabel:'GSTIN',payRef:'UTR 000000000000',addr:'Shop 4, Begum Bazaar\nHyderabad - 500012',
+        notes:'Sample slip — no such order exists.',
+        contact:{company:'Sample Traders',name:'Customer Name',phone:'9876543210',gstin:'36ABCDE1234F1Z5'},
+        dispatchMode:'outstation',dispatchTransport:'Your transporter',lrNumber:'LR-000000',
+        items:[{product:p.name,name:p.name,qty:60,rate:1299,packLabel:'Box packing',
+                master:'12 pcs per master box',perBox:12}],
+        total:77940,gst:11889.15};
+    }
+    printSlip(o);
+    genModal('Dispatch slip preview',
+      `<div class="hint" style="margin-bottom:8px">This is exactly what prints. Close this and press
+         <b>Print</b> on any order to send it to a printer or save it as a PDF.</div>
+       <div style="border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:60vh;background:#fff">
+         <iframe id="slipFrame" style="width:820px;height:1100px;border:0;transform:scale(.72);transform-origin:0 0"></iframe>
+       </div>`);
+    const f=$('slipFrame');
+    f.srcdoc=printDocument($('printArea').innerHTML);
+  }catch(e){toast(e.message,1)}
+}
+
 async function saveSettings(quiet){
   try{
     await api('/admin/settings','PUT',{
+      ...($('co-name')?{
+        coName:$('co-name').value.trim(),
+        coGstin:$('co-gstin').value.trim().toUpperCase(),
+        coAddress:$('co-addr').value.trim(),
+        coCity:$('co-city').value.trim(),
+        coState:$('co-state').value.trim(),
+        coPincode:$('co-pin').value.trim(),
+        coPhone:$('co-phone').value.trim(),
+        coEmail:$('co-email').value.trim(),
+        coWebsite:$('co-web').value.trim(),
+        coCin:$('co-cin').value.trim()
+      }:{}),
+      ...(pendingLogo!==null?{coLogo:pendingLogo}:{}),
       ...($('st-smsprov')?{smsProvider:$('st-smsprov').value}:{}),
       ...($('st-smtphost')?{smtpHost:$('st-smtphost').value.trim()}:{}),
       ...($('st-smtpport')?{smtpPort:$('st-smtpport').value.trim()}:{}),
@@ -4077,6 +4248,7 @@ async function saveSettings(quiet){
       ...($('st-gstkey').value.trim()?{gstApiKey:$('st-gstkey').value.trim()}:{}),
       ...($('st-apass').value?{adminPassword:$('st-apass').value}:{})
     });
+    pendingLogo=null;
     state.payInfo=await api('/pay-info'+zoneQuery());if(state.payInfo&&state.payInfo.zone)state.zone=state.payInfo.zone;
     if(!quiet)toast('Settings saved');
   }catch(e){toast(e.message,1)}

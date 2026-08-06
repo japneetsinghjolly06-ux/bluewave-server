@@ -911,6 +911,25 @@ const fmtMoney = (n, z) => {
 };
 const pubNotif = n => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, orderId: n.order_id || '', createdAt: n.created_at, read: !!n.read_at });
 
+/* ---------- the company's own details ----------
+ * Who HPMP is, as it has to appear on a dispatch slip: legal name, address, the
+ * GSTIN a customer's accounts team will look for, and a logo. Held in settings
+ * rather than hard-coded, so the branding can be corrected without a deploy —
+ * and so the same build serves a second company if it ever needs to.
+ */
+const COMPANY_FIELDS = ['coName', 'coGstin', 'coCin', 'coAddress', 'coCity',
+  'coState', 'coPincode', 'coPhone', 'coEmail', 'coWebsite'];
+const companyDetails = () => {
+  const g = k => getSetting(k) || '';
+  return {
+    name: g('coName') || getSetting('payeeName') || 'HPMP Manufacturers Pvt Ltd',
+    gstin: g('coGstin'), cin: g('coCin'),
+    address: g('coAddress'), city: g('coCity'), state: g('coState'), pincode: g('coPincode'),
+    phone: g('coPhone') || getSetting('whatsapp') || '', email: g('coEmail'),
+    website: g('coWebsite'), logo: g('coLogo')
+  };
+};
+
 const app = express();
 /* Railway and Render both sit behind a proxy, so the forwarded header is what
  * carries the caller's real address into the rate limiters. */
@@ -1045,6 +1064,7 @@ app.get('/api/pay-info', (req, res) => {
        zone-aware pair the current client reads. */
     gstPercent: z.taxPercent, taxPercent: z.taxPercent, taxLabel: z.taxLabel,
     zone: pubZone(z),
+    company: companyDetails(),
     /* Razorpay settles in INR only, so it is offered to Indian dealers alone. */
     razorpay: { enabled: rzpEnabled() && z.code === 'IN', keyId: (rzpEnabled() && z.code === 'IN') ? rzpKeys().id : '' },
     smsProvider: ss('smsProvider') || '', mailReady: mailReady()
@@ -3008,6 +3028,7 @@ app.get('/api/admin/settings', requireAdmin, (req, res) => {
     payeeName: getSetting('payeeName'), bankName: getSetting('bankName'),
     accountNo: getSetting('accountNo'), ifsc: getSetting('ifsc'), whatsapp: getSetting('whatsapp'),
     adminEmail: getSetting('adminEmail'), gstPercent: gstPercent(),
+    company: companyDetails(),
     defaultAdminPassword: usingDefaultAdminPassword(),
     rzpKeyId: getSetting('rzpKeyId') || '', rzpSecretSet: !!getSetting('rzpKeySecret'),
     gstApiKeySet: !!getSetting('gstApiKey'),
@@ -3031,8 +3052,13 @@ app.put('/api/admin/settings', requireAdmin, (req, res) => {
   for (const k of ['payeeName', 'bankName', 'accountNo', 'ifsc', 'whatsapp', 'adminEmail', 'rzpKeyId',
     'remProvider', 'remAuto', 'remBefore', 'remOnDue', 'remAfter', 'remHour', 'remTz', 'remTemplate', 'waPhoneId', 'smsSender',
     'smsProvider', 'smsRoute', 'smsTemplateId', 'twilioSid', 'twilioFrom',
-    'smtpHost', 'smtpPort', 'smtpUser', 'smtpFrom', 'smtpFromName'])
+    'smtpHost', 'smtpPort', 'smtpUser', 'smtpFrom', 'smtpFromName',
+    /* the company's own details, as they appear on a dispatch slip or invoice */
+    ...COMPANY_FIELDS])
     if (b[k] !== undefined) setSetting(k, String(b[k]).trim());
+  /* The logo is a data URL and can be several hundred KB, so it is set only
+     when one is actually sent, and cleared explicitly. */
+  if (b.coLogo !== undefined) setSetting('coLogo', String(b.coLogo).slice(0, 800000));
   for (const k of ['waToken', 'smsKey', 'twilioToken', 'smtpPass'])
     if (b[k] !== undefined && String(b[k]).trim() !== '') setSetting(k, String(b[k]).trim());
   if (b.gstPercent !== undefined) { const g = parseFloat(b.gstPercent); if (isFinite(g) && g >= 0 && g <= 100) setSetting('gstPercent', g); }
